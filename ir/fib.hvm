@@ -1,0 +1,9 @@
+// naive fib, hand written IR
+@fib = (?((#0 @fib1) r) r)
+@fib1 = (?((#1 @fib2) r) r)
+@fib2 = ({q0 q1} r)
+  & q0 ~ $(+ #1 a)
+  & @fib ~ (a fa)
+  & @fib ~ (q1 fb)
+  & fa ~ $(+ fb r)
+@main = r & @fib ~ (#15 r)
