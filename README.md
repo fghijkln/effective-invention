@@ -32,7 +32,7 @@ randomised schedules, mutation testing and benchmarks. Local repo only, never pu
 ```bash
 bash ../cpu128/tb/setup_toolchain.sh && source ~/env.sh      # rootless Verilator (same as TACHYON-128)
 export PYTHONPATH=.
-python3 -c "from omega import lang; print(lang.compile_source(open('programs/fib.olm').read().replace('N','10')))"
+python3 -c "from omega import progs, lang, semantic; print(lang.compile_source(progs.source('fib', 10))); print(semantic.result(progs.book('fib', 10))['readback'])"
 python3 tests/test_units.py --rtl        # directed rule tests on semantic + fabric + RTL 1x1/2x2/4x4
 python3 tests/test_programs.py --fuzz 150
 python3 tests/fuzz_rtl.py 0 600          # random nets, random meshes, random schedules
@@ -75,8 +75,8 @@ def main = tsum(gen(N))
 | directed rule/unit tests (`tests/test_units.py --rtl`) | **35 / 35** | every rule of the rule table (25 hand-written nets with expected normal form *and* interaction count) + 9 frontend programs (closures, Church numerals, Ackermann, mutual recursion, `match`) + IR round trip. Each net runs on the semantic model (random, LIFO, FIFO order), the fabric model and the RTL on 1×1, 2×2, 4×4 with jitter/stalls and scattered loading |
 | program tests (`tests/test_programs.py --fuzz 150`) | **268 / 268** | 9 programs × N = 0..5 (semantic), each program on the fabric model and on RTL 1×1/2×2/4×4 × 2 schedules, a performance bound (tree sum 4×4 ≥ 3× 1×1), and 150 random (program, N, mesh incl. 3×2 and 1×4, seed, jitter, stall, priority, scatter) cases |
 | RTL differential fuzz, small nets (`tests/fuzz_rtl.py 0 600`) | **600 / 600** | random books (all node kinds, 3 DUP labels, all 16 operators with both flip bits, SWI, REF DAGs) on 1×1, 2×2, 4×4, 3×2, 1×4 with random arbitration seed, link jitter (0–63%), engine stalls, message/task priority and random scatter of `@main` over the cells. Readback, interaction count and live node count must equal the semantic model's (165 diverging nets rejected) |
-| RTL differential fuzz, big nets (`--big`) | **FUZZBIG** | 3–8 definitions, 20–60 nodes each, ≥ 30 interactions |
-| mutation testing (`tests/mutants.py`) | **MUTS** | 15 functional mutants of the rule logic / protocol / quiescence + 1 performance mutant (no work distribution, caught by the speed-up bound). Two mutants (eraser reaches only aux1; REF~DUP expands instead of copying) produce the *right* answer and are caught only by the node count / interaction count. That is why all three observables are compared |
+| RTL differential fuzz, big nets (`--big`) | **200 / 200** | 3–8 definitions, 20–60 nodes each, deeper trees, more references; only nets with ≥ 30 interactions are kept (avg 375, max 16,239 interactions; 4,088 candidates rejected as diverging or trivial) |
+| mutation testing (`tests/mutants.py`) | **16 / 16 caught** | 15 functional mutants of the rule logic / protocol / quiescence + 1 performance mutant (no work distribution, caught by the speed-up bound). Two mutants (eraser reaches only aux1; REF~DUP expands instead of copying) produce the *right* answer and are caught only by the node count / interaction count. That is why all three observables are compared |
 
 Strong confluence is the test oracle. Any schedule (arbitration, delays, stalls, task/message priority,
 initial placement) must produce exactly the same normal form, the same number of interactions and the
@@ -84,24 +84,61 @@ same number of live nodes. The fuzzers vary all of these on every run.
 
 ### Benchmarks (Verilator RTL, cycle accurate, 1024 node + 1024 var slots per cell)
 
-BENCHTABLE
+| program | mesh | ok | interactions | cycles | speed-up vs 1x1 | interactions/cycle | cell utilisation | LINK msgs | NODE msgs | SPAWN msgs | msgs/interaction | busiest / idlest cell (interactions) | peak nodes / vars in one cell |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
+| fib(20) | 1x1 | yes | 295,525 | 1,565,188 | 1.00x | 0.189 | 100% | 0 | 0 | 0 | 0.00 | 295,525 / 295,525 | 69 / 108 |
+| fib(20) | 2x2 | yes | 295,525 | 392,241 | 3.99x | 0.753 | 100% | 254 | 76 | 76 | 0.00 | 73,958 / 73,806 | 65 / 101 |
+| fib(20) | 4x4 | yes | 295,525 | 114,293 | 13.69x | 2.586 | 89% | 21,652 | 5,912 | 5,912 | 0.11 | 21,320 / 14,869 | 64 / 114 |
+| fib(20) | 8x8 | yes | 295,525 | 60,948 | 25.68x | 4.849 | 44% | 56,424 | 15,324 | 15,324 | 0.29 | 11,275 / 557 | 65 / 113 |
+| treesum_direct(14) | 1x1 | yes | 245,750 | 1,228,750 | 1.00x | 0.200 | 100% | 0 | 0 | 0 | 0.00 | 245,750 / 245,750 | 32 / 75 |
+| treesum_direct(14) | 2x2 | yes | 245,750 | 308,061 | 3.99x | 0.798 | 100% | 337 | 85 | 85 | 0.00 | 61,468 / 61,407 | 32 / 75 |
+| treesum_direct(14) | 4x4 | yes | 245,750 | 78,479 | 15.66x | 3.131 | 99% | 3,215 | 769 | 769 | 0.02 | 15,588 / 15,166 | 31 / 84 |
+| treesum_direct(14) | 8x8 | yes | 245,750 | 32,044 | 38.35x | 7.669 | 66% | 47,366 | 11,092 | 11,092 | 0.28 | 6,272 / 1,123 | 32 / 95 |
+| treesum(9) | 1x1* | yes | 18,410 | 120,174 | 1.00x | 0.153 | 100% | 0 | 0 | 0 | 0.00 | 18,410 / 18,410 | 1032 / 1563 |
+| treesum(9) | 2x2 | yes | 18,410 | 32,107 | 3.74x | 0.573 | 97% | 1,449 | 547 | 197 | 0.12 | 4,625 / 4,538 | 264 / 413 |
+| treesum(9) | 4x4 | yes | 18,410 | 9,058 | 13.27x | 2.032 | 89% | 3,277 | 1,208 | 499 | 0.27 | 1,245 / 1,022 | 152 / 238 |
+| treesum(9) | 8x8 | yes | 18,410 | 6,830 | 17.60x | 2.695 | 35% | 11,275 | 3,952 | 2,014 | 0.94 | 911 / 31 | 123 / 188 |
+| qsort(40) | 1x1 | yes | 13,855 | 95,149 | 1.00x | 0.146 | 100% | 0 | 0 | 0 | 0.00 | 13,855 / 13,855 | 408 / 745 |
+| qsort(40) | 2x2 | yes | 13,855 | 31,259 | 3.04x | 0.443 | 87% | 4,847 | 1,857 | 339 | 0.51 | 3,496 / 3,418 | 228 / 392 |
+| qsort(40) | 4x4 | yes | 13,855 | 19,021 | 5.00x | 0.728 | 44% | 13,276 | 4,879 | 1,515 | 1.42 | 982 / 677 | 91 / 134 |
+| qsort(40) | 8x8 | yes | 13,855 | 17,083 | 5.57x | 0.811 | 13% | 15,378 | 5,624 | 1,860 | 1.65 | 396 / 52 | 45 / 72 |
+| list(120) | 1x1* | yes | 6,269 | 42,760 | 1.00x | 0.147 | 100% | 0 | 0 | 0 | 0.00 | 6,269 / 6,269 | 966 / 1691 |
+| list(120) | 2x2 | yes | 6,269 | 18,486 | 2.31x | 0.339 | 74% | 4,181 | 1,538 | 401 | 0.98 | 1,601 / 1,532 | 108 / 159 |
+| list(120) | 4x4 | yes | 6,269 | 15,171 | 2.82x | 0.413 | 26% | 7,105 | 2,561 | 876 | 1.68 | 477 / 230 | 48 / 76 |
+| list(120) | 8x8 | yes | 6,269 | 14,306 | 2.99x | 0.438 | 7% | 7,427 | 2,671 | 940 | 1.76 | 234 / 35 | 26 / 37 |
+| sum(1000) | 1x1 | yes | 13,008 | 65,041 | 1.00x | 0.200 | 100% | 0 | 0 | 0 | 0.00 | 13,008 / 13,008 | 1007 / 1009 |
+| sum(1000) | 2x2 | yes | 13,008 | 63,170 | 1.03x | 0.206 | 35% | 8,001 | 3,001 | 2,001 | 1.00 | 4,006 / 2,500 | 503 / 504 |
+| sum(1000) | 4x4 | yes | 13,008 | 64,089 | 1.01x | 0.203 | 9% | 8,359 | 3,001 | 2,001 | 1.03 | 1,184 / 500 | 144 / 144 |
+| sum(1000) | 8x8 | yes | 13,008 | 64,319 | 1.01x | 0.202 | 2% | 8,451 | 3,001 | 2,001 | 1.03 | 312 / 115 | 41 / 41 |
+| fact(12) | 1x1 | yes | 164 | 821 | 1.00x | 0.200 | 100% | 0 | 0 | 0 | 0.00 | 164 / 164 | 19 / 21 |
+| fact(12) | 2x2 | yes | 164 | 798 | 1.03x | 0.206 | 35% | 97 | 37 | 25 | 0.97 | 54 / 27 | 10 / 11 |
+| fact(12) | 4x4 | yes | 164 | 824 | 1.00x | 0.199 | 9% | 105 | 37 | 25 | 1.02 | 30 / 0 | 7 / 7 |
+| fact(12) | 8x8 | yes | 164 | 824 | 1.00x | 0.199 | 2% | 105 | 37 | 25 | 1.02 | 30 / 0 | 7 / 7 |
 
 `*` = the program does not fit in one 1024-slot cell (a 512-leaf tree or a 120-element Scott list
 needs > 1024 vars). The sequential baseline is therefore a single cell with 4096 slots. Speed-up is
 cycles(1 cell) / cycles(W×H).
 
 Observations:
-* **Parallel recursion scales.** Direct tree sum (2¹⁴ leaves) reaches 3.99× on 4 cells, 15.7× on 16
-  and 38× on 64. fib(20) reaches 3.99× / 13.7× / 25.7×. Up to 4×4, cell utilisation stays at 89–100%.
-* **Sequential programs do not scale, and should not.** sum(1000) and fact(12) are a single dependency
-  chain: ≈1.0× on every mesh. Lists are dominated by the sequential producer, and `list` gains nothing.
-  qsort gains 5×, limited by the sequential partition passes. tree build+sum gains less than direct
-  tree sum because building the tree is serial at the top.
-* **Message traffic is low.** Demand-driven spawning keeps it at ≈0.002–0.11 messages per interaction
-  up to 4×4 for the parallel programs. An earlier round-robin push policy needed ≈0.5 and could
-  exhaust a 2×2 fabric's memory.
-* **Cost per interaction.** One cell does 1 interaction per ≈5.3 cycles (IDLE pick + LINK + pushes +
-  var links). A `link` through a var is the dominant cost, at about 1.5 per interaction.
+* **Parallel recursion scales.**
+
+  | program | 2×2 (4 cells) | 4×4 (16 cells) | 8×8 (64 cells) |
+  |---|---:|---:|---:|
+  | direct tree sum (2¹⁴ leaves) | 3.99× | 15.7× (99% utilisation) | 38× |
+  | fib(20) | 3.99× | 13.7× | 25.7× |
+  | tree build + sum (2⁹ leaves) | 3.7× | 13.3× | 17.6× |
+
+  At 8×8 the parallel work no longer fills the mesh: utilisation is 35–66%, and the cells far from
+  cell (0,0) get work late.
+* **Sequential programs do not scale, and should not.**
+  * sum(1000) and fact(12) are a single dependency chain: ≈1.0× on every mesh.
+  * qsort(40) reaches 5×, limited by the sequential partition passes and append.
+  * list map + sum reaches 3×, from producer/consumer pipelining.
+* **Message traffic is low.** For the parallel programs it stays at 0.00–0.27 messages per
+  interaction up to 4×4. Demand-driven spawning keeps work local until a neighbour is hungry. The
+  earlier round-robin push policy needed ≈0.5 and could exhaust a 2×2 fabric's memory.
+* **Cost per interaction.** One cell does 1 interaction per 5–6.5 cycles (IDLE pick + LINK + pushes +
+  var links). The var `link` is the dominant cost, at ≈1.5–2.5 per interaction.
 
 ### Comparison with TACHYON-128 (same algorithm: naive recursive fib(20))
 
@@ -186,4 +223,13 @@ What this comparison does and does not say:
 
 ## Commits
 
-COMMITS
+* `9322771` stage 0: port encoding, text IR, semantic reducer
+* `6d68b69` stage 1: cycle-level fabric model (cells, mesh routers, LINK/NODE/SPAWN protocol, retry back-pressure, loader image)
+* `cb05aa5` stage 2: Omega-lang frontend (lambda + numbers + recursion + Scott data, arm lifting) and program suite
+* `fc3d68d` stage 3+4: SystemVerilog RTL (active memory cell, 5-port mesh router, W x H mesh), Verilator TB, Python harness; programs pass on 1x1/2x2/4x4
+* `2a4c82c` stage 5a: random net generator, RTL differential fuzz (600/600), directed unit tests (35/35 incl. RTL), mutation knobs + harness
+* `759fc50` stage 5b: mutation testing 16/16 caught, SPEC.md, program tests, bench script
+* `7be478c` frontend: only lift arms that can reduce (value arms inline) - fixes unexpanded REF results at N=0; program tests 268/268
+* `18e4ce5` demand-driven spawn (hungry side-band wires between neighbours) replaces round-robin push: 100x fewer messages, no OOM livelock; per-cell peak occupancy counters; run_all.sh
+* `9cccae8` full regression on demand-driven spawn RTL: units 35/35, programs 268/268, fuzz 600/600 + big 200/200, mutants 16/16; README draft
+* (HEAD) benchmarks with demand-driven spawn, README/SPEC final
