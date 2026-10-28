@@ -112,7 +112,7 @@ module omega_router #(
         logic push, pop;
         push = go[4];
         pop = ej_pop && ejc != 0;
-        if (push) ejq[ejh + AW'(ejc)] <= hf[sel[4]];
+        if (push) ejq[AW'(ejh + AW'(ejc))] <= hf[sel[4]];
         if (pop) ejh <= ejh + 1'b1;
         ejc <= ejc + (AW+1)'(push) - (AW+1)'(pop);
       end

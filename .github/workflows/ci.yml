@@ -20,4 +20,6 @@ jobs:
           path: /tmp/omega_build
           key: vbuild-${{ hashFiles('rtl/**', 'tb/**') }}
       - name: Quick regression
+        env:
+          PYTHONUNBUFFERED: "1"
         run: bash tests/ci_quick.sh

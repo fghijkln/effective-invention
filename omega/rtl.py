@@ -9,7 +9,7 @@ RTL = ["rtl/omega_router.sv", "rtl/omega_cell.sv", "rtl/omega_mesh.sv"]
 HDRS = ["rtl/omega_defs.svh", "rtl/omega_funcs.svh"]
 RDXSZ = 2048
 BUILD = os.environ.get("OMEGA_BUILD", "/tmp/omega_build")
-ENV_SH = os.path.expanduser("~/env.sh")
+ENV_SH = os.environ.get("OMEGA_ENV_SH", os.path.expanduser("~/env.sh"))
 
 
 def _env():

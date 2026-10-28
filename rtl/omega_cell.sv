@@ -698,7 +698,7 @@ module omega_cell #(
         logic pop;
         pop = l_pop && ob_cnt != 0;
         if (snd) begin
-          ob[ob_hd + OB'(ob_cnt)] <= sf;
+          ob[OB'(ob_hd + OB'(ob_cnt))] <= sf;
           case (sf.kind) M_LINK: st_msg0 <= st_msg0 + 1; M_NODE, M_PULL: st_msg1 <= st_msg1 + 1; default: st_msg2 <= st_msg2 + 1; endcase
         end
         if (pop) ob_hd <= ob_hd + 1'b1;
