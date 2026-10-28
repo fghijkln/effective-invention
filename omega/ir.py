@@ -9,11 +9,14 @@
           | {a b} | {3 a b}       DUP with label 0 / label 3
           | $(+ a r) | $(+' a r)  OPR (s=0 / s=1): principal = operand, a = other operand, r = result
           | ?(a r)       SWI: principal = number, a = (zero_case succ_case), r = result
+          | !var(x,y,s) | !con(x,y,s) | !dup(x,y,s) ...
+                         ABSOLUTE pointer (forged address, not relocated on expansion).  Only an
+                         attack/test program writes these; the ABS flag is port bit 39 in templates.
 """
 import re
 from .ports import *
 
-TOK = re.compile(r"\s*(?:(//[^\n]*)|(\$\()|(\?\()|([(){}*=&~])|(#-?\d+)|(@[A-Za-z_][\w.]*)|(\d+)|([A-Za-z_][\w.]*)|(\S))")
+TOK = re.compile(r"\s*(?:(//[^\n]*)|(![a-z]+\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\))|(\$\()|(\?\()|([(){}*=&~])|(#-?\d+)|(@[A-Za-z_][\w.]*)|(\d+)|([A-Za-z_][\w.]*)|(\S))")
 
 
 class Tree:
@@ -58,6 +61,12 @@ class Parser:
 
     def tree(self):
         tok = self.next()
+        if tok.startswith("!"):
+            m = re.match(r"!([a-z]+)\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)", tok)
+            t = {"var": VAR, "con": CON, "dup": DUP, "opr": OPR, "swi": SWI}.get(m.group(1))
+            if t is None:
+                raise SyntaxError(f"bad absolute pointer {tok!r}")
+            return Tree(ABS, label=t, val=addr(int(m.group(2)), int(m.group(3)), int(m.group(4))))
         if tok == "*":
             return Tree(ERA)
         if tok.startswith("#"):
@@ -150,6 +159,7 @@ def parse_book(src):
 
         def flat(t):
             if t.kind == ERA: return ERA_P
+            if t.kind == ABS: return mk(t.label, 0, t.val) | ABS_BIT
             if t.kind == NUM: return num(t.val)
             if t.kind == REF:
                 if t.name not in book.ids:
@@ -181,6 +191,9 @@ def parse_book(src):
 def def_to_text(book, d):
     def show(p):
         t = tag(p)
+        if p & ABS_BIT:
+            a = payload(p); x, y = addr_xy(a)
+            return f"!{TAG_NAMES[t].lower()}({x},{y},{addr_slot(a)})"
         if t == ERA: return "*"
         if t == NUM: return f"#{payload(p)}"
         if t == REF: return "@" + book.defs[label(p)].name
@@ -197,3 +210,30 @@ def def_to_text(book, d):
     for a, b in d.redexes:
         s += f"\n  & {show(a)} ~ {show(b)}"
     return s
+
+
+def merge_books(books, prefixes=None):
+    """Combine several programs (tenants) into one book with a shared ROM.  Definitions of book k
+    are renamed `<prefix_k>.<name>`; returns (book, [main id of each tenant]).  A tenant's own
+    @main is also kept as its entry point; there is no 'main' in the merged book unless k == 0 is
+    renamed to plain names (prefix '')."""
+    prefixes = prefixes or [f"t{k}" for k in range(len(books))]
+    out = Book()
+    mains = []
+    for b, pre in zip(books, prefixes):
+        base = len(out.defs)
+        for d in b.defs:
+            nd = Def(f"{pre}.{d.name}" if pre else d.name)
+
+            def rl(p):
+                return mk(REF, label(p) + base) | (p & ((0xF << 40) | ABS_BIT)) if tag(p) == REF else p
+            nd.nodes = [(tp, rl(a), rl(c)) for tp, a, c in d.nodes]
+            nd.nvars = d.nvars
+            nd.root = rl(d.root)
+            nd.redexes = [(rl(a), rl(c)) for a, c in d.redexes]
+            if nd.name in out.ids:
+                raise SyntaxError(f"duplicate definition @{nd.name}")
+            out.ids[nd.name] = len(out.defs)
+            out.defs.append(nd)
+        mains.append(base + b.id("main"))
+    return out, mains

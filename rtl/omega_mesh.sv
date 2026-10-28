@@ -9,6 +9,7 @@ module omega_mesh import omega_pkg::*; #(
   input  logic        clk, rst,
   input  logic [31:0] seed,
   input  logic [7:0]  jitter, stall, pmsg,
+  input  logic [7:0]  fi,
   input  logic        dump,
   output logic        all_ready,
   output logic        all_idle,
@@ -33,7 +34,7 @@ module omega_mesh import omega_pkg::*; #(
     for (genvar y = 0; y < H; y++) begin : gy
       omega_cell #(.X(x), .Y(y), .W(W), .H(H), .SLOTS(SLOTS), .QDEPTH(QDEPTH), .ROMSZ(ROMSZ),
                    .DIRSZ(DIRSZ), .DEPTH(DEPTH), .MUT(MUT)) u_cell (
-        .clk, .rst, .seed, .jitter, .stall, .pmsg,
+        .clk, .rst, .seed, .jitter, .stall, .pmsg, .fi,
         .in_v(iv[x][y]), .in_f(inf[x][y]), .in_rdy(irdy[x][y]),
         .out_v(ov[x][y]), .out_f(of[x][y]), .out_rdy(ordy[x][y]),
         .idle(cidle[x][y]), .hungry(chung[x][y]), .nbr_hungry(nhung[x][y]), .ready(crdy[x][y]), .err(cerr[x][y]), .dump, .st_inter(cint[x][y]));

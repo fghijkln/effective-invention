@@ -56,8 +56,9 @@ serialisation is what turns HVM2's atomic swap into a plain local read-modify-wr
 ```
 [63:60] tag     0 NONE  1 VAR  2 REF  3 ERA  4 NUM  5 CON  6 DUP  7 OPR  8 SWI
 [59:44] label   DUP label | OPR {s[4], op[3:0]} | REF definition id
-[43:40] owner   reserved for the owner-capability demo (always 0 in the MVP, see Known gaps)
-[39:32] 0
+[43:40] owner   owner capability id of the tenant the port belongs to (0..14; §12)
+[39]    ABS     template-only flag: absolute (forged) pointer, not relocated on expansion (§12)
+[38:32] 0
 [31:0]  payload NUM: value.  VAR / node tags: address {x[23:20], y[19:16], slot[11:0]}
 ```
 Up to 16×16 cells and 4096 slots per cell. The RTL default is SLOTS = 1024.
@@ -176,6 +177,7 @@ Correctness argument (also checked by fuzzing):
   for work.
 * **Task stack.** Depth-first (LIFO) order keeps live memory small (HVM2 uses per-thread stacks for the
   same reason). Retry tasks (`K_SPAWN`, re-queued `LINK`) reuse it.
+* **Owner tags.** `nown[SLOTS]` and `vown[SLOTS]` (4 bits each) next to the node and var RAMs; see §12.
 * **Rule execution.** Reading both nodes, applying the rule, writing up to four node slots and
   launching the first resulting link take one cycle. Every further link costs one PUSH cycle, and is
   later popped as a task. The first link is processed immediately (tail-call), with no push.
@@ -243,7 +245,7 @@ AND tree with a pipelined tree or a Dijkstra–Safra token ring. Both preserve t
 (probability/256 that a link holds a flit for a cycle), `stall` (probability/256 that an idle engine
 skips a cycle) and `pmsg` (message vs. task priority) give the RTL a different interleaving on every
 run. Strong confluence makes any difference in the three observables a bug. `MUT` (256-bit parameter)
-injects the 16 mutations listed in `tests/mutants.py`.
+injects the 22 mutations listed in `tests/mutants.py` (16–21: owner-capability checks).
 
 ## 10. Frontend (`omega/lang.py`)
 
@@ -261,3 +263,56 @@ types, 32-bit arithmetic and global recursive `def`s.
 ## 11. Known gaps (MVP)
 
 See README.md, "Known gaps".
+
+## 12. Owner-capability isolation (multi-tenant fabric)
+
+Several mutually distrusting programs (*tenants*) can share one fabric. Each tenant has an owner id
+0..14 (15 = `OWN_FREE`, the tag of a free slot).
+
+**Tags.** Every node slot and var slot carries a 4-bit shadow owner tag (`nown`, `vown`). The loader
+tags every slot of tenant *k*'s image with its owner, and stamps the owner field `[43:40]` of every
+*capability* port (VAR, REF, CON, DUP, OPR, SWI) it holds. NUM and ERA are values, not capabilities,
+and always carry owner 0. Tenant *k*'s root var is cell (0,0), var slot *k*.
+
+**Inheritance.** Every port and slot a rewrite creates takes the owner of the redex (the owner of its
+capability side). An EXPAND stamps the owner of the REF port onto every port and slot it instantiates
+(the ROM is shared by all tenants and its owner bits are ignored), one node write and one var-tag
+write per cycle, i.e. `max(nn, nv)` cycles. Freeing a slot sets its tag to `OWN_FREE`. A program
+therefore cannot choose the owner of any port; it can only forge the *address* bits (the `!var(x,y,s)`
+IR atom, i.e. an `ABS` template port, models a program that fabricates a pointer).
+
+**Checks (traps).** Checked in this order, in every model, at the cell that performs the access:
+
+| trap | code | condition | where |
+|---|---|---|---|
+| CROSS | 1 | `link(a, b)` where a and b are both capabilities with different owners | every LINK step (sender before a LINK message leaves, receiver again on arrival); on NODE arrival (node vs partner) and SPAWN arrival (REF vs partner) |
+| OOB | 3 | a VAR or node pointer outside the fabric: `x >= W`, `y >= H`, `slot >= SLOTS`, or non-zero address padding bits | before any local access *and* before a message is sent (so nothing is ever routed off the mesh) |
+| FORGED | 2 | the owner tag of the addressed slot differs from the port's owner (includes free slots, tag 15) | var exchange at the var's home cell; node read (redex) at the node's home cell |
+
+A trapped operation is **dropped** before it reads or writes anything: the victim's state is never
+touched and no interaction is counted. The cell records the trap: a counter, the first trap's
+`(reason, owner, address)` (the address names cell and slot), and a 48-bit mask of every
+`(reason, owner)` pair seen; the testbench dumps them per cell. The offending owner's own graph may
+be left incomplete; other tenants are unaffected. A CROSS trap blames the lower of the two owner ids.
+
+**Why this is sound.** Owners come only from the loader and from stamping, never from program data.
+Every write to a slot (var exchange, node creation, NODE re-homing) happens after T1/T2 (or creates a
+slot tagged with the redex owner), so by induction every capability port stored in a tenant's slot
+carries that tenant's owner, and any port with the right owner but a foreign address hits T2 or T3.
+Strong confluence is preserved per tenant: tenants share no slots, so the honest tenants' normal forms,
+live node counts and the total interaction count are schedule independent, and the set of
+`(reason, owner)` traps is too (each dropped operation is dropped in every schedule).
+
+**Fault injection.** The `fi[0]` knob makes the *sender* skip T1 whenever the access would leave the
+cell, to show that the receiver-side checks (LINK, NODE, SPAWN arrival) and the slot tags still stop a
+corrupted port that a faulty loader/DMA injected (tests re-stamp one of the attacker's initial ports
+with the victim's owner). Under `fi` a corrupted access may be reported as FORGED rather than CROSS
+and may count one REF expansion before the trap.
+
+**Tests.** `tests/test_security.py`: two- and four-tenant program demos (each tenant gets its known
+answer, zero traps), attacks (overwrite or capture the victim's result through a forged root-var
+pointer, out-of-bounds slot / cell, forged node pointer to the victim's result node, an attack hidden
+in a lazily expanded definition), the CROSS fault-injection cases with `fi` = 0 and 1, and a
+multi-tenant random fuzz (2–4 random tenants with random owners, half of the cases with an attacker
+carrying random forged redexes, random mesh, schedule knobs, scatter and `fi`). Mutants 16–21
+disable each check in turn.

@@ -61,7 +61,7 @@ def _readhex(path, n):
 
 
 def run(book, W, H, seed=1, jitter=0, stall=0, pmsg=128, slots=1024, qdepth=1024, romsz=4096,
-        mut=0, maxcycles=20_000_000, keep=None, img=None, timeout=600):
+        mut=0, maxcycles=20_000_000, keep=None, img=None, timeout=600, fi=0):
     exe = build(W, H, slots, qdepth, romsz, mut)
     img = img or fabric.Image(book, W, H, slots, qdepth)
     if len(img.rom) > romsz or len(img.dir) > 256:
@@ -70,19 +70,20 @@ def run(book, W, H, seed=1, jitter=0, stall=0, pmsg=128, slots=1024, qdepth=1024
     try:
         img.write_hex(tmp)
         r = subprocess.run([exe, f"+img={tmp}", f"+seed={seed}", f"+jitter={jitter}", f"+stall={stall}",
-                            f"+pmsg={pmsg}", f"+maxcycles={maxcycles}"], capture_output=True, text=True, timeout=timeout)
+                            f"+pmsg={pmsg}", f"+maxcycles={maxcycles}", f"+fi={fi}"], capture_output=True, text=True, timeout=timeout)
         res = {}
         for line in r.stdout.splitlines():
             k, _, v = line.partition(" ")
             if v.strip().lstrip("-").isdigit(): res[k] = int(v)
         if "status" not in res:
             raise RuntimeError("simulator crashed: " + r.stdout[-2000:] + r.stderr[-2000:])
-        nodes, vars_, cells = {}, {}, {}
+        nodes, vars_, cells, nown = {}, {}, {}, {}
         for x in range(W):
             for y in range(H):
                 nm = _readhex(f"{tmp}/out_node_{x}_{y}.hex", slots)
                 na = _readhex(f"{tmp}/out_nalloc_{x}_{y}.hex", slots)
                 vm = _readhex(f"{tmp}/out_var_{x}_{y}.hex", slots)
+                nown[(x, y)] = _readhex(f"{tmp}/out_nown_{x}_{y}.hex", slots)
                 nodes[(x, y)] = [[w & M64, w >> 64] if a else None for w, a in zip(nm, na)]
                 vars_[(x, y)] = vm
                 st = {}
@@ -95,11 +96,27 @@ def run(book, W, H, seed=1, jitter=0, stall=0, pmsg=128, slots=1024, qdepth=1024
         res["node_count"] = sum(sum(e is not None for e in t) for t in nodes.values())
         if res["status"] == 0:
             try:
-                res["readback"] = fabric.readback_dump(book, nodes, vars_)
-            except fabric.FabricError as e:
+                res["readback"] = fabric.readback_dump(book, nodes, vars_, img.root)
+            except Exception as e:
                 res["readback"] = f"ERROR {e}"
         else:
             res["readback"] = f"STATUS {res['status']} err {res.get('err')}"
+        # owner capabilities: per-tenant results and the (reason, owner) trap set
+        res["tenants"] = []
+        for k, t in enumerate(img.tenants):
+            if res["status"] == 0:
+                try:
+                    rb = fabric.readback_dump(book, nodes, vars_, img.roots[k])
+                except Exception as e:
+                    rb = f"ERROR {type(e).__name__}"
+            else:
+                rb = res["readback"]
+            res["tenants"].append({"owner": t["owner"], "readback": rb,
+                                   "nodes": sum(1 for c in nodes for s, e in enumerate(nodes[c])
+                                                if e is not None and nown[c][s] == t["owner"])})
+        res["traps"] = sorted({(b // 16 + 1, b % 16) for c in cells.values() for b in range(48) if c.get("trap_mask", 0) >> b & 1})
+        res["trap_count"] = sum(c.get("traps", 0) for c in cells.values())
+        res["trap_first"] = {k: (c["trap_reason"], c["trap_owner"], c["trap_addr"]) for k, c in cells.items() if c.get("traps")}
         res["msgs"] = {k: sum(c[k] for c in cells.values()) for k in ("msg_link", "msg_node", "msg_spawn")}
         busy = [c["busy"] for c in cells.values()]
         res["util"] = sum(busy) / (len(busy) * max(1, res.get("cycles", 1)))

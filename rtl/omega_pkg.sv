@@ -29,6 +29,19 @@ package omega_pkg;
   function automatic logic [63:0] mkp(input logic [3:0] t, input logic [15:0] l, input logic [31:0] v);
     return {t, l, 12'd0, v};
   endfunction
+  // ---- owner capabilities (SPEC 12) ----
+  localparam logic [3:0] OWN_FREE = 4'hF;
+  localparam logic [1:0] TR_CROSS = 2'd1, TR_FORGED = 2'd2, TR_OOB = 2'd3;
+  function automatic logic [3:0] pown(input logic [63:0] p); return p[43:40]; endfunction
+  function automatic logic is_cap(input logic [63:0] p);
+    return p[63:60] == T_VAR || p[63:60] == T_REF || is_node(p);
+  endfunction
+  function automatic logic [63:0] mkpo(input logic [3:0] t, input logic [15:0] l, input logic [3:0] o, input logic [31:0] v);
+    return {t, l, o, 8'd0, v};
+  endfunction
+  function automatic logic [63:0] withown(input logic [63:0] p, input logic [3:0] o);
+    return {p[63:44], o, p[39:0]};
+  endfunction
   function automatic logic [63:0] withpay(input logic [63:0] p, input logic [31:0] v);
     return {p[63:32], v};
   endfunction

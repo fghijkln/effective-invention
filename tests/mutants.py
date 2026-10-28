@@ -23,6 +23,12 @@ MUTANTS = {
     13: "REF ~ DUP expands instead of copying the reference",
     14: "commutation: two fresh wires share one var",
     15: "quiescence detection ignores in-flight router flits",
+    16: "security: var slot owner-tag check disabled (forged VAR pointers accepted)",
+    17: "security: cross-owner (T1) check disabled",
+    18: "security: out-of-bounds pointer check disabled",
+    19: "security: expansion does not stamp the tenant's owner (ROM owner 0 leaks into tenants)",
+    20: "security: forged-var trap is recorded but the access is not blocked",
+    21: "security: node slot owner-tag check disabled",
 }
 PROGS = [("fib", 8), ("list", 6), ("sort", 6), ("higher", 5), ("fact", 5), ("treesum", 4), ("qsort", 5), ("sum", 20)]
 
@@ -31,8 +37,26 @@ def same(r, ref):
     return r["status"] == 0 and (r["readback"], r["interactions"], r["node_count"]) == (ref["readback"], ref["interactions"], ref["nodes"])
 
 
+def try_security(mut):
+    import test_security as ts
+    cases = [(n, b, t, w, None) for n, b, t, w in ts.demo_cases()] + ts.attack_cases() + ts.cross_cases()
+    for j, (name, b, t, want, reasons) in enumerate(cases):
+        for (W, H) in ((2, 2), (1, 1)):
+            for fi in (0, 1):
+                try:
+                    ok, ref, r = ts.check(name, b, t, W, H, True, seed=j + 1, jitter=30 * fi, scatter=(j if fi and W > 1 and "result node" not in name else None),
+                                          fi=fi, mut=mut, want=want, honest=([0] if reasons else None), verbose=False)
+                except Exception as e:
+                    return True, f"{name} {W}x{H}: simulator error {str(e)[:80]}"
+                if not ok:
+                    return True, f"{name} on {W}x{H} fi={fi}: honest result / trap set differs (rtl traps {r and r['traps']}, semantic {ref['traps']})"
+    return False, f"survived {len(cases)} security cases"
+
+
 def try_mutant(bit):
     mut = 1 << bit
+    if bit >= 16:
+        return try_security(mut)
     if bit == 7:
         b = progs.book("treesum_direct", 8)
         c1 = rtl.run(b, 1, 1, mut=mut)["cycles"]

@@ -6,9 +6,11 @@ and no instruction stream**. A program is a graph (an interaction net). The mach
 active pairs it holds. Cells cooperate only by passing messages to their four neighbours. The result is
 the normal-form graph left in the cells' RAMs.
 
-Status: **MVP**. It has a semantic golden model, a cycle-level fabric model, a frontend for a small
-functional language, SystemVerilog RTL (Verilator) for 1×1 to 8×8 meshes, differential fuzzing under
-randomised schedules, mutation testing and benchmarks. Local repo only, never pushed.
+Status: **MVP+**. It has a semantic golden model, a cycle-level fabric model, a frontend for a small
+functional language, SystemVerilog RTL (Verilator) for 1×1 to 8×8 meshes, owner-capability isolation
+for several mutually distrusting programs on one fabric, differential fuzzing under randomised
+schedules, mutation testing and benchmarks. Repository: https://github.com/fghijkln/effective-invention
+(CI: `.github/workflows/ci.yml` runs `tests/ci_quick.sh` on every push).
 
 * Specification: [SPEC.md](SPEC.md) (model, encodings, rule table, message protocol, cell
   microarchitecture, back-pressure, termination).
@@ -37,7 +39,8 @@ python3 tests/test_units.py --rtl        # directed rule tests on semantic + fab
 python3 tests/test_programs.py --fuzz 150
 python3 tests/fuzz_rtl.py 0 600          # random nets, random meshes, random schedules
 python3 tests/fuzz_rtl.py 0 200 --big
-python3 tests/mutants.py                 # 16 RTL mutants
+python3 tests/test_security.py --fuzz 300   # owner-capability isolation (multi-tenant)
+python3 tests/mutants.py                 # 22 RTL mutants
 python3 bench/bench.py --8x8             # results/bench.md
 bash tests/run_all.sh                    # everything except the benchmarks
 ```
@@ -64,6 +67,7 @@ def main = tsum(gen(N))
 | `rtl/omega_pkg.sv` `omega_router.sv` `omega_cell.sv` `omega_mesh.sv` | RTL: encodings; 5-port XY router; cell (RAMs, shadow tags, free stacks, task stack, ROM, rewrite FSM); W×H mesh |
 | `tb/tb_mesh.cpp` | testbench: reset, run to quiescence, dump |
 | `programs/*.olm` | fib, sum, fact, list map/sum, tree build+sum, direct tree sum, insertion sort, quicksort, higher-order |
+| `tests/test_security.py` | owner-capability isolation: multi-tenant demos, attacks, fault injection, multi-tenant fuzz |
 | `tests/` `bench/` `results/` | test suites, benchmarks, logs |
 
 ## Results
@@ -76,7 +80,8 @@ def main = tsum(gen(N))
 | program tests (`tests/test_programs.py --fuzz 150`) | **268 / 268** | 9 programs × N = 0..5 (semantic), each program on the fabric model and on RTL 1×1/2×2/4×4 × 2 schedules, a performance bound (tree sum 4×4 ≥ 3× 1×1), and 150 random (program, N, mesh incl. 3×2 and 1×4, seed, jitter, stall, priority, scatter) cases |
 | RTL differential fuzz, small nets (`tests/fuzz_rtl.py 0 600`) | **600 / 600** | random books (all node kinds, 3 DUP labels, all 16 operators with both flip bits, SWI, REF DAGs) on 1×1, 2×2, 4×4, 3×2, 1×4 with random arbitration seed, link jitter (0–63%), engine stalls, message/task priority and random scatter of `@main` over the cells. Readback, interaction count and live node count must equal the semantic model's (165 diverging nets rejected) |
 | RTL differential fuzz, big nets (`--big`) | **200 / 200** | 3–8 definitions, 20–60 nodes each, deeper trees, more references; only nets with ≥ 30 interactions are kept (avg 375, max 16,239 interactions; 4,088 candidates rejected as diverging or trivial) |
-| mutation testing (`tests/mutants.py`) | **16 / 16 caught** | 15 functional mutants of the rule logic / protocol / quiescence + 1 performance mutant (no work distribution, caught by the speed-up bound). Two mutants (eraser reaches only aux1; REF~DUP expands instead of copying) produce the *right* answer and are caught only by the node count / interaction count. That is why all three observables are compared |
+| owner-capability isolation (`tests/test_security.py --fuzz 300`) | **420 / 420** | 2- and 4-tenant program demos (fib ∥ qsort; treesum ∥ list ∥ sort ∥ higher-order) on 1×1/2×2/4×4/3×2, each tenant gets its known answer with zero traps; 10 attack programs (overwrite / capture the victim's result through a forged root-var pointer, out-of-bounds slot and cell, forged node pointers to the victim's result node, an attack hidden in a lazily expanded definition) and 3 cross-owner fault injections, each with the sender-side check on and off (`fi`); 300 random multi-tenant cases (2–4 random tenants, random owners, half with an attacker carrying random forged redexes). Semantic model, fabric model and RTL must agree on every honest tenant's result and node count, on the trap set and on the interaction count (SPEC §12) |
+| mutation testing (`tests/mutants.py`) | **22 / 22 caught** | 15 functional mutants of the rule logic / protocol / quiescence + 1 performance mutant (no work distribution, caught by the speed-up bound) + 6 security mutants (each owner-capability check disabled, owner stamping missing, trap not blocking). Two mutants (eraser reaches only aux1; REF~DUP expands instead of copying) produce the *right* answer and are caught only by the node count / interaction count. That is why all three observables are compared |
 
 Strong confluence is the test oracle. Any schedule (arbitration, delays, stalls, task/message priority,
 initial placement) must produce exactly the same normal form, the same number of interactions and the
@@ -167,11 +172,13 @@ What this comparison does and does not say:
 
 ## Known gaps
 
-1. **Owner-capability security demo (optional item) is not implemented.** The port format reserves the
-   4-bit owner field `[43:40]`, but no model sets or checks it. The planned design:
-   * a per-slot shadow owner tag on node and var slots, inherited by every node and var a rewrite
-     creates;
-   * a trap when a LINK or NODE message reaches a slot whose owner differs from the incoming port's.
+1. **Owner capabilities: scope.** 15 tenants (4-bit owner, 15 = free). A trapped tenant is not
+   killed or cleaned up: its offending operation is dropped and the rest of its graph may stay in
+   memory (no reclamation of a misbehaving tenant's slots). There is no timing isolation: tenants
+   share cells, routers and memory capacity, so one tenant can slow another or exhaust shared memory.
+   The ROM is shared, so tenants see each other's definitions (they cannot forge an owner, but code is
+   not confidential). Forged pointers to slots the attacker itself owns are not trapped (no isolation
+   issue, but the attacker can corrupt its own graph).
 2. **RAMs are register files.** Node/var RAM, the free stacks and the task stack are reg arrays with
    asynchronous read and up to 4 writes per cycle (the commutation rule). That simulates and is
    synthesisable as flops, but a real cell would use 1R1W SRAM banks and take a few more cycles per
@@ -205,7 +212,6 @@ What this comparison does and does not say:
 
 ## Next steps (suggested)
 
-1. Owner-capability tags and traps (Known gap 1), then two mutually distrusting programs on one fabric.
 2. A banked SRAM cell (1R1W) and yosys/OpenROAD area and Fmax for one cell, giving an area-normalised
    comparison with TACHYON-128.
 3. Cut the cycles per interaction:

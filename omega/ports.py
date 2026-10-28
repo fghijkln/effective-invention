@@ -15,6 +15,12 @@ A *var* occupies one 64-bit var slot holding its substitution (NONE = not yet su
 """
 
 NONE, VAR, REF, ERA, NUM, CON, DUP, OPR, SWI = range(9)
+ABS = 15                 # parser-only tree kind (absolute pointer); never a port tag
+ABS_BIT = 1 << 39        # template-only flag: payload is an absolute address, do not relocate
+OWNER_FREE = 15          # shadow owner tag of a free node/var slot (no tenant may use id 15)
+CAP_TAGS = (VAR, REF, CON, DUP, OPR, SWI)   # ports that are capabilities (carry an owner)
+TRAP_NONE, TRAP_CROSS, TRAP_FORGED, TRAP_OOB = 0, 1, 2, 3
+TRAP_NAMES = ["none", "cross-owner", "forged-tag", "out-of-bounds"]
 TAG_NAMES = ["NONE", "VAR", "REF", "ERA", "NUM", "CON", "DUP", "OPR", "SWI"]
 NODE_TAGS = (CON, DUP, OPR, SWI)
 M32 = 0xFFFFFFFF
@@ -39,6 +45,20 @@ def label(p):
 
 def owner(p):
     return (p >> 40) & 0xF
+
+
+def is_cap(p):
+    return tag(p) in CAP_TAGS
+
+
+def with_owner(p, o):
+    return (p & ~(0xF << 40) & M64) | ((o & 0xF) << 40)
+
+
+def stamp(p, o):
+    """Owner stamping on load / expansion: capabilities get the tenant's owner, atoms get 0."""
+    p &= ~ABS_BIT & M64
+    return with_owner(p, o if is_cap(p) else 0)
 
 
 def payload(p):

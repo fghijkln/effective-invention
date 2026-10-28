@@ -9,15 +9,16 @@ int main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
     auto* m = new Vomega_mesh;
     unsigned long long maxc = 50000000ULL;
-    unsigned seed = 1, jit = 0, stl = 0, pmsg = 128;
+    unsigned seed = 1, jit = 0, stl = 0, pmsg = 128, fi = 0;
     for (int i = 1; i < argc; i++) {
         if (!strncmp(argv[i], "+seed=", 6)) seed = strtoul(argv[i] + 6, 0, 0);
         if (!strncmp(argv[i], "+jitter=", 8)) jit = strtoul(argv[i] + 8, 0, 0);
         if (!strncmp(argv[i], "+stall=", 7)) stl = strtoul(argv[i] + 7, 0, 0);
+        if (!strncmp(argv[i], "+fi=", 4)) fi = strtoul(argv[i] + 4, 0, 0);
         if (!strncmp(argv[i], "+pmsg=", 6)) pmsg = strtoul(argv[i] + 6, 0, 0);
         if (!strncmp(argv[i], "+maxcycles=", 11)) maxc = strtoull(argv[i] + 11, 0, 0);
     }
-    m->seed = seed; m->jitter = jit; m->stall = stl; m->pmsg = pmsg; m->dump = 0;
+    m->seed = seed; m->jitter = jit; m->stall = stl; m->pmsg = pmsg; m->fi = fi; m->dump = 0;
     m->rst = 1; m->clk = 0;
     for (int i = 0; i < 4; i++) { m->clk = 1; m->eval(); m->clk = 0; m->eval(); }
     m->rst = 0;

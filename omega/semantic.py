@@ -14,61 +14,108 @@ class OutOfFuel(Exception):
 
 
 class Net:
-    def __init__(self, book):
+    def __init__(self, book, geometry=None):
         self.book = book
+        self.geometry = geometry   # (W, H, SLOTS) of the fabric being predicted: classifies forged pointers
         self.nodes = {}      # addr -> [aux1, aux2]
         self.vars = {}       # addr -> port (NONE = unsubstituted)
+        self.nown = {}       # addr -> owner tag of the node slot
+        self.vown = {}       # addr -> owner tag of the var slot
+        self.absmap = {}     # fabric address of a tenant root var -> semantic var id
+        self.traps = []      # (reason, owner of the offending port, target address)
         self.next_node = 1
         self.next_var = 1
         self.rdx = []
         self.stats = {"interactions": 0, "anni": 0, "comm": 0, "eras": 0, "oper": 0, "swit": 0, "expand": 0, "copy": 0, "void": 0, "links": 0}
 
     # --- allocation -------------------------------------------------------
-    def alloc_node(self, a1, a2):
+    def alloc_node(self, a1, a2, o=0):
         n = self.next_node; self.next_node += 1
         self.nodes[n] = [a1, a2]
+        self.nown[n] = o
         return n
 
-    def alloc_var(self):
+    def alloc_var(self, o=0):
         v = self.next_var; self.next_var += 1
         self.vars[v] = mk(NONE)
+        self.vown[v] = o
         return v
+
+    # --- owner-capability checks (SPEC 12) ---------------------------------
+    def trap(self, reason, p):
+        self.traps.append((reason, owner(p), payload(p)))
+        self.stats["traps"] = self.stats.get("traps", 0) + 1
+
+    def oob(self, p):
+        """A forged (absolute) pointer outside the fabric geometry."""
+        if not (p & ABS_BIT) or self.geometry is None:
+            return False
+        W, H, S = self.geometry
+        a = payload(p); x, y = addr_xy(a)
+        return x >= W or y >= H or addr_slot(a) >= S or (a & 0xFF00F000) != 0
+
+    def cross(self, a, b):
+        return is_cap(a) and is_cap(b) and owner(a) != owner(b)
 
     # --- linking ----------------------------------------------------------
     def link(self, a, b):
         while True:
             self.stats["links"] += 1
+            if self.cross(a, b):
+                self.trap(TRAP_CROSS, a if owner(a) < owner(b) else b); return
             if not is_var(a):
                 if not is_var(b):
                     self.rdx.append((a, b)); return
                 a, b = b, a
+            if self.oob(a):
+                self.trap(TRAP_OOB, a); return
             v = payload(a)
+            if a & ABS_BIT or self.vown.get(v) != owner(a):
+                self.trap(TRAP_FORGED, a); return
             old = self.vars[v]
             if tag(old) == NONE:
                 self.vars[v] = b; return
             del self.vars[v]
+            del self.vown[v]
             a = old
 
     # --- definitions ------------------------------------------------------
-    def instantiate(self, did, x=None):
+    def instantiate(self, did, x=None, o=0, patch=None):
+        """Expand definition `did` for owner `o` (every capability port is stamped with o)."""
         d = self.book[did]
-        vmap = [self.alloc_var() for _ in range(d.nvars)]
+        vmap = [self.alloc_var(o) for _ in range(d.nvars)]
         nmap = [self.next_node + i for i in range(len(d.nodes))]
         self.next_node += len(d.nodes)
 
         def tr(p):
             t = tag(p)
-            if t == VAR: return mk(VAR, 0, vmap[payload(p)])
-            if t in NODE_TAGS: return with_payload(p, nmap[payload(p)])
-            return p
+            if p & ABS_BIT:
+                if t == VAR and payload(p) in self.absmap:
+                    return mk(VAR, 0, self.absmap[payload(p)], owner=o)
+                return with_owner(p, o)      # forged pointer: keeps its ABS mark, traps when used
+            if t == VAR: return mk(VAR, 0, vmap[payload(p)], owner=o)
+            if t in NODE_TAGS: return with_owner(with_payload(p, nmap[payload(p)]), o)
+            return stamp(p, o)
         for j, (_, a, b) in enumerate(d.nodes):
             self.nodes[nmap[j]] = [tr(a), tr(b)]
+            self.nown[nmap[j]] = o
         root = tr(d.root)
-        if x is not None:
-            self.link(root, x)
-        for a, b in d.redexes:
-            self.link(tr(a), tr(b))
+        links = ([(root, x)] if x is not None else []) + [(tr(a), tr(b)) for a, b in d.redexes]
+        if patch:
+            links = patch(links)
+        for a, b in links:
+            self.link(a, b)
         return root
+
+    def deref(self, p):
+        """Consume the node p points at; returns its aux ports, or None after a trap."""
+        if self.oob(p):
+            self.trap(TRAP_OOB, p); return None
+        n = payload(p)
+        if p & ABS_BIT or self.nown.get(n) != owner(p):
+            self.trap(TRAP_FORGED, p); return None
+        del self.nown[n]
+        return self.nodes.pop(n)
 
     # --- interaction ------------------------------------------------------
     def interact(self, a, b):
@@ -76,13 +123,26 @@ class Net:
         if ta < tb or (ta == tb and label(a) < label(b)):
             a, b, ta, tb = b, a, tb, ta
         st = self.stats
+        o = owner(a) if is_cap(a) else owner(b)
+        # forged / out-of-bounds node pointers trap before anything is consumed or counted.  Only
+        # nodes the rule actually reads are checked (REF ~ CON/OPR/SWI expands without reading).
+        if tb <= NUM and ta > NUM and tb == REF and ta != DUP:
+            chk = ()
+        else:
+            chk = tuple(p for p in (a, b) if is_node(p))
+        for p in chk:
+            if self.oob(p):
+                self.trap(TRAP_OOB, p); return
+        for p in chk:
+            if (p & ABS_BIT) or self.nown.get(payload(p)) != owner(p):
+                self.trap(TRAP_FORGED, p); return
         st["interactions"] += 1
         # both nullary: REF=2 ERA=3 NUM=4
         if ta <= NUM:
             if tb == REF and ta != ERA:
                 # REF ~ NUM / REF ~ REF: expand b (the smaller label for REF~REF)
                 st["expand"] += 1
-                self.instantiate(label(b), a)
+                self.instantiate(label(b), a, owner(b))
             else:
                 st["void"] += 1
             return
@@ -90,13 +150,13 @@ class Net:
             if tb == REF:
                 if ta == DUP:
                     st["copy"] += 1
-                    a1, a2 = self.nodes.pop(payload(a))
+                    a1, a2 = self.deref(a)
                     self.link(a1, b); self.link(a2, b)
                 else:
                     st["expand"] += 1
-                    self.instantiate(label(b), a)
+                    self.instantiate(label(b), a, owner(b))
                 return
-            a1, a2 = self.nodes.pop(payload(a))
+            a1, a2 = self.deref(a)
             if tb == ERA:
                 st["eras"] += 1
                 self.link(a1, ERA_P); self.link(a2, ERA_P); return
@@ -112,29 +172,29 @@ class Net:
                     y = payload(a1)
                     self.link(a2, num(apply_op(op, y, x) if s else apply_op(op, x, y)))
                 else:
-                    m = self.alloc_node(b, a2)
-                    self.link(a1, mk(OPR, op | ((1 - s) << 4), m))
+                    m = self.alloc_node(b, a2, o)
+                    self.link(a1, mk(OPR, op | ((1 - s) << 4), m, owner=o))
                 return
             # SWI
             st["swit"] += 1
             if x == 0:
-                c = self.alloc_node(a2, ERA_P)
-                self.link(a1, mk(CON, 0, c))
+                c = self.alloc_node(a2, ERA_P, o)
+                self.link(a1, mk(CON, 0, c, owner=o))
             else:
-                c1 = self.alloc_node(num(x - 1), a2)
-                c2 = self.alloc_node(ERA_P, mk(CON, 0, c1))
-                self.link(a1, mk(CON, 0, c2))
+                c1 = self.alloc_node(num(x - 1), a2, o)
+                c2 = self.alloc_node(ERA_P, mk(CON, 0, c1, owner=o), o)
+                self.link(a1, mk(CON, 0, c2, owner=o))
             return
         # both binary
-        a1, a2 = self.nodes.pop(payload(a))
-        b1, b2 = self.nodes.pop(payload(b))
+        a1, a2 = self.deref(a)
+        b1, b2 = self.deref(b)
         if ta == tb and label(a) == label(b) and ta in (CON, DUP):
             st["anni"] += 1
             self.link(a1, b1); self.link(a2, b2); return
         st["comm"] += 1
-        x11, x12, x21, x22 = (mk(VAR, 0, self.alloc_var()) for _ in range(4))
-        nb1 = self.alloc_node(x11, x12); nb2 = self.alloc_node(x21, x22)
-        na1 = self.alloc_node(x11, x21); na2 = self.alloc_node(x12, x22)
+        x11, x12, x21, x22 = (mk(VAR, 0, self.alloc_var(o), owner=o) for _ in range(4))
+        nb1 = self.alloc_node(x11, x12, o); nb2 = self.alloc_node(x21, x22, o)
+        na1 = self.alloc_node(x11, x21, o); na2 = self.alloc_node(x12, x22, o)
         self.link(a1, with_payload(b, nb1)); self.link(a2, with_payload(b, nb2))
         self.link(b1, with_payload(a, na1)); self.link(b2, with_payload(a, na2))
 
@@ -214,8 +274,43 @@ def readback(get_node, get_var, root_port, book=None, limit=100000):
 
 
 def readback_net(net, root):
+    try:
+        return _readback_net(net, root)
+    except Exception as e:      # a trapped tenant's graph may hold forged pointers
+        return f"ERROR {type(e).__name__}"
+
+
+def _readback_net(net, root):
     return readback(lambda p: net.nodes[payload(p)], lambda p: net.vars.get(payload(p), mk(NONE)),
                     mk(VAR, 0, root), net.book)
+
+
+def run_multi(book, tenants, seed=None, fuel=10**7, order="random", geometry=None):
+    """Several mutually distrusting programs in one net.  tenants: list of dicts
+    {"owner": o (0..14), "main": definition id, "patch": optional fn(links)->links (fault injection on
+    the initial links)}.  Tenant k's root var is the var the fabric puts at cell (0,0) slot k."""
+    net = Net(book, geometry)
+    roots = []
+    for k, t in enumerate(tenants):
+        assert 0 <= t["owner"] < OWNER_FREE
+        r = net.alloc_var(t["owner"])
+        net.absmap[addr(0, 0, k)] = r
+        roots.append(r)
+    for k, t in enumerate(tenants):
+        net.instantiate(t["main"], mk(VAR, 0, roots[k], owner=t["owner"]), t["owner"], t.get("patch"))
+    net.normalize(seed, fuel, order)
+    return net, roots
+
+
+def result_multi(book, tenants, seed=None, fuel=10**7, order="random", geometry=None):
+    net, roots = run_multi(book, tenants, seed, fuel, order, geometry)
+    per = []
+    for k, t in enumerate(tenants):
+        o = t["owner"]
+        per.append({"owner": o, "readback": readback_net(net, roots[k]),
+                    "nodes": sum(1 for n in net.nown.values() if n == o)})
+    return {"tenants": per, "interactions": net.stats["interactions"], "nodes": len(net.nodes),
+            "traps": sorted(set((r, o) for r, o, _ in net.traps)), "trap_list": list(net.traps)}
 
 
 def result(book, seed=None, fuel=10**7, order="random"):
