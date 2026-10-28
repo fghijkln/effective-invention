@@ -38,7 +38,7 @@ def build(W, H, slots=1024, qdepth=1024, romsz=4096, mut=0, quiet=True):
     cmd = ["verilator", "--cc", "--exe", "--build", "-j", "2", "-O3", "-Wno-fatal", "-Wno-WIDTH", "-Wno-UNUSED",
            "-Wno-MULTIDRIVEN", "--top-module", "omega_mesh", f"-GW={W}", f"-GH={H}", f"-GSLOTS={slots}",
            f"-GQDEPTH={qdepth}", f"-GROMSZ={romsz}", f"-GMUT=256'h{mut:x}", "-Mdir", d, "-o", "vsim",
-           "-CFLAGS", "-O1"] + RTL + ["tb/tb_mesh.cpp"]
+           "-CFLAGS", "-O1"] + [os.path.join(ROOT, f) for f in RTL + ["tb/tb_mesh.cpp"]]
     r = subprocess.run(cmd, cwd=ROOT, env=_ENV, capture_output=True, text=True)
     if r.returncode != 0 or not os.path.exists(exe):
         raise RuntimeError("verilator build failed:\n" + r.stdout[-3000:] + r.stderr[-3000:])
