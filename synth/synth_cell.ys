@@ -1,0 +1,22 @@
+read_verilog -sv -DSYNTHESIS -Irtl rtl/omega_router.sv rtl/omega_cell.sv
+chparam -set X 1 -set Y 1 -set W 4 -set H 4 -set SLOTS 1024 -set QDEPTH 1024 -set ROMSZ 4096 -set DIRSZ 256 omega_cell
+hierarchy -check -top omega_cell
+proc
+opt_expr
+opt_clean
+opt -nodffe -nosdff
+memory -nomap
+opt -full
+wreduce
+peepopt
+alumacc
+share
+opt
+memory -nomap
+opt -fast
+tee -o build/synth_pre.txt stat
+techmap
+opt -fast
+abc
+opt_clean
+tee -o build/synth_stat.txt stat

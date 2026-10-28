@@ -145,6 +145,30 @@ Observations:
 * **Cost per interaction.** One cell does 1 interaction per 5–6.5 cycles (IDLE pick + LINK + pushes +
   var links). The var `link` is the dominant cost, at ≈1.5–2.5 per interaction.
 
+### SRAM-style cell and synthesis (step 2)
+
+The cell's storage is now written as **1R1W synchronous SRAMs** (one write statement and one registered
+read per array): node RAM 1024×132 b (`{owner, aux2, aux1}`), var RAM 1024×68 b (`{owner, port}`),
+the free-node / free-var stacks and the task stack as a small register cache over a 1R1W SRAM, and
+the definition ROM / directory as 1R ROMs with a loader write port. The owner tags moved into the
+RAM words. The same RTL is simulated by Verilator and synthesised by Yosys' native front end (no
+`sv2v`/slang; the RTL uses the SystemVerilog subset both accept: shared `omega_defs.svh`, functions
+included per module).
+
+Yosys 0.70 (yowasp, WebAssembly), generic gates after `techmap; abc`, memories kept as `$mem_v2`
+macros (`synth/synth_cell.ys`, reports in `results/synth/`, GE = NAND2 equivalents from
+`synth/ge.py`, same weights for both designs):
+
+| design | generic cells | flip-flops | GE (logic) | SRAM / ROM macros |
+|---|---:|---:|---:|---|
+| Ω cell v2, 1024 slots (router 1,612 cells) | 92,420 | 4,240 | 147,102 | 7 macros, 886,784 bits (node 135 Kb, var 70 Kb, task stack 133 Kb, free stacks 20 Kb, ROM 524 Kb, dir 4 Kb) |
+| Ω cell v2, 256 slots | 54,403 | 3,152 | 92,741 | 7 macros |
+| TACHYON-128 core v4 (`cpu128/results/synth_stat_abc.txt`) | 129,811 | 8,519 | 217,636 | 3 macros (register file ≈ 26 Kbit) |
+
+Cost of the SRAM discipline: fib(20) on one cell takes 2,605,000 cycles, **8.82 cycles/interaction**
+(v1 register-file cell: 5.30), because every var exchange and node read now waits one cycle for the
+synchronous read. Step 3 below removes that with read-ahead addressing.
+
 ### Comparison with TACHYON-128 (same algorithm: naive recursive fib(20))
 
 | machine | work | cycles | vs TACHYON-128 |
@@ -179,10 +203,10 @@ What this comparison does and does not say:
    The ROM is shared, so tenants see each other's definitions (they cannot forge an owner, but code is
    not confidential). Forged pointers to slots the attacker itself owns are not trapped (no isolation
    issue, but the attacker can corrupt its own graph).
-2. **RAMs are register files.** Node/var RAM, the free stacks and the task stack are reg arrays with
-   asynchronous read and up to 4 writes per cycle (the commutation rule). That simulates and is
-   synthesisable as flops, but a real cell would use 1R1W SRAM banks and take a few more cycles per
-   rewrite. No yosys area numbers yet.
+2. **Synthesis is technology-independent.** Generic-gate cell counts and NAND2 equivalents only; no
+   standard-cell library, no place and route, no timing. Memories are counted in bits, not area.
+   The per-slot `nalloc` valid bits are flip-flops (1 per node slot) and dominate the growth from
+   256 to 1024 slots.
 3. **Out-of-memory handling is detection, not recovery.**
    * Task-stack overflow (`err = 1`) or a 1×1 cell that cannot place an expansion (`err = 2`) halt the
      cell.

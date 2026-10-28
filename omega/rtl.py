@@ -5,7 +5,8 @@ from .ports import *
 from . import fabric
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-RTL = ["rtl/omega_pkg.sv", "rtl/omega_router.sv", "rtl/omega_cell.sv", "rtl/omega_mesh.sv"]
+RTL = ["rtl/omega_router.sv", "rtl/omega_cell.sv", "rtl/omega_mesh.sv"]
+HDRS = ["rtl/omega_defs.svh", "rtl/omega_funcs.svh"]
 BUILD = os.environ.get("OMEGA_BUILD", "/tmp/omega_build")
 ENV_SH = os.path.expanduser("~/env.sh")
 
@@ -36,7 +37,7 @@ def build(W, H, slots=1024, qdepth=1024, romsz=4096, mut=0, quiet=True):
         return exe
     os.makedirs(BUILD, exist_ok=True)
     cmd = ["verilator", "--cc", "--exe", "--build", "-j", "2", "-O3", "-Wno-fatal", "-Wno-WIDTH", "-Wno-UNUSED",
-           "-Wno-MULTIDRIVEN", "--top-module", "omega_mesh", f"-GW={W}", f"-GH={H}", f"-GSLOTS={slots}",
+           "-Wno-MULTIDRIVEN", "-Irtl", "--top-module", "omega_mesh", f"-GW={W}", f"-GH={H}", f"-GSLOTS={slots}",
            f"-GQDEPTH={qdepth}", f"-GROMSZ={romsz}", f"-GMUT=256'h{mut:x}", "-Mdir", d, "-o", "vsim",
            "-CFLAGS", "-O1"] + [os.path.join(ROOT, f) for f in RTL + ["tb/tb_mesh.cpp"]]
     r = subprocess.run(cmd, cwd=ROOT, env=_ENV, capture_output=True, text=True)
@@ -83,9 +84,10 @@ def run(book, W, H, seed=1, jitter=0, stall=0, pmsg=128, slots=1024, qdepth=1024
                 nm = _readhex(f"{tmp}/out_node_{x}_{y}.hex", slots)
                 na = _readhex(f"{tmp}/out_nalloc_{x}_{y}.hex", slots)
                 vm = _readhex(f"{tmp}/out_var_{x}_{y}.hex", slots)
-                nown[(x, y)] = _readhex(f"{tmp}/out_nown_{x}_{y}.hex", slots)
-                nodes[(x, y)] = [[w & M64, w >> 64] if a else None for w, a in zip(nm, na)]
-                vars_[(x, y)] = vm
+                # v2 dump: node word {owner, aux2, aux1}, var word {owner, port}
+                nodes[(x, y)] = [[w & M64, (w >> 64) & M64] if a else None for w, a in zip(nm, na)]
+                vars_[(x, y)] = [w & M64 for w in vm]
+                nown[(x, y)] = [w >> 128 for w in nm]
                 st = {}
                 with open(f"{tmp}/out_stats_{x}_{y}.txt") as f:
                     for line in f:

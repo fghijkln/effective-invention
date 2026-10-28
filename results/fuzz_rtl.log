@@ -1,1 +1,1 @@
-fuzz 0..764: 600/600 pass, 165 rejected (diverging), 53s
+fuzz 0..764: 600/600 pass, 165 rejected (diverging), 63s

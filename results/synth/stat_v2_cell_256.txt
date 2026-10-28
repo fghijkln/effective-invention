@@ -1,0 +1,104 @@
+
+23. Printing statistics.
+
+=== omega_cell ===
+
+        +----------Local Count, excluding submodules.
+        | 
+    45748 wires
+    60121 wire bits
+      151 public wires
+     8969 public wire bits
+       24 ports
+      804 port bits
+    52798 cells
+     2240   $_ANDNOT_
+    11195   $_AND_
+      648   $_DFFE_PN_
+     2282   $_DFFE_PP_
+       32   $_DFF_P_
+    11071   $_MUX_
+    16018   $_NAND_
+      921   $_NOR_
+      300   $_NOT_
+     1970   $_ORNOT_
+     3649   $_OR_
+        8   $_SDFFCE_PN0P_
+       14   $_SDFFCE_PP0P_
+       51   $_SDFFE_PP0P_
+        2   $_SDFFE_PP1P_
+       50   $_SDFF_PP0_
+      962   $_XNOR_
+     1378   $_XOR_
+        7   $mem_v2
+        1 submodules
+        1   $paramod$8fbdfe6a91beeb005859bac4a54d2a2dcba342d8\omega_router
+
+=== $paramod$8fbdfe6a91beeb005859bac4a54d2a2dcba342d8\omega_router ===
+
+        +----------Local Count, excluding submodules.
+        | 
+     1370 wires
+     4081 wire bits
+       30 public wires
+     2027 public wire bits
+       17 ports
+     1127 port bits
+     1612 cells
+      193   $_ANDNOT_
+      309   $_AND_
+        4   $_DFFE_PN_
+        4   $_DFFE_PP_
+       32   $_DFF_P_
+      200   $_MUX_
+      193   $_NAND_
+       78   $_NOR_
+      130   $_NOT_
+       82   $_ORNOT_
+      169   $_OR_
+       10   $_SDFFE_PP0P_
+       15   $_SDFF_PP0_
+      124   $_XNOR_
+       69   $_XOR_
+
+=== design hierarchy ===
+
+        +----------Count including submodules.
+        | 
+    54410 omega_cell
+     1612 $paramod$8fbdfe6a91beeb005859bac4a54d2a2dcba342d8\omega_router
+
+        +----------Count including submodules.
+        | 
+    47118 wires
+    64202 wire bits
+      181 public wires
+    10996 public wire bits
+       41 ports
+     1931 port bits
+        - memories
+        - memory bits
+        - processes
+    54410 cells
+     2433   $_ANDNOT_
+    11504   $_AND_
+      652   $_DFFE_PN_
+     2286   $_DFFE_PP_
+       64   $_DFF_P_
+    11271   $_MUX_
+    16211   $_NAND_
+      999   $_NOR_
+      430   $_NOT_
+     2052   $_ORNOT_
+     3818   $_OR_
+        8   $_SDFFCE_PN0P_
+       14   $_SDFFCE_PP0P_
+       61   $_SDFFE_PP0P_
+        2   $_SDFFE_PP1P_
+       65   $_SDFF_PP0_
+     1086   $_XNOR_
+     1447   $_XOR_
+        7   $mem_v2
+        1 submodules
+        1   $paramod$8fbdfe6a91beeb005859bac4a54d2a2dcba342d8\omega_router
+

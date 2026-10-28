@@ -27,6 +27,9 @@ class FabricError(Exception):
     pass
 
 
+XMAP = 64      # RTL expansion maps: at most 64 nodes and 64 vars per definition
+
+
 # ---------------------------------------------------------------------------------------------
 # Loader: memory image (shared with the RTL testbench)
 # ---------------------------------------------------------------------------------------------
@@ -99,8 +102,9 @@ class Image:
         for dd in book.defs:
             self.dir.append(len(self.rom))
             cnt = len(dd.nodes) | (dd.nvars << 8) | (len(dd.redexes) << 16)
-            if len(dd.nodes) > 255 or dd.nvars > 255 or len(dd.redexes) > 255:
-                raise FabricError(f"definition @{dd.name} too large for one EXPAND")
+            if len(dd.nodes) > XMAP or dd.nvars > XMAP or len(dd.redexes) > 255:
+                raise FabricError(f"definition @{dd.name} too large for one EXPAND "
+                                  f"({len(dd.nodes)} nodes / {dd.nvars} vars, limit {XMAP})")
             self.rom.append((dd.root, cnt))
             for (_, a, b) in dd.nodes:
                 self.rom.append((a, b))
@@ -114,14 +118,14 @@ class Image:
         h = lambda v, w: format(v, "0%dx" % w)
         for (x, y), tab in self.nodes.items():
             with open(f"{outdir}/node_{x}_{y}.hex", "w") as f:
-                for e in tab:
-                    f.write(h(0 if e is None else (e[1] << 64) | e[0], 32) + "\n")
+                for e, o in zip(tab, self.nown[(x, y)]):
+                    f.write(h((o << 128) | (0 if e is None else (e[1] << 64) | e[0]), 33) + "\n")
             with open(f"{outdir}/nalloc_{x}_{y}.hex", "w") as f:
                 for e in tab:
                     f.write("0\n" if e is None else "1\n")
             with open(f"{outdir}/var_{x}_{y}.hex", "w") as f:
-                for e in self.vars[(x, y)]:
-                    f.write(h(0 if e is None else e, 16) + "\n")
+                for e, o in zip(self.vars[(x, y)], self.vown[(x, y)]):
+                    f.write(h((o << 64) | (0 if e is None else e), 17) + "\n")
             with open(f"{outdir}/valloc_{x}_{y}.hex", "w") as f:
                 for e in self.vars[(x, y)]:
                     f.write("0\n" if e is None else "1\n")
