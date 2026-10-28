@@ -33,9 +33,12 @@ MUTANTS = {
     23: "v3 S_WQ: leaves after the first queued write (commutation copies / var tags never written)",
     24: "v3 S_WQ: owner tags of fresh commutation vars not written",
     25: "v3 EXPAND allocation pops one node slot fewer than it maps (slot aliasing)",
-    26: "v3 EXPAND: template ROM read-ahead lags one entry",
+    26: "v3 EXPAND: template pair half select inverted (entry i reads entry i xor 1)",
     27: "memory pressure: roomy neighbours ignored (no PULL / NODE offload, OOM SPAWNs round robin)",
     28: "memory pressure: hungry does not require roomy (a full cell still asks for work)",
+    29: "cluster ROM: arbiter grants more requesters than it has read ports (they get another cell's data)",
+    30: "cluster ROM: EXPAND does not wait for its template pair (proceeds on a missed grant)",
+    31: "cluster ROM: buffered template pair not dropped when a new expansion starts (stale definition)",
 }
 PROGS = [("fib", 8), ("list", 6), ("sort", 6), ("higher", 5), ("fact", 5), ("treesum", 4), ("qsort", 5), ("sum", 20)]
 
@@ -64,7 +67,7 @@ def try_mutant(bit):
     mut = 1 << bit
     if 16 <= bit <= 21:
         return try_security(mut)
-    if bit >= 27:
+    if bit in (27, 28):
         import test_mempress
         n, fails, tag = test_mempress.run_cases(True, mut, verbose=False, quick=True)
         return bool(fails), (f"{tag}: wrong result / timeout" if fails else f"survived {n} memory-pressure cases")

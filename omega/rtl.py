@@ -5,7 +5,7 @@ from .ports import *
 from . import fabric
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-RTL = ["rtl/omega_router.sv", "rtl/omega_cell.sv", "rtl/omega_mesh.sv"]
+RTL = ["rtl/omega_router.sv", "rtl/omega_rom.sv", "rtl/omega_cell.sv", "rtl/omega_mesh.sv"]
 HDRS = ["rtl/omega_defs.svh", "rtl/omega_funcs.svh"]
 RDXSZ = 2048
 BUILD = os.environ.get("OMEGA_BUILD", "/tmp/omega_build")
@@ -26,12 +26,25 @@ def _env():
 _ENV = None
 
 
-def build(W, H, slots=1024, qdepth=1024, romsz=4096, mut=0, quiet=True):
+# cluster ROM configuration (step 7): CW x CH cells share one ROM with RPORTS read ports.
+# Default from the environment (OMEGA_CLUSTER="2x2:1"), else 2x2 with one port.
+def _cluster_default():
+    v = os.environ.get("OMEGA_CLUSTER", "2x2:1")
+    shape, _, ports = v.partition(":")
+    cw, ch = (int(t) for t in shape.split("x"))
+    return cw, ch, int(ports or 1)
+
+
+CLUSTER = _cluster_default()
+
+
+def build(W, H, slots=1024, qdepth=1024, romsz=4096, mut=0, quiet=True, cluster=None):
     global _ENV
     if _ENV is None:
         _ENV = _env()
     src_hash = hashlib.sha1(b"".join(open(os.path.join(ROOT, f), "rb").read() for f in RTL + ["tb/tb_mesh.cpp"])).hexdigest()[:10]
-    name = f"v{W}x{H}_s{slots}_q{qdepth}_r{romsz}_m{mut:x}_{src_hash}"
+    cw, ch, rp = cluster or CLUSTER
+    name = f"v{W}x{H}_s{slots}_q{qdepth}_r{romsz}_m{mut:x}_c{cw}x{ch}p{rp}_{src_hash}"
     d = os.path.join(BUILD, name)
     exe = os.path.join(d, "vsim")
     if os.path.exists(exe):
@@ -39,7 +52,7 @@ def build(W, H, slots=1024, qdepth=1024, romsz=4096, mut=0, quiet=True):
     os.makedirs(BUILD, exist_ok=True)
     cmd = ["verilator", "--cc", "--exe", "--build", "-j", "2", "-O3", "-Wno-fatal", "-Wno-WIDTH", "-Wno-UNUSED",
            "-Wno-MULTIDRIVEN", "-Irtl", "--top-module", "omega_mesh", f"-GW={W}", f"-GH={H}", f"-GSLOTS={slots}",
-           f"-GQDEPTH={qdepth}", f"-GROMSZ={romsz}", f"-GRDXSZ={RDXSZ}", f"-GMUT=256'h{mut:x}", "-Mdir", d, "-o", "vsim",
+           f"-GQDEPTH={qdepth}", f"-GROMSZ={romsz}", f"-GRDXSZ={RDXSZ}", f"-GCW={cw}", f"-GCH={ch}", f"-GRPORTS={rp}", f"-GMUT=256'h{mut:x}", "-Mdir", d, "-o", "vsim",
            "-CFLAGS", "-O1"] + [os.path.join(ROOT, f) for f in RTL + ["tb/tb_mesh.cpp"]]
     r = subprocess.run(cmd, cwd=ROOT, env=_ENV, capture_output=True, text=True)
     if r.returncode != 0 or not os.path.exists(exe):
@@ -63,8 +76,8 @@ def _readhex(path, n):
 
 
 def run(book, W, H, seed=1, jitter=0, stall=0, pmsg=128, slots=1024, qdepth=1024, romsz=4096,
-        mut=0, maxcycles=20_000_000, keep=None, img=None, timeout=600, fi=0):
-    exe = build(W, H, slots, qdepth, romsz, mut)
+        mut=0, maxcycles=20_000_000, keep=None, img=None, timeout=600, fi=0, cluster=None):
+    exe = build(W, H, slots, qdepth, romsz, mut, cluster=cluster)
     img = img or fabric.Image(book, W, H, slots, qdepth)
     if len(img.romn) > romsz or len(img.romr) > RDXSZ or len(img.dir) > 256:
         raise fabric.FabricError("book does not fit the ROM")

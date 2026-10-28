@@ -5,6 +5,8 @@
 module omega_mesh #(
   parameter int W = 2, parameter int H = 2, parameter int SLOTS = 1024, parameter int QDEPTH = 1024,
   parameter int ROMSZ = 4096, parameter int DIRSZ = 256, parameter int DEPTH = 4, parameter int RDXSZ = 2048,
+  parameter int CW = 1, parameter int CH = 1,      // cluster of CW x CH cells shares one definition ROM
+  parameter int RPORTS = 1,                        // read ports of the cluster ROM
   parameter logic [255:0] MUT = '0
 ) (
   input  logic        clk, rst,
@@ -32,6 +34,34 @@ module omega_mesh #(
   logic  crdy [W][H];
   logic [3:0]  cerr [W][H];
   logic [31:0] cint [W][H];
+  logic        rreq [W][H];
+  logic [15:0] ran  [W][H];
+  logic [15:0] rar  [W][H];
+  logic        rgnt [W][H];
+  logic [255:0] rdn [W][H];
+  logic [255:0] rdr [W][H];
+
+  // ---- cluster ROMs: cell (x, y) is member (x % CW) + (y % CH) * CW of cluster (x / CW, y / CH) ----
+  localparam int NCX = (W + CW - 1) / CW, NCY = (H + CH - 1) / CH;
+  for (genvar cx = 0; cx < NCX; cx++) begin : gcx
+    for (genvar cy = 0; cy < NCY; cy++) begin : gcy
+      logic [CW*CH-1:0] req, gnt;
+      logic [CW*CH-1:0][15:0] an, ar;
+      logic [CW*CH-1:0][255:0] dn, dr;
+      for (genvar k = 0; k < CW * CH; k++) begin : gk
+        localparam int XX = cx * CW + k % CW, YY = cy * CH + k / CW;
+        if (XX < W && YY < H) begin : gin
+          assign req[k] = rreq[XX][YY]; assign an[k] = ran[XX][YY]; assign ar[k] = rar[XX][YY];
+          assign rgnt[XX][YY] = gnt[k]; assign rdn[XX][YY] = dn[k]; assign rdr[XX][YY] = dr[k];
+        end else begin : gout
+          assign req[k] = 1'b0; assign an[k] = '0; assign ar[k] = '0;
+        end
+      end
+      omega_rom #(.NC(CW * CH), .NP(RPORTS), .ROMSZ(ROMSZ), .RDXSZ(RDXSZ), .CX(cx), .CY(cy), .MUT(MUT)) u_rom (
+        .clk, .rst, .req, .an, .ar, .gnt, .dn, .dr,
+        .cfg_we(1'b0), .cfg_sel(2'd0), .cfg_a(16'd0), .cfg_d(256'd0));
+    end
+  end
 
   for (genvar x = 0; x < W; x++) begin : gx
     for (genvar y = 0; y < H; y++) begin : gy
@@ -41,6 +71,7 @@ module omega_mesh #(
         .in_v(iv[x][y]), .in_f(inf[x][y]), .in_rdy(irdy[x][y]),
         .out_v(ov[x][y]), .out_f(of[x][y]), .out_rdy(ordy[x][y]),
         .idle(cidle[x][y]), .hungry(chung[x][y]), .nbr_hungry(nhung[x][y]), .roomy(croom[x][y]), .nbr_roomy(nroom[x][y]), .ready(crdy[x][y]), .err(cerr[x][y]), .dump,
+        .rom_req(rreq[x][y]), .rom_an(ran[x][y]), .rom_ar(rar[x][y]), .rom_gnt(rgnt[x][y]), .rom_dn(rdn[x][y]), .rom_dr(rdr[x][y]),
         .cfg_we(1'b0), .cfg_sel(2'd0), .cfg_a(16'd0), .cfg_d(128'd0), .st_inter(cint[x][y]));
       assign nhung[x][y][0] = (y > 0)     ? chung[x][(y > 0) ? y-1 : 0] : 1'b0;
       assign nhung[x][y][1] = (x < W - 1) ? chung[(x < W - 1) ? x+1 : x][y] : 1'b0;

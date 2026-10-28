@@ -64,7 +64,7 @@ def main = tsum(gen(N))
 | `omega/lang.py` | Ω-lang frontend (λ, numbers, `let`, `if`, `switch`, `match`, Scott `data`, recursion; arm lifting) |
 | `omega/randnet.py` | random interaction-net generator |
 | `omega/rtl.py` | Verilator build/run harness |
-| `rtl/omega_pkg.sv` `omega_router.sv` `omega_cell.sv` `omega_mesh.sv` | RTL: encodings; 5-port XY router; cell (RAMs, shadow tags, free stacks, task stack, ROM, rewrite FSM); W×H mesh |
+| `rtl/omega_defs.svh` `omega_router.sv` `omega_cell.sv` `omega_rom.sv` `omega_mesh.sv` | RTL: encodings; 5-port XY router; cell (RAMs, owner tags, free stacks, task stack, directory, rewrite FSM); cluster definition ROM with round-robin arbiter; W×H mesh |
 | `tb/tb_mesh.cpp` | testbench: reset, run to quiescence, dump |
 | `programs/*.olm` | fib, sum, fact, list map/sum, tree build+sum, direct tree sum, insertion sort, quicksort, higher-order |
 | `tests/test_security.py` | owner-capability isolation: multi-tenant demos, attacks, fault injection, multi-tenant fuzz |
@@ -72,7 +72,7 @@ def main = tsum(gen(N))
 
 ## Results
 
-### Verification (full regression on `1dfad55`: RTL with the FIFO-index fix, frontend step 6)
+### Verification (full regression on step 7: cluster definition ROM, default 2×2 cells per ROM, one port)
 
 | suite | result | what it checks |
 |---|---|---|
@@ -82,7 +82,7 @@ def main = tsum(gen(N))
 | RTL differential fuzz, big nets (`--big`) | **200 / 200** | 3–8 definitions, 20–60 nodes each, deeper trees, more references; only nets with ≥ 30 interactions are kept (avg 375, max 16,239 interactions; 4,088 candidates rejected as diverging or trivial) |
 | owner-capability isolation (`tests/test_security.py --fuzz 300`) | **420 / 420** | 2- and 4-tenant program demos (fib ∥ qsort; treesum ∥ list ∥ sort ∥ higher-order) on 1×1/2×2/4×4/3×2, each tenant gets its known answer with zero traps; 10 attack programs (overwrite / capture the victim's result through a forged root-var pointer, out-of-bounds slot and cell, forged node pointers to the victim's result node, an attack hidden in a lazily expanded definition) and 3 cross-owner fault injections, each with the sender-side check on and off (`fi`); 300 random multi-tenant cases (2–4 random tenants, random owners, half with an attacker carrying random forged redexes). Semantic model, fabric model and RTL must agree on every honest tenant's result and node count, on the trap set and on the interaction count (SPEC §12) |
 | memory pressure (`tests/test_mempress.py`) | **36 / 36** | cell (0,0) pre-filled with foreign ballast so only 4–30 slots are free (30 cases), small-cell capacity cases, security fuzz case 265; semantic model, fabric model and RTL must agree |
-| mutation testing (`tests/mutants.py`) | **29 / 29 caught** | 15 functional mutants of the rule logic / protocol / quiescence + 1 performance mutant (no work distribution, caught by the speed-up bound) + 6 security mutants (each owner-capability check disabled, owner stamping missing, trap not blocking). Two mutants (eraser reaches only aux1; REF~DUP expands instead of copying) produce the *right* answer and are caught only by the node count / interaction count. That is why all three observables are compared. + 5 v3 engine mutants (read-ahead write bypass, write-queue drain, var owner-tag queue, allocation pop count, ROM read-ahead) + 2 memory-pressure mutants (caught by `tests/test_mempress.py`) |
+| mutation testing (`tests/mutants.py`) | **32 / 32 caught** | 15 functional mutants of the rule logic / protocol / quiescence + 1 performance mutant (no work distribution, caught by the speed-up bound) + 6 security mutants (each owner-capability check disabled, owner stamping missing, trap not blocking). Two mutants (eraser reaches only aux1; REF~DUP expands instead of copying) produce the *right* answer and are caught only by the node count / interaction count. That is why all three observables are compared. + 5 v3 engine mutants (read-ahead write bypass, write-queue drain, var owner-tag queue, allocation pop count, ROM read-ahead) + 2 memory-pressure mutants (caught by `tests/test_mempress.py`) + 3 cluster-ROM mutants (grant beyond the port count, EXPAND not waiting for its template word, stale buffered word) |
 
 Strong confluence is the test oracle. Any schedule (arbitration, delays, stalls, task/message priority,
 initial placement) must produce exactly the same normal form, the same number of interactions and the
@@ -222,6 +222,63 @@ without step 4 livelocks on 7 of them), capacity cases with small cells, and the
 265. Regression: units 35/35, programs 268/268, fuzz 600/600 + 200/200, security 420/420,
 memory pressure 36/36, mutants 29/29 (2 new: roomy neighbours ignored; hungry without roomy).
 
+### Cluster definition ROM (step 7)
+
+The node-template and redex-template ROMs (786 Kbit, 67% of a v3 cell's 1.18 Mbit) were replicated in
+every cell. Now one `omega_rom` serves a **cluster** of CW×CH cells (`omega_mesh` parameters `CW`,
+`CH`, `RPORTS`; `OMEGA_CLUSTER=2x2:1` is the default in the harness and the regression). SPEC §5.3 has
+the protocol:
+
+* **One ROM word = two template entries.** The loader aligns definitions to even entries, so an
+  EXPAND, which writes one entry per cycle, needs a grant only every other cycle. The cell keeps the
+  last word it received (512 flip-flops) and uses an arriving word directly.
+* **Request / grant.** Requests are combinational from registers. A round-robin arbiter grants up to
+  `RPORTS` cells per cycle, and the data comes back one cycle later. In `S_LINK` the request is
+  speculative: when the link may start an expansion here, the cell asks for word 0 of the definition
+  whose directory word was read ahead. A missed grant only holds `S_EXN`.
+* The per-cell directory (256×128 b) stays local: it is read ahead on every link step.
+
+Trade-offs measured on the RTL. First, fib(15) on the earlier one-entry-per-word variant, which shows
+why words hold pairs:
+
+| organisation | ROM storage per cell | fib(15) 2×2 | fib(15) 4×4 |
+|---|---:|---:|---:|
+| replicated (v3) | 786 Kbit | 23,784 | 6,881 |
+| 2×2 cluster, 1 port, 1 entry/word | 197 Kbit | 32,182 (+35%) | 8,893 (+29%) |
+| 2×2 cluster, 2 ports, 1 entry/word | 197 Kbit, 2R ROM | 24,403 (+3%) | 7,195 (+5%) |
+| **2×2 cluster, 1 port, 2 entries/word** | **197 Kbit** | **24,118 (+1.4%)** | **7,174 (+4%)** |
+| 4×4 cluster, 1 port, 2 entries/word | 49 Kbit | — | 12,444 (+81%) |
+
+Then the step-5 benchmark set, 1×1 to 8×8, per configuration (`bench/bench.py --cluster CWxCH:P`,
+`results/bench_c*.json`; the 1×1 row is identical in all configurations because one cell never
+contends):
+
+| program | mesh | replicated (1x1) | 2x2, 1 port | 2x2, 2 ports | 4x4, 1 port | 4x4, 2 ports |
+|---|---|---:|---:|---:|---:|---:|
+| fib(20) | 1x1 | 1,006,974 | 1,006,974 (+0.0%) | 1,006,974 (+0.0%) | 1,006,974 (+0.0%) | 1,006,974 (+0.0%) |
+| fib(20) | 2x2 | 252,422 | 269,881 (+6.9%) | 253,898 (+0.6%) | 269,881 (+6.9%) | 253,898 (+0.6%) |
+| fib(20) | 4x4 | 67,105 | 70,938 (+5.7%) | 66,286 (-1.2%) | 133,348 (+98.7%) | 75,800 (+13.0%) |
+| fib(20) | 8x8 | 26,171 | 25,635 (-2.0%) | — | — | — |
+| treesum_direct(14) | 1x1 | 753,632 | 753,632 (+0.0%) | 753,632 (+0.0%) | 753,632 (+0.0%) | 753,632 (+0.0%) |
+| treesum_direct(14) | 2x2 | 189,110 | 211,721 (+12.0%) | 189,286 (+0.1%) | 211,721 (+12.0%) | 189,286 (+0.1%) |
+| treesum_direct(14) | 4x4 | 48,577 | 53,077 (+9.3%) | 48,423 (-0.3%) | 115,594 (+138.0%) | 61,952 (+27.5%) |
+| treesum_direct(14) | 8x8 | 23,406 | 19,492 (-16.7%) | — | — | — |
+| treesum(9) | 1x1 | 71,590 | 71,590 (+0.0%) | 71,590 (+0.0%) | 71,590 (+0.0%) | 71,590 (+0.0%) |
+| treesum(9) | 2x2 | 20,119 | 19,306 (-4.0%) | 19,954 (-0.8%) | 19,306 (-4.0%) | 19,954 (-0.8%) |
+| treesum(9) | 4x4 | 6,299 | 6,245 (-0.9%) | 5,594 (-11.2%) | 10,972 (+74.2%) | 7,400 (+17.5%) |
+| treesum(9) | 8x8 | 2,677 | 3,195 (+19.4%) | — | — | — |
+
+* **Default: 2×2 cells per ROM, one port.** ROM storage per cell drops 4× (786 → 197 Kbit; the whole
+  cell from 1.18 Mbit to ≈0.59 Mbit). It costs 6–12% cycles on 2×2 and 4×4 meshes for the
+  expansion-heavy programs. At 8×8, where the mesh is not saturated, the difference is schedule noise
+  (−17% to +19%): the demand-driven spawn reacts to small timing changes.
+* A second port removes the contention (≤ 1% except schedule noise) at the cost of a 2-read-port
+  ROM. A 4×4 cluster needs at least two ports: with one it is bandwidth-bound (+74% to +138% on 4×4),
+  because fib and the tree sums expand a definition every ≈9 interactions.
+* Correctness does not depend on the arbitration (a missed grant only delays an EXPAND).
+  Regression on the default configuration: units 42/42, programs 268/268, fuzz 600/600 + big
+  200/200, security 420/420, memory pressure 36/36, mutants 32/32 (3 new).
+
 ### Comparison with TACHYON-128 (same algorithm: naive recursive fib(20))
 
 | machine | work | cycles | vs TACHYON-128 |
@@ -272,7 +329,7 @@ What this comparison does and does not say:
    standard-cell library, no place and route, no timing. Memories are counted in bits, not area.
    The per-slot `nalloc` valid bits are flip-flops (1 per node slot) and dominate the growth from
    256 to 1024 slots. The area-normalised comparison with TACHYON-128 counts logic GE only; each Ω
-   cell's 1.18 Mbit of SRAM/ROM (ROMs replicated per cell) is not converted to area. No Fmax.
+   cell's SRAM/ROM is not converted to area. No Fmax.
 3. **Out-of-memory handling: local recovery only.** Step 4 moves work from poor to rich cells
    (`roomy` wire, SPAWN/NODE/PULL to roomy neighbours), but:
    * task-stack overflow (`err = 1`) or a 1×1 cell that cannot place an expansion (`err = 2`) still
@@ -307,9 +364,8 @@ What this comparison does and does not say:
 
 ## Next steps (suggested)
 
-1. Shrink the cell: share one definition ROM per cluster of cells instead of one per cell (the ROMs are
-   ≈ 70% of each cell's 1.18 Mbit), and a standard-cell flow (OpenROAD + a public PDK) for real area
-   and Fmax.
+1. A standard-cell flow (OpenROAD + a public PDK) for real area and Fmax. (The definition ROM is
+   already shared per 2×2 cluster, step 7.)
 2. Cut cycles per interaction below 3.4: process a var link that overlaps a rule (2.5-cycle target),
    or dual-issue independent tasks.
 3. Global memory pressure: throttle spawning when every neighbour is poor, and spill to off-fabric
@@ -338,3 +394,4 @@ What this comparison does and does not say:
 * `74bbbd7` fix: explicit FIFO write-index wrap (Verilator 5.020 CI failure); unbuffered CI output
 * `9a19a33` step 5: v3 benchmarks, v3 cell synthesis (233,164 GE), area-normalised comparison
 * `1dfad55` step 6: nested / literal / default patterns, Hindley–Milner type checker
+* step 7: cluster definition ROM (`rtl/omega_rom.sv`, 2×2 cells per ROM, pair words, round-robin arbiter), benchmarks per configuration

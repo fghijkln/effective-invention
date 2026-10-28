@@ -1,6 +1,6 @@
 """Benchmarks on the RTL mesh (Verilator, cycle accurate): interactions, cycles, speed-up vs 1x1,
 message traffic, cell utilisation.  Writes results/bench.json and results/bench.md.
-usage: bench.py [--quick] [--8x8] [--progs fib:20,treesum:9] [--tag NAME]"""
+usage: bench.py [--quick] [--8x8] [--progs fib:20,treesum:9] [--tag NAME] [--cluster 2x2:1]"""
 import sys, os, json, time
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from omega import progs, semantic, rtl
@@ -15,6 +15,9 @@ def main():
     if "--progs" in sys.argv:
         work = [(p.split(":")[0], int(p.split(":")[1])) for p in sys.argv[sys.argv.index("--progs") + 1].split(",")]
     shapes = SHAPES + ([(8, 8)] if "--8x8" in sys.argv else [])
+    if "--cluster" in sys.argv:          # cluster ROM: CWxCH cells share one ROM with P read ports
+        shape, _, ports = sys.argv[sys.argv.index("--cluster") + 1].partition(":")
+        rtl.CLUSTER = tuple(int(t) for t in shape.split("x")) + (int(ports or 1),)
     out = []
     for name, n in work:
         b = progs.book(name, n)
@@ -33,7 +36,7 @@ def main():
             ok = r["readback"] == exp and r["interactions"] == ref["interactions"]
             cyc = r["cycles"]
             base = base or cyc
-            row = dict(prog=f"{name}({n})", mesh=f"{W}x{H}" + ("*" if slots != 1024 else ""), ok=ok, interactions=r["interactions"], cycles=cyc,
+            row = dict(cluster="%dx%d:%d" % rtl.CLUSTER, prog=f"{name}({n})", mesh=f"{W}x{H}" + ("*" if slots != 1024 else ""), ok=ok, interactions=r["interactions"], cycles=cyc,
                        speedup=base / cyc, ipc=r["interactions"] / cyc, util=r["util"],
                        msg_link=r["msgs"]["msg_link"], msg_node=r["msgs"]["msg_node"], msg_spawn=r["msgs"]["msg_spawn"],
                        msgs_per_inter=sum(r["msgs"].values()) / max(1, r["interactions"]),

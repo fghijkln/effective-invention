@@ -72,7 +72,7 @@ are taken from it.
 `var_mem[slot]` holds a substitution port, or 0 (NONE). Invariant: a free var slot always holds NONE,
 so allocation needs no initialisation write.
 
-### 2.4 Definition ROM (read-only templates, replicated in every cell)
+### 2.4 Definition ROM (read-only templates; one per cluster of cells since step 7, §5.3)
 `dir[id]` points to a header entry `{counts, root}` with
 `counts = nn[7:0] | nv[15:8] | nr[23:16]`. The header is followed by `nn` node entries `{aux2, aux1}`
 and `nr` redex entries `{b, a}`. Template ports carry local indices in their payload: `VAR i` means
@@ -161,7 +161,7 @@ Correctness argument (also checked by fuzzing):
             +---+-----------+--------------+---------------+---------------+
                 |           |              |               |
           node RAM      var RAM       free stacks      task stack (LIFO, 1024 x 130 b)
-          1024x128b     1024x64b      node / var       def ROM (templates) + dir
+          1024x128b     1024x64b      node / var       directory; def ROM per cluster (5.3)
           + nalloc tag
 ```
 * **Local allocation.** A rewrite allocates in its own cell from the free stacks. Commutation and SWI
@@ -223,6 +223,44 @@ NAND2 equivalents from `synth/ge.py`. One v3 cell at 1024 slots (`results/synth/
 2048×128, directory 256×128). Area-normalised cost of a run = cells × GE per cell × cycles, compared
 with TACHYON-128's 217,636 GE × its cycles for the same program; memories are excluded on both sides
 (README, "Comparison").
+
+### 5.3 Cluster definition ROM (step 7, `rtl/omega_rom.sv`)
+
+The node-template ROM (4096 entries) and the redex-template ROM (2048 entries) were replicated in every
+cell: 786 Kbit of the cell's 1.18 Mbit. They are now one `omega_rom` per **cluster** of CW×CH cells
+(`omega_mesh` parameters `CW`, `CH`, `RPORTS`; default 2×2 with one read port). The per-cell
+directory (256×128 b) stays in the cell, because it is read ahead on every link step.
+
+* **Pair words.** One ROM word holds two template entries (256 b). The loader aligns every definition
+  to an even entry (`fabric.Image`: a padding entry after an odd-sized definition). An EXPAND that
+  writes node *i* / redex *i* per cycle therefore needs the ROM on only half of its cycles; the cell
+  keeps the last pair it received (`bufn`/`bufr`, 512 flip-flops) and uses an arriving pair directly.
+* **Request / grant.** A cell's request is combinational from registers only: in `S_EXN` the pair of
+  entry `ex_i` (held) or `ex_i + 1` (advancing) unless that pair is already buffered or arriving; in
+  `S_EXA` pair 0; in `S_LINK` pair 0 of the definition whose directory word was read ahead, when the
+  link may start an expansion here (dQ is a REF not handed to a hungry neighbour). The arbiter grants
+  up to `RPORTS` requesters per cycle from a rotating priority pointer (round robin: a requester
+  waits at most ⌈NC/RPORTS⌉ − 1 cycles); the data is the synchronous ROM read, steered back one cycle
+  later. A cell that misses a grant re-requests and its `S_EXN` step holds until its pair arrives.
+  The buffered pair is dropped when a new expansion starts.
+* **Correctness does not depend on the arbitration**: a missed grant only delays an EXPAND step.
+  Mutants 29–31 (grant beyond the port count, EXPAND not waiting for its pair, stale buffered pair)
+  are caught by the regression.
+* **Options measured** (fib(15) / treesum(7), RTL cycles; full table in the README):
+
+  | ROM organisation | storage per cell | 2×2 mesh fib(15) | 4×4 mesh fib(15) |
+  |---|---|---:|---:|
+  | replicated (v3, one per cell) | 786 Kbit | 23,784 | 6,881 |
+  | 2×2 cluster, 1 port, one entry per word | 197 Kbit | 32,182 (+35%) | 8,893 (+29%) |
+  | 2×2 cluster, 2 ports, one entry per word | 197 Kbit × port cost | 24,403 (+3%) | 7,195 (+5%) |
+  | **2×2 cluster, 1 port, pair words (default)** | **197 Kbit** | **24,118 (+1.4%)** | **7,174 (+4%)** |
+  | 4×4 cluster, 1 port, pair words | 49 Kbit | — | 12,444 (+81%) |
+  | 4×4 cluster, 2 ports, pair words | 49 Kbit × port cost | — | 7,594 (+10%) |
+
+  Pair words buy the bandwidth of a second port without the second port. A 4×4 cluster with one
+  port is bandwidth-bound (fib expands a definition every ≈9 interactions).
+* The Python fabric model reserves a cluster port for ⌈max(nn, nr)/2⌉ cycles per EXPAND
+  (`Fabric(cluster=(CW, CH, NP))`); it is an approximation of the cycle-by-cycle round robin.
 
 ## 6. Loader and readback
 

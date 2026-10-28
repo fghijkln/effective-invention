@@ -110,6 +110,9 @@ class Image:
             self.dir3.append(len(self.romn) | (len(self.romr) << 16) | (cnt << 32) | (dd.root << 64))
             self.romn += [(a, b) for (_, a, b) in dd.nodes]
             self.romr += list(dd.redexes)
+            # cluster ROM words hold pairs of entries: align every definition to an even entry
+            if len(self.romn) % 2: self.romn.append((0, 0))
+            if len(self.romr) % 2: self.romr.append((0, 0))
             for (_, a, b) in dd.nodes:
                 self.rom.append((a, b))
             for a, b in dd.redexes:
@@ -150,12 +153,12 @@ class Image:
             for a, b in self.rom:
                 f.write(h((b << 64) | a, 32) + "\n")
         # v3 cell: node template ROM, redex template ROM, directory {root, nr, nv, nn, rbase, nbase}
-        with open(f"{outdir}/romn.hex", "w") as f:
-            for a, b in self.romn:
-                f.write(h((b << 64) | a, 32) + "\n")
-        with open(f"{outdir}/romr.hex", "w") as f:
-            for a, b in self.romr or [(0, 0)]:
-                f.write(h((b << 64) | a, 32) + "\n")
+        # cluster ROM (rtl/omega_rom.sv): one 256-bit word = entries 2k (low half) and 2k + 1
+        for nm, tab in (("romn", self.romn), ("romr", self.romr or [(0, 0), (0, 0)])):
+            with open(f"{outdir}/{nm}.hex", "w") as f:
+                for k in range(0, len(tab), 2):
+                    (a0, b0), (a1, b1) = tab[k], tab[k + 1]
+                    f.write(h((b1 << 192) | (a1 << 128) | (b0 << 64) | a0, 64) + "\n")
         with open(f"{outdir}/dir.hex", "w") as f:
             for d in self.dir3:
                 f.write(h(d, 32) + "\n")
@@ -373,7 +376,7 @@ class Cell:
         self.push(tr(d.root), x)
         for a, b in d.redexes:
             self.push(tr(a), tr(b))
-        return 1 + max(nn, nv) + 1 + len(d.redexes)
+        return 1 + max(nn, nv) + 1 + len(d.redexes) + self.fab.rom_wait(self, (max(nn, len(d.redexes)) + 1) // 2)
 
     # ---- redex (SPEC 3, 6) ----
     def redex(self, a, b):
@@ -566,8 +569,15 @@ class Cell:
 
 class Fabric:
     def __init__(self, book, W, H, slots=1024, qdepth=1024, fifo_depth=4, seed=0,
-                 p_jitter=0.0, p_stall=0.0, p_msg=0.5, img=None, fi_nosend=False):
+                 p_jitter=0.0, p_stall=0.0, p_msg=0.5, img=None, fi_nosend=False, cluster=(2, 2, 1)):
         self.book, self.W, self.H = book, W, H
+        # cluster definition ROM (SPEC 5.6): CW x CH cells share one ROM with NP read ports.  An
+        # EXPAND reads max(nodes, redexes) template entries, two per ROM word (one grant per pair); a cell whose
+        # cluster's ports are all busy waits (the RTL interleaves cycle by cycle with a round-robin
+        # arbiter; the model reserves a port for the whole template, an approximation).
+        self.cw, self.ch, self.rom_np = cluster
+        self.rom_free = {}
+        self.rom_wait_cycles = 0
         self.fi_nosend = fi_nosend
         self.fifo_depth, self.qdepth = fifo_depth, qdepth
         self.rng = random.Random(seed)
@@ -579,6 +589,16 @@ class Fabric:
         self.msgs = [0, 0, 0, 0]
         self.hops = 0
         self.cycles = 0
+
+    def rom_wait(self, cell, n):
+        if n == 0:
+            return 0
+        ports = self.rom_free.setdefault((cell.x // self.cw, cell.y // self.ch), [0] * self.rom_np)
+        j = min(range(len(ports)), key=ports.__getitem__)
+        start = max(self.cycles + 1, ports[j])
+        ports[j] = start + n
+        self.rom_wait_cycles += start - (self.cycles + 1)
+        return start - (self.cycles + 1)
 
     def route(self, c, m):
         dx, dy = m[1], m[2]
@@ -659,6 +679,6 @@ class Fabric:
 
     def report(self):
         busy = [c.st["busy"] + c.st["tasks"] for c in self.cells.values()]
-        return {"cycles": self.cycles, "interactions": self.interactions, "msgs": dict(zip(MSG_NAMES, self.msgs)),
+        return {"cycles": self.cycles, "interactions": self.interactions, "rom_wait": self.rom_wait_cycles, "msgs": dict(zip(MSG_NAMES, self.msgs)),
                 "hops": self.hops, "util": sum(busy) / (len(busy) * max(1, self.cycles)),
                 "per_cell_interactions": {k: c.st["interactions"] for k, c in self.cells.items()}}

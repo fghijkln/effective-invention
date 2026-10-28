@@ -62,9 +62,15 @@ module omega_cell #(
   output logic        ready,               // initialisation finished
   output logic [3:0]  err,
   input  logic        dump,
-  // loader port for the replicated definition ROM / directory (simulation preloads them with $readmemh)
+  // cluster definition ROM (omega_rom, shared by the cells of a cluster; SPEC 5.6): request / grant,
+  // data one cycle after the grant
+  output logic        rom_req,
+  output logic [15:0] rom_an, rom_ar,
+  input  logic        rom_gnt,
+  input  logic [255:0] rom_dn, rom_dr,     // one ROM word = a pair of template entries
+  // loader port for the per-cell directory (simulation preloads it with $readmemh)
   input  logic        cfg_we,
-  input  logic [1:0]  cfg_sel,             // 0 = node ROM, 1 = redex ROM, 2 = directory
+  input  logic [1:0]  cfg_sel,             // 2 = directory
   input  logic [15:0] cfg_a,
   input  logic [127:0] cfg_d,
   output logic [31:0] st_inter
@@ -86,14 +92,16 @@ module omega_cell #(
   // sequential block), so synthesis infers 1R1W synchronous SRAMs (ROM/dir: 1R).
   logic [131:0] node_mem [SLOTS];       // {owner, aux2, aux1}
   logic [67:0]  var_mem  [SLOTS];       // {owner, substitution}
-  logic [127:0] romn [ROMSZ];           // template nodes {aux2, aux1}
-  logic [127:0] romr [RDXSZ];           // template redexes {b, a}
   logic [127:0] dirm [DIRSZ];           // {root[63:0], 8'0, nr, nv, nn, rbase[15:0], nbase[15:0]}
   logic [SB-1:0] nstk [SLOTS];          // free node stack (SRAM part)
   logic [SB-1:0] vstk [SLOTS];          // free var stack (SRAM part)
   logic [129:0] tqm  [QDEPTH];          // task stack (SRAM part) {kind, b, a}
   // synchronous read data
   logic [131:0] n_rd, n_rd2;  logic [67:0] v_rd;  logic [127:0] rn_rd, rr_rd, d_rd;
+  logic rom_v;                          // rom_dn / rom_dr carry the template pair requested last cycle (rvp)
+  logic [255:0] bufn, bufr;             // last template pair received (node / redex)
+  logic [6:0]   bufp, rvp;              // pair index within the definition: buffered / arriving
+  logic         bufok;
   logic [SB-1:0] nstk_rd, vstk_rd;  logic [129:0] tqm_rd;
   // stack top caches (registers): c[0] bottom .. c[cnt-1] top; sp = entries in the SRAM part
   localparam int NK = 14, VK = 14, QK = 8;    // (4-bit cache counters: K + pushes <= 15)
@@ -117,8 +125,6 @@ module omega_cell #(
     $readmemh($sformatf("%s/node_%0d_%0d.hex", imgdir, X, Y), node_mem);
     $readmemh($sformatf("%s/var_%0d_%0d.hex", imgdir, X, Y), var_mem);
     $readmemh($sformatf("%s/queue_%0d_%0d.hex", imgdir, X, Y), tqm);
-    $readmemh($sformatf("%s/romn.hex", imgdir), romn);
-    $readmemh($sformatf("%s/romr.hex", imgdir), romr);
     $readmemh($sformatf("%s/dir.hex", imgdir), dirm);
   end
 `else
@@ -302,6 +308,46 @@ module omega_cell #(
     else tr = p;
   endfunction
 
+  // ---------------- cluster ROM request (combinational from registers only) ----------------
+  // The definition templates are stored as PAIRS of entries per ROM word (the loader aligns every
+  // definition to an even entry), so one grant feeds two EXPAND cycles and a cell needs the cluster
+  // ROM on only half of its EXPAND cycles.  Entry i of the running expansion is in pair i/2; the cell
+  // keeps the last pair it received (bufn/bufr) and uses an arriving pair directly (bypass).
+  // The request for the pair the NEXT cycle needs is made from the current registered state: in
+  // S_EXN pair (ex_i or ex_i + 1)/2, in S_EXA pair 0, in S_LINK pair 0 of the definition whose
+  // directory word was read ahead when the link may start an expansion here (dQ is a REF that is not
+  // handed to a hungry neighbour).  A missed grant just holds S_EXN until the pair arrives.
+  logic [7:0] ex_lrom;                  // template entries an expansion reads: max(nodes, redexes)
+  logic       rom_have;                 // entry ex_i is available this cycle
+  logic [6:0] rom_q;                    // pair requested this cycle
+  always_comb begin
+    logic [7:0] i;
+    logic adv, arr, nbok;
+    logic [6:0] q, nbp;
+    logic [255:0] wn, wr;
+    logic [15:0] nb, rb2;
+    ex_lrom = (ex_nn > ex_nr) ? ex_nn : ex_nr;
+    q = ex_i[7:1];
+    arr = rom_v && rvp == q;
+    rom_have = arr || (bufok && bufp == q);
+    wn = arr ? rom_dn : bufn; wr = arr ? rom_dr : bufr;
+    rn_rd = (ex_i[0] ^ MUT[26]) ? wn[255:128] : wn[127:0];
+    rr_rd = (ex_i[0] ^ MUT[26]) ? wr[255:128] : wr[127:0];
+    nbp = rom_v ? rvp : bufp; nbok = rom_v || bufok;    // buffer contents next cycle
+    rom_req = 1'b0; rom_q = '0; i = '0; adv = 1'b0; nb = ex_nbase; rb2 = ex_rbase;
+    if (state == S_EXN) begin
+      adv = tq_room != 0 && (rom_have || ex_i >= ex_lrom || MUT[30]);
+      i = adv ? ex_i + 8'd1 : ex_i;
+      rom_q = i[7:1];
+      rom_req = i < ex_lrom && !(nbok && nbp == rom_q);
+    end else if (state == S_EXA) begin
+      rom_req = ex_lrom != 0 && !(nbok && nbp == 7'd0);
+    end else if (state == S_LINK && ptag(dQ) == T_REF && (rsp || rsx || !(hv_found && can_send && !MUT[7]))) begin
+      rom_req = 1'b1; nb = d_rd[15:0]; rb2 = d_rd[31:16];       // (the buffer is cleared when the expansion starts)
+    end
+    rom_an = (nb >> 1) + 16'(rom_q); rom_ar = (rb2 >> 1) + 16'(rom_q);
+  end
+
   // Per-cycle temporaries of the sequential block (blocking-assigned first thing every cycle, so
   // synthesis keeps them combinational; declared here because Yosys mishandles packed-array locals).
   logic snd; flit_t sf;
@@ -316,7 +362,7 @@ module omega_cell #(
   logic n_we, v_we; logic [SB-1:0] n_wa, v_wa; logic [131:0] n_wd; logic [67:0] v_wd;
   logic [NK-1:0][SB-1:0] nc_n; logic [VK-1:0][SB-1:0] vc_n; logic [QK-1:0][129:0] qc_n;
   logic [4:0] cs_m, cs_after; logic cs_spill, cs_fill;
-  logic [SB-1:0] la_v, la_n1, la_n2; logic [DB-1:0] la_d; logic [RB-1:0] la_rn; logic [RRB-1:0] la_rr;
+  logic [SB-1:0] la_v, la_n1, la_n2; logic [DB-1:0] la_d;
   logic [63:0] la_A, la_B, la_P, la_Q;
   logic alloc; logic [7:0] al_nn, al_nv, al_in, al_iv;
   logic [3:0] al_kn, al_kv;
@@ -334,7 +380,7 @@ module omega_cell #(
       st_msg2 <= '0; st_maxq <= '0; st_links <= '0; st_tasks <= '0;
       st_minfn <= '1; st_minfv <= '1;
       st_traps <= '0; tr_addr <= '0; tr_reason <= '0; tr_owner <= '0; tr_mask <= '0;
-      wq_n <= '0; vq_n <= '0; rsp <= 1'b0; rsx <= 1'b0; rfw <= 1'b0; ej_taken <= 1'b0;
+      wq_n <= '0; vq_n <= '0; bufok <= 1'b0; rom_v <= 1'b0; rsp <= 1'b0; rsx <= 1'b0; rfw <= 1'b0; ej_taken <= 1'b0;
       roomy <= 1'b0; mrot <= 2'(X + Y + 1);
       ncnt <= '0; nsp <= '0; npend <= 1'b0;
       vcnt <= '0; vsp <= '0; vpend <= 1'b0;
@@ -353,6 +399,7 @@ module omega_cell #(
       ex_last = '0;
       erng <= xorshift(erng);
       ej_taken <= 1'b0;
+      if (rom_v) begin bufn <= rom_dn; bufr <= rom_dr; bufp <= rvp; bufok <= 1'b1; end
       if (state != S_INIT && nf_tot < st_minfn) st_minfn <= nf_tot;
       if (state != S_INIT && vf_tot < st_minfv) st_minfv <= vf_tot;
       if (state != S_INIT) cyc <= cyc + 1;
@@ -581,7 +628,7 @@ module omega_cell #(
         end
 
         // ------------------------------------------------------------------ EXPAND pass 2: node i, var tag i, redex i per cycle
-        S_EXN: if (tq_room != 0) begin
+        S_EXN: if (tq_room != 0 && (rom_have || ex_i >= ex_lrom || MUT[30])) begin
           logic [SB-1:0] s;
           ex_last = (ex_nn > ex_nv) ? ex_nn : ex_nv;
           if (ex_nr > ex_last) ex_last = ex_nr;
@@ -616,6 +663,7 @@ module omega_cell #(
           ex_nn <= nn; ex_nv <= nv; ex_nr <= nr; ex_own <= pown(sp_ref_p); ex_x <= sp_x_p;
           ex_ref <= plab(sp_ref_p);
           alloc = 1'b1; al_nn = nn; al_nv = nv; al_in = '0; al_iv = '0;   // first allocation batch now
+          if (!MUT[31]) bufok <= 1'b0;                                      // new definition: drop the buffered pair
         end else if (NT > 1) begin
           // not enough room here: forward the SPAWN to a neighbour
           logic [2:0] t;
@@ -720,23 +768,12 @@ module omega_cell #(
       if (qfirst(la_A, la_B)) begin la_P = la_B; la_Q = la_A; end else begin la_P = la_A; la_Q = la_B; end
       la_v = SB'(pslot(la_A)); la_n1 = SB'(pslot(la_P)); la_n2 = SB'(pslot(la_Q));
       la_d = DB'(plab(la_Q));
-      if (nst == S_EXN) begin
-        logic [7:0] i;
-        i = (state == S_EXN && tq_room != 0 && !MUT[26]) ? ex_i + 8'd1 : ((state == S_EXN) ? ex_i : 8'd0);
-        la_rn = RB'(ex_nbase + 16'(i)); la_rr = RRB'(ex_rbase + 16'(i));
-        if (state != S_EXN && state != S_EXA) begin la_rn = RB'(d_rd[15:0]); la_rr = RRB'(d_rd[31:16]); end
-      end else begin
-        la_rn = '0; la_rr = '0;
-      end
       v_rd   <= (v_we && v_wa == la_v)  ? v_wd : var_mem[la_v];
       n_rd   <= (n_we && n_wa == la_n1 && !MUT[22]) ? n_wd : node_mem[la_n1];
       n_rd2  <= (n_we && n_wa == la_n2) ? n_wd : node_mem[la_n2];
       d_rd   <= dirm[la_d];
-      rn_rd  <= romn[la_rn];
-      rr_rd  <= romr[la_rr];
+      rom_v  <= rom_req && rom_gnt; rvp <= rom_q;
     end
-    if (cfg_we && cfg_sel == 2'd0) romn[RB'(cfg_a)] <= cfg_d;
-    if (cfg_we && cfg_sel == 2'd1) romr[RRB'(cfg_a)] <= cfg_d;
     if (cfg_we && cfg_sel == 2'd2) dirm[DB'(cfg_a)] <= cfg_d;
   end
 
