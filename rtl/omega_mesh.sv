@@ -23,6 +23,8 @@ module omega_mesh import omega_pkg::*; #(
   flit_t inf [W][H][4];
   logic  irdy [W][H][4];
   logic  cidle [W][H];
+  logic  chung [W][H];
+  logic  nhung [W][H][4];
   logic  crdy [W][H];
   logic [3:0]  cerr [W][H];
   logic [31:0] cint [W][H];
@@ -34,7 +36,11 @@ module omega_mesh import omega_pkg::*; #(
         .clk, .rst, .seed, .jitter, .stall, .pmsg,
         .in_v(iv[x][y]), .in_f(inf[x][y]), .in_rdy(irdy[x][y]),
         .out_v(ov[x][y]), .out_f(of[x][y]), .out_rdy(ordy[x][y]),
-        .idle(cidle[x][y]), .ready(crdy[x][y]), .err(cerr[x][y]), .dump, .st_inter(cint[x][y]));
+        .idle(cidle[x][y]), .hungry(chung[x][y]), .nbr_hungry(nhung[x][y]), .ready(crdy[x][y]), .err(cerr[x][y]), .dump, .st_inter(cint[x][y]));
+      assign nhung[x][y][0] = (y > 0)     ? chung[x][(y > 0) ? y-1 : 0] : 1'b0;
+      assign nhung[x][y][1] = (x < W - 1) ? chung[(x < W - 1) ? x+1 : x][y] : 1'b0;
+      assign nhung[x][y][2] = (y < H - 1) ? chung[x][(y < H - 1) ? y+1 : y] : 1'b0;
+      assign nhung[x][y][3] = (x > 0)     ? chung[(x > 0) ? x-1 : 0][y] : 1'b0;
       // N neighbour (x, y-1): my in[N] <- its out[S]; my out[N] -> its in[S]
       if (y > 0) begin : gn
         assign iv[x][y][0] = ov[x][y-1][2]; assign inf[x][y][0] = of[x][y-1][2];

@@ -19,6 +19,8 @@ module omega_cell import omega_pkg::*; #(
   output flit_t       out_f [4],
   input  logic        out_rdy [4],
   output logic        idle,
+  output logic        hungry,              // to neighbours: no local work (demand-driven spawn)
+  input  logic        nbr_hungry [4],      // from neighbours N, E, S, W
   output logic        ready,               // initialisation finished
   output logic [3:0]  err,
   input  logic        dump,
@@ -85,6 +87,26 @@ module omega_cell import omega_pkg::*; #(
     if (HAS_N != 0) begin tx[k] = 4'(X); ty[k] = 4'(Y - 1); k++; end
   end
 
+  // demand-driven spawn target: first hungry existing neighbour in rotating order (N E S W)
+  localparam logic [3:0] EXISTS = {HAS_W != 0, HAS_S != 0, HAS_E != 0, HAS_N != 0};
+  logic       hv_found;
+  logic [1:0] hv_dir;
+  logic [1:0] hrot;
+  always_comb begin
+    hv_found = 1'b0; hv_dir = 2'd0;
+    for (int k = 0; k < 4; k++) begin
+      logic [1:0] d;
+      d = 2'(hrot + 2'(k));
+      if (!hv_found && EXISTS[d] && nbr_hungry[d]) begin hv_found = 1'b1; hv_dir = d; end
+    end
+  end
+  function automatic logic [3:0] dir_x(input logic [1:0] d);
+    return (d == 2'd1) ? 4'(X + 1) : (d == 2'd3) ? 4'(X - 1) : 4'(X);
+  endfunction
+  function automatic logic [3:0] dir_y(input logic [1:0] d);
+    return (d == 2'd0) ? 4'(Y - 1) : (d == 2'd2) ? 4'(Y + 1) : 4'(Y);
+  endfunction
+
   // ---------------- engine registers ----------------
   logic [63:0] ra, rb;
   logic [63:0] pa [4], pbv [4];
@@ -98,6 +120,7 @@ module omega_cell import omega_pkg::*; #(
   logic [SB:0] nb, vb;
   logic [31:0] erng;
   logic [SB:0] init_i;
+  logic [SB:0] st_minfn, st_minfv;
   logic [31:0] cyc, st_busy, st_retry, st_msg0, st_msg1, st_msg2, st_maxq, st_links, st_tasks;
 
   function automatic logic local_p(input logic [63:0] p);
@@ -120,6 +143,7 @@ module omega_cell import omega_pkg::*; #(
     ej_pop    = take_msg;
     idle      = (state == S_IDLE) && (qtop == 0) && !ej_v && (ob_cnt == 0) && (!rbusy || MUT[15]);
     ready     = state != S_INIT;
+    hungry    = (state == S_IDLE) && (qtop == 0) && !ej_v;
   end
 
   // translation of a template port during EXPAND
@@ -138,10 +162,11 @@ module omega_cell import omega_pkg::*; #(
       ntop <= '0; vtop <= '0; init_i <= (SB+1)'(SLOTS);
       qtop <= (QB+1)'(qinit[0]);
       ob_cnt <= '0; ob_hd <= '0;
-      err <= '0; rr <= '0;
+      err <= '0; rr <= '0; hrot <= 2'(X + Y);
       erng <= seed ^ (32'h85EBCA6B * (X * 16 + Y + 7)) ^ 32'h2;
       cyc <= '0; st_inter <= '0; st_busy <= '0; st_retry <= '0; st_msg0 <= '0; st_msg1 <= '0;
       st_msg2 <= '0; st_maxq <= '0; st_links <= '0; st_tasks <= '0;
+      st_minfn <= '1; st_minfv <= '1;
     end else begin
       // per-cycle temporaries
       logic snd; flit_t sf;
@@ -149,6 +174,8 @@ module omega_cell import omega_pkg::*; #(
       logic [1:0] nfc; logic [SB-1:0] nf0, nf1;
       snd = 1'b0; sf = '0; qp = 1'b0; qe = '0; nfc = 2'd0; nf0 = '0; nf1 = '0;
       erng <= xorshift(erng);
+      if (state != S_INIT && ntop < st_minfn) st_minfn <= ntop;
+      if (state != S_INIT && vtop < st_minfv) st_minfv <= vtop;
       if (state != S_INIT) cyc <= cyc + 1;
       if (state != S_IDLE && state != S_INIT && state != S_HALT) st_busy <= st_busy + 1;
 
@@ -338,14 +365,12 @@ module omega_cell import omega_pkg::*; #(
 
         // ------------------------------------------------------------------ choose where a REF expands
         S_SPAWN: begin
-          logic [2:0] t;
-          t = rr;
-          rr <= (rr == 3'(NT - 1)) ? 3'd0 : rr + 1;
-          if (t == 3'd0 || MUT[7]) begin
+          // give the expansion to a hungry neighbour if there is one, otherwise expand here
+          hrot <= hrot + 2'd1;
+          if (!hv_found || !can_send || MUT[7]) begin
             ex_x <= sp_x; state <= S_EXPH;
           end else begin
-            if (can_send) begin snd = 1'b1; sf = '{M_SPAWN, tx[t], ty[t], 64'd0, 64'd0, sp_x, mkp(T_REF, sp_ref, 32'd0)}; end
-            else begin qp = 1'b1; qe = {K_SPAWN, sp_x, mkp(T_REF, sp_ref, 32'd0)}; end
+            snd = 1'b1; sf = '{M_SPAWN, dir_x(hv_dir), dir_y(hv_dir), 64'd0, 64'd0, sp_x, mkp(T_REF, sp_ref, 32'd0)};
             state <= S_IDLE;
           end
         end
@@ -435,8 +460,8 @@ module omega_cell import omega_pkg::*; #(
       $writememh($sformatf("%s/out_nalloc_%0d_%0d.hex", outdir, X, Y), nalloc);
       $writememh($sformatf("%s/out_var_%0d_%0d.hex", outdir, X, Y), var_mem);
       fd = $fopen($sformatf("%s/out_stats_%0d_%0d.txt", outdir, X, Y), "w");
-      $fwrite(fd, "cycles %0d\ninteractions %0d\nbusy %0d\ntasks %0d\nlinks %0d\nretry %0d\nmsg_link %0d\nmsg_node %0d\nmsg_spawn %0d\nmaxq %0d\nfree_nodes %0d\nfree_vars %0d\nerr %0d\n",
-              cyc, st_inter, st_busy, st_tasks, st_links, st_retry, st_msg0, st_msg1, st_msg2, st_maxq, ntop, vtop, err);
+      $fwrite(fd, "cycles %0d\ninteractions %0d\nbusy %0d\ntasks %0d\nlinks %0d\nretry %0d\nmsg_link %0d\nmsg_node %0d\nmsg_spawn %0d\nmaxq %0d\nfree_nodes %0d\nfree_vars %0d\nerr %0d\npeak_nodes %0d\npeak_vars %0d\n",
+              cyc, st_inter, st_busy, st_tasks, st_links, st_retry, st_msg0, st_msg1, st_msg2, st_maxq, ntop, vtop, err, SLOTS - st_minfn, SLOTS - st_minfv);
       $fclose(fd);
     end
   end

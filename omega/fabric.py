@@ -223,13 +223,20 @@ class Cell:
             self.vfree.append(s)
             a = old
 
+    def hungry(self):
+        return not (self.busy or self.queue or self.eject)
+
     def spawn(self, ref, x):
-        t = self.spawn_targets[self.rr % len(self.spawn_targets)]
-        self.rr += 1
-        if t is None:
-            return self.expand(ref, x)
-        self.send_or_retry(MSG_SPAWN, self.nbr_xy(t), mk(REF, ref), x)
-        return 1
+        """Demand-driven work distribution: hand the expansion to a hungry neighbour (one that
+        advertises an empty task stack on its side-band wire), otherwise expand locally."""
+        self.hrot = (getattr(self, "hrot", self.x + self.y)) + 1
+        order = ["N", "E", "S", "W"]
+        for k in range(4):
+            d = order[(self.hrot - 1 + k) % 4]
+            if d in self.nbrs and self.fab.cells[self.nbr_xy(d)].hungry() and self.can_send():
+                self.send(MSG_SPAWN, self.nbr_xy(d), mk(REF, ref), x)
+                return 1
+        return self.expand(ref, x)
 
     def expand(self, ref, x, forwarded=False):
         d = self.fab.book[ref]

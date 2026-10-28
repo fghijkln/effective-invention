@@ -10,7 +10,7 @@ import random
 from . import ir
 
 
-def gen_book_text(seed, ndefs=None, size=None):
+def gen_book_text(seed, ndefs=None, size=None, maxdepth=4, nrdx=6, refs=0.23):
     rng = random.Random(seed)
     ndefs = ndefs if ndefs is not None else rng.randint(1, 5)
     size = size if size is not None else rng.randint(3, 30)
@@ -37,14 +37,14 @@ def gen_book_text(seed, ndefs=None, size=None):
             r = rng.random()
             if r < 0.50:
                 leaves.append(len(leaves)); return f"\0{len(leaves) - 1}\0"
-            if r < 0.65: return "*"
-            if r < 0.88: return f"#{rng.choice([0, 0, 1, 2, 3, 5, 7, 100, 4294967295, rng.randint(0, 50)])}"
+            if r < 0.65 - refs + 0.23: return "*"
+            if r < 1.11 - refs: return f"#{rng.choice([0, 0, 1, 2, 3, 5, 7, 100, 4294967295, rng.randint(0, 50)])}"
             if later: return "@" + rng.choice(later)
             return f"#{rng.randint(0, 9)}"
-        root = tree(rng.randint(1, 4))
+        root = tree(rng.randint(1, maxdepth))
         rdx = []
-        for _ in range(rng.randint(0, 6)):
-            rdx.append((tree(rng.randint(0, 3)), tree(rng.randint(0, 3))))
+        for _ in range(rng.randint(0, nrdx)):
+            rdx.append((tree(rng.randint(0, maxdepth - 1)), tree(rng.randint(0, maxdepth - 1))))
         if not rdx and rng.random() < 0.7:
             rdx.append((tree(2), tree(2)))
         # pair the variable placeholders

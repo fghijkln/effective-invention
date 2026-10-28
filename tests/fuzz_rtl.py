@@ -13,11 +13,17 @@ from omega import randnet, semantic, fabric, rtl
 CONFIGS = [(1, 1), (2, 2), (4, 4), (3, 2), (1, 4)]
 
 
-def case(i, mut=0):
-    b = randnet.gen_book(i)
+def case(i, mut=0, big=False):
+    if big:
+        g = random.Random(i ^ 0x5EED)
+        b = randnet.gen_book(i, ndefs=g.randint(3, 8), size=g.randint(20, 60), maxdepth=6, nrdx=10, refs=0.35)
+    else:
+        b = randnet.gen_book(i)
     try:
-        ref = semantic.result(b, seed=i, fuel=5000)
+        ref = semantic.result(b, seed=i, fuel=20000 if big else 5000)
     except semantic.OutOfFuel:
+        return None
+    if big and ref["interactions"] < 30:
         return None
     rng = random.Random(i * 7919 + 1)
     W, H = CONFIGS[i % len(CONFIGS)]
@@ -37,6 +43,7 @@ if __name__ == "__main__":
     ap.add_argument("start", type=int); ap.add_argument("count", type=int)
     ap.add_argument("--mut", default="0"); ap.add_argument("--out", default=None)
     ap.add_argument("--stop-on-fail", action="store_true")
+    ap.add_argument("--big", action="store_true", help="larger random books (3-8 defs, 20-60 nodes per def)")
     a = ap.parse_args()
     mut = int(a.mut, 16)
     n = fails = skipped = 0
@@ -44,7 +51,7 @@ if __name__ == "__main__":
     t = time.time()
     i = a.start
     while n < a.count:
-        res = case(i, mut)
+        res = case(i, mut, a.big)
         i += 1
         if res is None:
             skipped += 1; continue
@@ -54,5 +61,5 @@ if __name__ == "__main__":
             fails += 1
             print("FAIL", json.dumps(res))
             if a.stop_on_fail: break
-    print(f"fuzz {a.start}..{i-1}: {n - fails}/{n} pass, {skipped} rejected (diverging), {time.time()-t:.0f}s")
+    print(f"fuzz{' (big)' if a.big else ''} {a.start}..{i-1}: {n - fails}/{n} pass, {skipped} rejected (diverging), {time.time()-t:.0f}s")
     sys.exit(1 if fails else 0)
