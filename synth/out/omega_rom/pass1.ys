@@ -1,0 +1,18 @@
+read_verilog -sv -DSYNTHESIS -I/workspace/work/omega/rtl /workspace/work/omega/rtl/omega_rom.sv
+chparam -set NC 4 -set NP 1 -set ROMSZ 4096 -set RDXSZ 2048 omega_rom
+hierarchy -check -top omega_rom
+proc
+opt_expr
+opt_clean
+opt -nodffe -nosdff
+memory -nomap
+opt -full
+wreduce
+peepopt
+alumacc
+share
+opt
+memory -nomap
+opt -fast
+rename -enumerate -pattern omem_% t:$mem_v2
+write_rtlil /workspace/work/omega/synth/out/omega_rom/pre.il

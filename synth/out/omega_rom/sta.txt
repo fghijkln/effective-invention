@@ -1,0 +1,69 @@
+WORST_SLACK 1.2331060617043477e-9
+Startpoint: cfg_sel[0] (input port clocked by clk)
+Endpoint: romr (rising edge-triggered flip-flop clocked by clk)
+Path Group: clk
+Path Type: max
+
+   Delay     Time   Description
+-----------------------------------------------------------
+   0.000    0.000   clock clk (rise edge)
+   0.000    0.000   clock network delay (ideal)
+   0.100    0.100 ^ input external delay
+   0.000    0.100 ^ cfg_sel[0] (in)
+   0.005    0.105 v _2889_/ZN (INV_X1)
+   0.529    0.634 ^ _2966_/ZN (NOR3_X1)
+   0.083    0.717 ^ _fb187_/Z (BUF_X4)
+   0.000    0.717 ^ romr/WR_EN[0] (M_omega_rom_romr)
+            0.717   data arrival time
+
+   2.000    2.000   clock clk (rise edge)
+   0.000    2.000   clock network delay (ideal)
+   0.000    2.000   clock reconvergence pessimism
+            2.000 ^ romr/WR_CLK (M_omega_rom_romr)
+  -0.050    1.950   library setup time
+            1.950   data required time
+-----------------------------------------------------------
+            1.950   data required time
+           -0.717   data arrival time
+-----------------------------------------------------------
+            1.233   slack (MET)
+
+
+REG2REG
+Startpoint: _3428_ (rising edge-triggered flip-flop clocked by clk)
+Endpoint: romr (rising edge-triggered flip-flop clocked by clk)
+Path Group: clk
+Path Type: max
+
+   Delay     Time   Description
+-----------------------------------------------------------
+   0.000    0.000   clock clk (rise edge)
+   0.000    0.000   clock network delay (ideal)
+   0.000    0.000 ^ _3428_/CK (DFF_X1)
+   0.153    0.153 ^ _3428_/Q (DFF_X1)
+   0.075    0.228 v _2929_/Z (MUX2_X1)
+   0.087    0.315 v _2940_/Z (MUX2_X1)
+   0.133    0.448 ^ _2941_/ZN (NOR3_X1)
+   0.048    0.496 v _2946_/ZN (OAI21_X1)
+   0.038    0.534 v _fb150_/Z (BUF_X4)
+   0.039    0.573 ^ _2948_/ZN (NAND2_X1)
+   0.044    0.617 ^ _fb72_/Z (BUF_X4)
+   0.017    0.634 v _2536_/ZN (AOI21_X1)
+   0.065    0.699 ^ _2538_/ZN (OAI221_X1)
+   0.000    0.699 ^ romr/RD_ADDR[0] (M_omega_rom_romr)
+            0.699   data arrival time
+
+   2.000    2.000   clock clk (rise edge)
+   0.000    2.000   clock network delay (ideal)
+   0.000    2.000   clock reconvergence pessimism
+            2.000 ^ romr/RD_CLK (M_omega_rom_romr)
+  -0.050    1.950   library setup time
+            1.950   data required time
+-----------------------------------------------------------
+            1.950   data required time
+           -0.699   data arrival time
+-----------------------------------------------------------
+            1.251   slack (MET)
+
+
+REG2REG_SLACK 1.233

@@ -1,0 +1,66 @@
+{
+ "design": "tx_core",
+ "period_ns": 2.0,
+ "std_cell_area_um2": 166992.938,
+ "buffer_area_um2": 8010.3240000000005,
+ "buffers": {
+  "BUF_X4": 4081,
+  "BUF_X8": 119
+ },
+ "mem_area_um2": 28449.874300480766,
+ "total_area_um2": 195442.81230048076,
+ "stat_total_area_um2": 187432.514,
+ "mem_bits": 26976,
+ "sram_density_um2_per_bit": 0.5326893780048076,
+ "fakeram_densities": [
+  0.5006738891601562,
+  0.569396259014423,
+  0.5279979858398437
+ ],
+ "worst_slack_ns": -8.475317336831267,
+ "fmax_mhz": 95.46250178827472,
+ "reg2reg_slack_ns": -8.475,
+ "fmax_reg2reg_mhz": 95.4653937947494,
+ "mems": [
+  {
+   "module": "\\tx_core",
+   "memid": "rf_val",
+   "words": 64,
+   "width": 128,
+   "rd_ports": 2,
+   "wr_ports": 1,
+   "bits": 8192,
+   "area_um2": 8727.6
+  },
+  {
+   "module": "\\tx_core",
+   "memid": "rf_meta",
+   "words": 64,
+   "width": 285,
+   "rd_ports": 2,
+   "wr_ports": 1,
+   "bits": 18240,
+   "area_um2": 19432.5
+  },
+  {
+   "module": "\\tx_core",
+   "memid": "$auto$proc_rom.cc:155:do_switch$4192",
+   "words": 64,
+   "width": 6,
+   "rd_ports": 1,
+   "wr_ports": 0,
+   "bits": 384,
+   "area_um2": 204.6
+  },
+  {
+   "module": "\\tx_core",
+   "memid": "$auto$proc_rom.cc:155:do_switch$4196",
+   "words": 32,
+   "width": 5,
+   "rd_ports": 1,
+   "wr_ports": 0,
+   "bits": 160,
+   "area_um2": 85.2
+  }
+ ]
+}

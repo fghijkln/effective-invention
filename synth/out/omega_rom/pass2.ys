@@ -1,0 +1,84 @@
+read_rtlil /workspace/work/omega/synth/out/omega_rom/pre.il
+chtype -set M_omega_rom_romr omega_rom/romr
+setparam -unset MEMID omega_rom/romr
+setparam -unset WIDTH omega_rom/romr
+setparam -unset OFFSET omega_rom/romr
+setparam -unset SIZE omega_rom/romr
+setparam -unset ABITS omega_rom/romr
+setparam -unset RD_PORTS omega_rom/romr
+setparam -unset RD_CLK_ENABLE omega_rom/romr
+setparam -unset RD_CLK_POLARITY omega_rom/romr
+setparam -unset RD_TRANSPARENCY_MASK omega_rom/romr
+setparam -unset RD_COLLISION_X_MASK omega_rom/romr
+setparam -unset RD_WIDE_CONTINUATION omega_rom/romr
+setparam -unset RD_CE_OVER_SRST omega_rom/romr
+setparam -unset RD_ARST_VALUE omega_rom/romr
+setparam -unset RD_SRST_VALUE omega_rom/romr
+setparam -unset RD_INIT_VALUE omega_rom/romr
+setparam -unset WR_PORTS omega_rom/romr
+setparam -unset WR_CLK_ENABLE omega_rom/romr
+setparam -unset WR_CLK_POLARITY omega_rom/romr
+setparam -unset WR_PRIORITY_MASK omega_rom/romr
+setparam -unset WR_WIDE_CONTINUATION omega_rom/romr
+setparam -unset INIT omega_rom/romr
+setparam -unset INIT omega_rom/romr
+setparam -unset OFFSET omega_rom/romr
+setparam -unset RD_CLK_POLARITY omega_rom/romr
+setparam -unset RD_TRANSPARENCY_MASK omega_rom/romr
+setparam -unset RD_COLLISION_X_MASK omega_rom/romr
+setparam -unset RD_WIDE_CONTINUATION omega_rom/romr
+setparam -unset RD_CE_OVER_SRST omega_rom/romr
+setparam -unset RD_ARST_VALUE omega_rom/romr
+setparam -unset RD_SRST_VALUE omega_rom/romr
+setparam -unset RD_INIT_VALUE omega_rom/romr
+setparam -unset WR_CLK_ENABLE omega_rom/romr
+setparam -unset WR_CLK_POLARITY omega_rom/romr
+setparam -unset WR_PRIORITY_MASK omega_rom/romr
+setparam -unset WR_WIDE_CONTINUATION omega_rom/romr
+chtype -set M_omega_rom_romn omega_rom/romn
+setparam -unset MEMID omega_rom/romn
+setparam -unset WIDTH omega_rom/romn
+setparam -unset OFFSET omega_rom/romn
+setparam -unset SIZE omega_rom/romn
+setparam -unset ABITS omega_rom/romn
+setparam -unset RD_PORTS omega_rom/romn
+setparam -unset RD_CLK_ENABLE omega_rom/romn
+setparam -unset RD_CLK_POLARITY omega_rom/romn
+setparam -unset RD_TRANSPARENCY_MASK omega_rom/romn
+setparam -unset RD_COLLISION_X_MASK omega_rom/romn
+setparam -unset RD_WIDE_CONTINUATION omega_rom/romn
+setparam -unset RD_CE_OVER_SRST omega_rom/romn
+setparam -unset RD_ARST_VALUE omega_rom/romn
+setparam -unset RD_SRST_VALUE omega_rom/romn
+setparam -unset RD_INIT_VALUE omega_rom/romn
+setparam -unset WR_PORTS omega_rom/romn
+setparam -unset WR_CLK_ENABLE omega_rom/romn
+setparam -unset WR_CLK_POLARITY omega_rom/romn
+setparam -unset WR_PRIORITY_MASK omega_rom/romn
+setparam -unset WR_WIDE_CONTINUATION omega_rom/romn
+setparam -unset INIT omega_rom/romn
+setparam -unset INIT omega_rom/romn
+setparam -unset OFFSET omega_rom/romn
+setparam -unset RD_CLK_POLARITY omega_rom/romn
+setparam -unset RD_TRANSPARENCY_MASK omega_rom/romn
+setparam -unset RD_COLLISION_X_MASK omega_rom/romn
+setparam -unset RD_WIDE_CONTINUATION omega_rom/romn
+setparam -unset RD_CE_OVER_SRST omega_rom/romn
+setparam -unset RD_ARST_VALUE omega_rom/romn
+setparam -unset RD_SRST_VALUE omega_rom/romn
+setparam -unset RD_INIT_VALUE omega_rom/romn
+setparam -unset WR_CLK_ENABLE omega_rom/romn
+setparam -unset WR_CLK_POLARITY omega_rom/romn
+setparam -unset WR_PRIORITY_MASK omega_rom/romn
+setparam -unset WR_WIDE_CONTINUATION omega_rom/romn
+techmap
+opt -fast
+dfflibmap -liberty /workspace/work/omega/synth/pdk/NangateOpenCellLibrary_typical.lib
+abc -liberty /workspace/work/omega/synth/pdk/NangateOpenCellLibrary_typical.lib -D 2000
+opt_clean
+hilomap -singleton -hicell LOGIC1_X1 Z -locell LOGIC0_X1 Z
+setundef -zero
+opt_clean
+tee -o /workspace/work/omega/synth/out/omega_rom/stat.txt stat -liberty /workspace/work/omega/synth/pdk/NangateOpenCellLibrary_typical.lib -liberty /workspace/work/omega/synth/out/omega_rom/mems.lib -top omega_rom
+tee -o /workspace/work/omega/synth/out/omega_rom/stat_std.txt stat -liberty /workspace/work/omega/synth/pdk/NangateOpenCellLibrary_typical.lib -top omega_rom
+write_verilog -noattr -noexpr -nohex -nodec /workspace/work/omega/synth/out/omega_rom/net.v

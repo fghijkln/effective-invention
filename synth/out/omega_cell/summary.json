@@ -1,0 +1,86 @@
+{
+ "design": "omega_cell",
+ "period_ns": 2.0,
+ "std_cell_area_um2": 150915.366,
+ "buffer_area_um2": 14846.524,
+ "buffers": {
+  "BUF_X4": 7498,
+  "BUF_X8": 256
+ },
+ "mem_area_um2": 348557.83684615383,
+ "total_area_um2": 499473.2028461539,
+ "stat_total_area_um2": 484626.542,
+ "mem_bits": 391168,
+ "sram_density_um2_per_bit": 0.5326893780048076,
+ "fakeram_densities": [
+  0.5006738891601562,
+  0.569396259014423,
+  0.5279979858398437
+ ],
+ "worst_slack_ns": -26.58337905359076,
+ "fmax_mhz": 34.98536677994255,
+ "reg2reg_slack_ns": -26.583,
+ "fmax_reg2reg_mhz": 34.98583073855089,
+ "mems": [
+  {
+   "module": "\\omega_cell",
+   "memid": "dirm",
+   "words": 256,
+   "width": 128,
+   "rd_ports": 1,
+   "wr_ports": 1,
+   "bits": 32768,
+   "area_um2": 26182.7
+  },
+  {
+   "module": "\\omega_cell",
+   "memid": "node_mem",
+   "words": 1024,
+   "width": 132,
+   "rd_ports": 2,
+   "wr_ports": 1,
+   "bits": 135168,
+   "area_um2": 144005.1
+  },
+  {
+   "module": "\\omega_cell",
+   "memid": "var_mem",
+   "words": 1024,
+   "width": 68,
+   "rd_ports": 1,
+   "wr_ports": 1,
+   "bits": 69632,
+   "area_um2": 55638.3
+  },
+  {
+   "module": "\\omega_cell",
+   "memid": "tqm",
+   "words": 1024,
+   "width": 130,
+   "rd_ports": 1,
+   "wr_ports": 1,
+   "bits": 133120,
+   "area_um2": 106367.4
+  },
+  {
+   "module": "\\omega_cell",
+   "memid": "vstk",
+   "words": 1024,
+   "width": 10,
+   "rd_ports": 1,
+   "wr_ports": 1,
+   "bits": 10240,
+   "area_um2": 8182.1
+  },
+  {
+   "module": "\\omega_cell",
+   "memid": "nstk",
+   "words": 1024,
+   "width": 10,
+   "rd_ports": 1,
+   "wr_ports": 1,
+   "bits": 10240,
+   "area_um2": 8182.1
+  }
+ ]
+}

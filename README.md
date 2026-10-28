@@ -316,6 +316,54 @@ What this comparison does and does not say:
   are not compared; the Ω cell's critical path (read-ahead address → SRAM) is unmeasured.
 * **The numbers are 32-bit.** TACHYON-128 computes with 128-bit registers. Ω's NUM atoms are 32-bit.
 
+### Standard-cell area and Fmax (step 8: Nangate45, pre-layout)
+
+`synth/flow.py` maps the Ω cell, the cluster ROM and the TACHYON-128 core (`cpu128/rtl/tx_core.sv`,
+read-only) onto the **Nangate45 (FreePDK45) Open Cell Library**, typical corner, with one flow:
+Yosys 0.70 (`dfflibmap` + `abc -D 2000`), every memory kept as a black-box macro whose area is
+bits × the mean density of the OpenROAD **fakeram45** macros (0.533 µm²/bit, +50% per extra port), a
+fanout repair pass (`synth/buffer_nets.py`, buffer trees above 16 sinks, buffers counted in the area)
+and **OpenSTA** pre-layout timing with the library's wire-load model. OpenROAD (place and route) is not
+installable on this aarch64 host, so these are pre-layout estimates (see Known gaps).
+Reports: `synth/out/<design>/{stat.txt, sta.txt, summary.json}`; table: `bench/area_table.py` →
+`results/area_fmax.md`.
+
+| design | std-cell area µm² (of which fanout buffers) | memory µm² (bits) | total µm² | Fmax MHz (critical path) |
+|---|---:|---:|---:|---:|
+| `omega_cell` (1024 node + 1024 var slots, router included) | 150,915 (14,847) | 348,558 (391,168) | 499,473 | **35.0** (engine next state → read-ahead node RAM address, ≈28.5 ns) |
+| `omega_rom` (one per 2×2 cluster, 1 port) | 2,501 (369) | 628,386 (786,432) | 630,887 | 1,304 |
+| per Ω cell with ¼ ROM | 151,540 | 505,654 | **657,195** | 35.0 |
+| TACHYON-128 `tx_core` (v6 RTL) | 166,993 (8,010) | 28,450 (26,976) | **195,443** | **95.5** (operand forwarding → mul/div unit, ≈10.4 ns) |
+
+fib(20), area including every cell and every cluster ROM the mesh needs (cycles from
+`results/bench_c2x2p1.json`; TACHYON-128 cycles from its v6 benchmark):
+
+| machine | cells + ROMs | area mm² (std cell / memory) | per cell mm² | Fmax MHz | fib(20) cycles | time µs | area × cycles (vs T-128) | std-cell area × cycles (vs T-128) | area × time (vs T-128) |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| TACHYON-128 tx_core (v6 cycles) | 1 + 0 | 0.195 (0.167 / 0.028) | 0.195 | 95.5 | 296,931 | 3,110 (1.00×) | 1.00× | 1.00× | 1.00× |
+| TACHYON-Omega 1x1 | 1 + 1 | 1.130 (0.153 / 0.977) | 1.130 | 35.0 | 1,006,974 | 28,783 (9.25×) | 19.61× | 3.12× | 53.52× |
+| TACHYON-Omega 2x2 | 4 + 1 | 2.629 (0.606 / 2.023) | 0.657 | 35.0 | 269,881 | 7,714 (2.48×) | 12.23× | 3.30× | 33.36× |
+| TACHYON-Omega 4x4 | 16 + 4 | 10.515 (2.425 / 8.090) | 0.657 | 35.0 | 70,938 | 2,028 (0.65×) | 12.85× | 3.47× | 35.07× |
+| TACHYON-Omega 8x8 | 64 + 16 | 42.060 (9.699 / 32.362) | 0.657 | 35.0 | 25,635 | 733 (0.24×) | 18.58× | 5.01× | 50.70× |
+
+What this says:
+* **The Ω cell runs at about a third of TACHYON-128's clock.** The v3 engine does a whole link step per
+  cycle *and* computes the next step's RAM read-ahead address from the next-state logic in the same
+  cycle (one `always_ff` block with blocking temporaries: task-stack push/pop, free-stack pops, the
+  next link, then the address). That chain is ≈28.5 ns pre-layout. TACHYON-128's 5-stage pipeline
+  is limited by its mul/div operand path at ≈10.4 ns. Splitting the read-ahead into its own pipeline
+  stage (one more cycle per dependent step, or a predicted address) is the obvious timing fix and would
+  raise cycles per interaction; it is not done.
+* **Wall-clock: Ω only wins from 4×4 up** (4×4: 0.65× the time, 8×8: 0.24×, i.e. 4.2× faster), against
+  2.5× slower at 2×2 and 9.3× slower on one cell.
+* **Area × cycles is 12–20× worse, area × time 33–54× worse.** Memory dominates: a cell carries
+  0.506 mm² of SRAM/ROM (node RAM 0.144, task queue 0.106, var RAM 0.056, directory 0.026, ¼ ROM
+  0.157) against 0.152 mm² of logic. Counting standard cells only, Ω is 3.1–5.0× worse in area ×
+  cycles, consistent with the generic-gate GE estimate of step 5 (3.6–6.0×).
+* The comparison omits what TACHYON-128 needs and Ω does not (caches, DRAM interface), and Ω's 1024
+  slots per cell are sized for the test suite, not tuned; smaller node RAM / task queue is the next
+  area lever.
+
 ## Known gaps
 
 1. **Owner capabilities: scope.** 15 tenants (4-bit owner, 15 = free). A trapped tenant is not
@@ -325,11 +373,16 @@ What this comparison does and does not say:
    The ROM is shared, so tenants see each other's definitions (they cannot forge an owner, but code is
    not confidential). Forged pointers to slots the attacker itself owns are not trapped (no isolation
    issue, but the attacker can corrupt its own graph).
-2. **Synthesis is technology-independent; area comparison is logic only.** Generic-gate cell counts and NAND2 equivalents only; no
-   standard-cell library, no place and route, no timing. Memories are counted in bits, not area.
-   The per-slot `nalloc` valid bits are flip-flops (1 per node slot) and dominate the growth from
-   256 to 1024 slots. The area-normalised comparison with TACHYON-128 counts logic GE only; each Ω
-   cell's SRAM/ROM is not converted to area. No Fmax.
+2. **Area and Fmax are pre-layout estimates (no OpenROAD).** OpenROAD has no linux-aarch64 package
+   and a source build of it and its dependencies was out of scope, so `synth/flow.py` stops after
+   synthesis + OpenSTA: no floorplan, placement, clock tree or routing, wire delay from the Nangate45
+   wire-load model only (real routed timing on a 0.66 mm² cell will be worse), the fanout repair is a
+   simple buffer-tree pass instead of `repair_design`/resizing, and `abc` maps for delay without
+   retiming or gate sizing. Memory macros are *not* generated: their area is bits × the average
+   fakeram45 density (+50% per extra port) and their timing is the fakeram45 clock-to-out/setup, so
+   the memory area is good to perhaps ±30%. Yosys maps logic only for the typical corner. Both
+   designs go through the same flow, so the *ratio* is more trustworthy than the absolute numbers.
+   The per-slot `nalloc` valid bits are flip-flops (1 per node slot).
 3. **Out-of-memory handling: local recovery only.** Step 4 moves work from poor to rich cells
    (`roomy` wire, SPAWN/NODE/PULL to roomy neighbours), but:
    * task-stack overflow (`err = 1`) or a 1×1 cell that cannot place an expansion (`err = 2`) still
@@ -364,8 +417,8 @@ What this comparison does and does not say:
 
 ## Next steps (suggested)
 
-1. A standard-cell flow (OpenROAD + a public PDK) for real area and Fmax. (The definition ROM is
-   already shared per 2×2 cluster, step 7.)
+1. Timing: pipeline the read-ahead address (the 35 MHz critical path), then place and route the cell
+   (OpenROAD on an x86-64 host) for routed area and Fmax. Shrink the node RAM / task queue.
 2. Cut cycles per interaction below 3.4: process a var link that overlaps a rule (2.5-cycle target),
    or dual-issue independent tasks.
 3. Global memory pressure: throttle spawning when every neighbour is poor, and spill to off-fabric

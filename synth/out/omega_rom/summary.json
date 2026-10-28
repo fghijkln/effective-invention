@@ -1,0 +1,46 @@
+{
+ "design": "omega_rom",
+ "period_ns": 2.0,
+ "std_cell_area_um2": 2501.464,
+ "buffer_area_um2": 369.20799999999997,
+ "buffers": {
+  "BUF_X4": 176,
+  "BUF_X8": 12
+ },
+ "mem_area_um2": 628385.9593846153,
+ "total_area_um2": 630887.4233846153,
+ "stat_total_area_um2": 630518.256,
+ "mem_bits": 786432,
+ "sram_density_um2_per_bit": 0.5326893780048076,
+ "fakeram_densities": [
+  0.5006738891601562,
+  0.569396259014423,
+  0.5279979858398437
+ ],
+ "worst_slack_ns": 1.2331060617043477,
+ "fmax_mhz": 1303.9612781689257,
+ "reg2reg_slack_ns": 1.251,
+ "fmax_reg2reg_mhz": 1335.1134846461948,
+ "mems": [
+  {
+   "module": "\\omega_rom",
+   "memid": "romr",
+   "words": 1024,
+   "width": 256,
+   "rd_ports": 1,
+   "wr_ports": 1,
+   "bits": 262144,
+   "area_um2": 209462.0
+  },
+  {
+   "module": "\\omega_rom",
+   "memid": "romn",
+   "words": 2048,
+   "width": 256,
+   "rd_ports": 1,
+   "wr_ports": 1,
+   "bits": 524288,
+   "area_um2": 418924.0
+  }
+ ]
+}

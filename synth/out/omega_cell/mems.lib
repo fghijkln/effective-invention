@@ -1,0 +1,117 @@
+library(omega_mems) {
+  delay_model : table_lookup;
+  time_unit : "1ns";
+  voltage_unit : "1V";
+  current_unit : "1mA";
+  capacitive_load_unit (1,ff);
+  pulling_resistance_unit : "1kohm";
+  leakage_power_unit : "1nW";
+  nom_process : 1.0; nom_voltage : 1.1; nom_temperature : 25.0;
+  default_max_transition : 0.227;
+  input_threshold_pct_rise : 50; input_threshold_pct_fall : 50;
+  output_threshold_pct_rise : 50; output_threshold_pct_fall : 50;
+  slew_lower_threshold_pct_rise : 20;
+  slew_lower_threshold_pct_fall : 20; slew_upper_threshold_pct_rise : 80; slew_upper_threshold_pct_fall : 80;
+  slew_derate_from_library : 1.0;
+  type(b1) { base_type : array; data_type : bit; bit_width : 1; bit_from : 0; bit_to : 0; downto : true; }
+  type(b2) { base_type : array; data_type : bit; bit_width : 2; bit_from : 1; bit_to : 0; downto : true; }
+  type(b10) { base_type : array; data_type : bit; bit_width : 10; bit_from : 9; bit_to : 0; downto : true; }
+  type(b11) { base_type : array; data_type : bit; bit_width : 11; bit_from : 10; bit_to : 0; downto : true; }
+  type(b16) { base_type : array; data_type : bit; bit_width : 16; bit_from : 15; bit_to : 0; downto : true; }
+  type(b20) { base_type : array; data_type : bit; bit_width : 20; bit_from : 19; bit_to : 0; downto : true; }
+  type(b68) { base_type : array; data_type : bit; bit_width : 68; bit_from : 67; bit_to : 0; downto : true; }
+  type(b128) { base_type : array; data_type : bit; bit_width : 128; bit_from : 127; bit_to : 0; downto : true; }
+  type(b130) { base_type : array; data_type : bit; bit_width : 130; bit_from : 129; bit_to : 0; downto : true; }
+  type(b132) { base_type : array; data_type : bit; bit_width : 132; bit_from : 131; bit_to : 0; downto : true; }
+  type(b264) { base_type : array; data_type : bit; bit_width : 264; bit_from : 263; bit_to : 0; downto : true; }
+  cell(M_omega_cell_dirm) {
+    area : 26182.7;
+    dont_touch : true;
+    dont_use : true;
+    pin(RD_CLK) { direction : input; capacitance : 25.0; clock : true; }
+    pin(RD_EN) { direction : input; capacitance : 5.0; timing() { related_pin : "RD_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "RD_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    pin(RD_ARST) { direction : input; capacitance : 5.0;  }
+    pin(RD_SRST) { direction : input; capacitance : 5.0; timing() { related_pin : "RD_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "RD_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    bus(RD_ADDR) { bus_type : b16; direction : input; capacitance : 5.0; timing() { related_pin : "RD_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "RD_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    bus(RD_DATA) { bus_type : b128; direction : output; max_capacitance : 500.0; timing() { related_pin : "RD_CLK"; timing_type : rising_edge; cell_rise(scalar) { values("0.309"); } cell_fall(scalar) { values("0.309"); } rise_transition(scalar) { values("0.050"); } fall_transition(scalar) { values("0.050"); } } }
+    pin(WR_CLK) { direction : input; capacitance : 25.0; clock : true; }
+    bus(WR_EN) { bus_type : b128; direction : input; capacitance : 5.0; timing() { related_pin : "WR_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "WR_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    bus(WR_ADDR) { bus_type : b16; direction : input; capacitance : 5.0; timing() { related_pin : "WR_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "WR_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    bus(WR_DATA) { bus_type : b128; direction : input; capacitance : 5.0; timing() { related_pin : "WR_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "WR_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+  }
+  cell(M_omega_cell_node_mem) {
+    area : 144005.1;
+    dont_touch : true;
+    dont_use : true;
+    bus(RD_CLK) { bus_type : b2; direction : input; capacitance : 25.0; clock : true; }
+    bus(RD_EN) { bus_type : b2; direction : input; capacitance : 5.0; timing() { related_pin : "RD_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "RD_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    bus(RD_ARST) { bus_type : b2; direction : input; capacitance : 5.0;  }
+    bus(RD_SRST) { bus_type : b2; direction : input; capacitance : 5.0; timing() { related_pin : "RD_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "RD_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    bus(RD_ADDR) { bus_type : b20; direction : input; capacitance : 5.0; timing() { related_pin : "RD_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "RD_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    bus(RD_DATA) { bus_type : b264; direction : output; max_capacitance : 500.0; timing() { related_pin : "RD_CLK"; timing_type : rising_edge; cell_rise(scalar) { values("0.309"); } cell_fall(scalar) { values("0.309"); } rise_transition(scalar) { values("0.050"); } fall_transition(scalar) { values("0.050"); } } }
+    pin(WR_CLK) { direction : input; capacitance : 25.0; clock : true; }
+    bus(WR_EN) { bus_type : b132; direction : input; capacitance : 5.0; timing() { related_pin : "WR_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "WR_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    bus(WR_ADDR) { bus_type : b10; direction : input; capacitance : 5.0; timing() { related_pin : "WR_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "WR_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    bus(WR_DATA) { bus_type : b132; direction : input; capacitance : 5.0; timing() { related_pin : "WR_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "WR_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+  }
+  cell(M_omega_cell_var_mem) {
+    area : 55638.3;
+    dont_touch : true;
+    dont_use : true;
+    pin(RD_CLK) { direction : input; capacitance : 25.0; clock : true; }
+    pin(RD_EN) { direction : input; capacitance : 5.0; timing() { related_pin : "RD_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "RD_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    pin(RD_ARST) { direction : input; capacitance : 5.0;  }
+    pin(RD_SRST) { direction : input; capacitance : 5.0; timing() { related_pin : "RD_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "RD_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    bus(RD_ADDR) { bus_type : b10; direction : input; capacitance : 5.0; timing() { related_pin : "RD_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "RD_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    bus(RD_DATA) { bus_type : b68; direction : output; max_capacitance : 500.0; timing() { related_pin : "RD_CLK"; timing_type : rising_edge; cell_rise(scalar) { values("0.309"); } cell_fall(scalar) { values("0.309"); } rise_transition(scalar) { values("0.050"); } fall_transition(scalar) { values("0.050"); } } }
+    pin(WR_CLK) { direction : input; capacitance : 25.0; clock : true; }
+    bus(WR_EN) { bus_type : b68; direction : input; capacitance : 5.0; timing() { related_pin : "WR_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "WR_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    bus(WR_ADDR) { bus_type : b10; direction : input; capacitance : 5.0; timing() { related_pin : "WR_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "WR_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    bus(WR_DATA) { bus_type : b68; direction : input; capacitance : 5.0; timing() { related_pin : "WR_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "WR_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+  }
+  cell(M_omega_cell_tqm) {
+    area : 106367.4;
+    dont_touch : true;
+    dont_use : true;
+    pin(RD_CLK) { direction : input; capacitance : 25.0; clock : true; }
+    pin(RD_EN) { direction : input; capacitance : 5.0; timing() { related_pin : "RD_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "RD_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    pin(RD_ARST) { direction : input; capacitance : 5.0;  }
+    pin(RD_SRST) { direction : input; capacitance : 5.0; timing() { related_pin : "RD_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "RD_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    bus(RD_ADDR) { bus_type : b11; direction : input; capacitance : 5.0; timing() { related_pin : "RD_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "RD_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    bus(RD_DATA) { bus_type : b130; direction : output; max_capacitance : 500.0; timing() { related_pin : "RD_CLK"; timing_type : rising_edge; cell_rise(scalar) { values("0.309"); } cell_fall(scalar) { values("0.309"); } rise_transition(scalar) { values("0.050"); } fall_transition(scalar) { values("0.050"); } } }
+    pin(WR_CLK) { direction : input; capacitance : 25.0; clock : true; }
+    bus(WR_EN) { bus_type : b130; direction : input; capacitance : 5.0; timing() { related_pin : "WR_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "WR_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    bus(WR_ADDR) { bus_type : b11; direction : input; capacitance : 5.0; timing() { related_pin : "WR_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "WR_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    bus(WR_DATA) { bus_type : b130; direction : input; capacitance : 5.0; timing() { related_pin : "WR_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "WR_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+  }
+  cell(M_omega_cell_vstk) {
+    area : 8182.1;
+    dont_touch : true;
+    dont_use : true;
+    pin(RD_CLK) { direction : input; capacitance : 25.0; clock : true; }
+    pin(RD_EN) { direction : input; capacitance : 5.0; timing() { related_pin : "RD_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "RD_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    pin(RD_ARST) { direction : input; capacitance : 5.0;  }
+    pin(RD_SRST) { direction : input; capacitance : 5.0; timing() { related_pin : "RD_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "RD_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    bus(RD_ADDR) { bus_type : b11; direction : input; capacitance : 5.0; timing() { related_pin : "RD_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "RD_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    bus(RD_DATA) { bus_type : b10; direction : output; max_capacitance : 500.0; timing() { related_pin : "RD_CLK"; timing_type : rising_edge; cell_rise(scalar) { values("0.309"); } cell_fall(scalar) { values("0.309"); } rise_transition(scalar) { values("0.050"); } fall_transition(scalar) { values("0.050"); } } }
+    pin(WR_CLK) { direction : input; capacitance : 25.0; clock : true; }
+    bus(WR_EN) { bus_type : b10; direction : input; capacitance : 5.0; timing() { related_pin : "WR_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "WR_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    bus(WR_ADDR) { bus_type : b11; direction : input; capacitance : 5.0; timing() { related_pin : "WR_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "WR_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    bus(WR_DATA) { bus_type : b10; direction : input; capacitance : 5.0; timing() { related_pin : "WR_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "WR_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+  }
+  cell(M_omega_cell_nstk) {
+    area : 8182.1;
+    dont_touch : true;
+    dont_use : true;
+    pin(RD_CLK) { direction : input; capacitance : 25.0; clock : true; }
+    pin(RD_EN) { direction : input; capacitance : 5.0; timing() { related_pin : "RD_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "RD_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    pin(RD_ARST) { direction : input; capacitance : 5.0;  }
+    pin(RD_SRST) { direction : input; capacitance : 5.0; timing() { related_pin : "RD_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "RD_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    bus(RD_ADDR) { bus_type : b11; direction : input; capacitance : 5.0; timing() { related_pin : "RD_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "RD_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    bus(RD_DATA) { bus_type : b10; direction : output; max_capacitance : 500.0; timing() { related_pin : "RD_CLK"; timing_type : rising_edge; cell_rise(scalar) { values("0.309"); } cell_fall(scalar) { values("0.309"); } rise_transition(scalar) { values("0.050"); } fall_transition(scalar) { values("0.050"); } } }
+    pin(WR_CLK) { direction : input; capacitance : 25.0; clock : true; }
+    bus(WR_EN) { bus_type : b10; direction : input; capacitance : 5.0; timing() { related_pin : "WR_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "WR_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    bus(WR_ADDR) { bus_type : b11; direction : input; capacitance : 5.0; timing() { related_pin : "WR_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "WR_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+    bus(WR_DATA) { bus_type : b10; direction : input; capacitance : 5.0; timing() { related_pin : "WR_CLK"; timing_type : setup_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } timing() { related_pin : "WR_CLK"; timing_type : hold_rising; rise_constraint(scalar) { values("0.050"); } fall_constraint(scalar) { values("0.050"); } } }
+  }
+}

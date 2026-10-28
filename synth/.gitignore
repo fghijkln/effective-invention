@@ -1,0 +1,5 @@
+pdk/
+out/*/net.v
+out/*/pre.il
+out/*/pass*.log
+out/*/net_buf.v

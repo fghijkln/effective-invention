@@ -1,0 +1,176 @@
+11. Printing statistics.
+
+=== omega_cell ===
+
+        +----------Local Count, excluding submodules.
+        |        +-Local Area, excluding submodules.
+        |        | 
+   103769        - wires
+   115706        - wire bits
+      138        - public wires
+    11084        - public wire bits
+       32        - ports
+     1356        - port bits
+   104034 1.35E+05 cells
+     1691  1.8E+03   AND2_X1
+      527   700.91   AND3_X1
+      114  181.944   AND4_X1
+     4282  5695.06   AOI211_X1
+    12363 1.32E+04   AOI21_X1
+     2669 4.26E+03   AOI221_X1
+      348  740.544   AOI222_X1
+     5933  7890.89   AOI22_X1
+     4743 2.14E+04   DFF_X1
+     3913 2.08E+03   INV_X1
+        1    0.532   LOGIC0_X1
+     7179 1.34E+04   MUX2_X1
+        1        -   M_omega_cell_dirm
+        1        -   M_omega_cell_node_mem
+        1        -   M_omega_cell_nstk
+        1        -   M_omega_cell_tqm
+        1        -   M_omega_cell_var_mem
+        1        -   M_omega_cell_vstk
+    12025  9595.95   NAND2_X1
+     3552 3.78E+03   NAND3_X1
+      359   477.47   NAND4_X1
+    12614 1.01E+04   NOR2_X1
+     3260  3468.64   NOR3_X1
+      602   800.66   NOR4_X1
+     3764  5006.12   OAI211_X1
+    12547 1.34E+04   OAI21_X1
+     3650   5825.4   OAI221_X1
+       91  193.648   OAI222_X1
+     2996  3984.68   OAI22_X1
+      359  668.458   OAI33_X1
+     1561 1.66E+03   OR2_X1
+      507   674.31   OR3_X1
+       71  113.316   OR4_X1
+     1686 2.69E+03   XNOR2_X1
+      621  991.116   XOR2_X1
+        1        - submodules
+        1        -   $paramod$8fbdfe6a91beeb005859bac4a54d2a2dcba342d8\omega_router
+
+   Area for cell type \M_omega_cell_dirm is unknown!
+   Area for cell type \M_omega_cell_node_mem is unknown!
+   Area for cell type \M_omega_cell_var_mem is unknown!
+   Area for cell type \M_omega_cell_tqm is unknown!
+   Area for cell type \M_omega_cell_vstk is unknown!
+   Area for cell type \M_omega_cell_nstk is unknown!
+
+   Chip area for module '\omega_cell': 134666.756000
+     of which used for sequential elements: 21447.846000 (15.93%)
+
+=== $paramod$8fbdfe6a91beeb005859bac4a54d2a2dcba342d8\omega_router ===
+
+        +----------Local Count, excluding submodules.
+        |        +-Local Area, excluding submodules.
+        |        | 
+      969        - wires
+     3028        - wire bits
+       30        - public wires
+     2027        - public wire bits
+       17        - ports
+     1127        - port bits
+      987  1.4E+03 cells
+       20    21.28   AND2_X1
+       11    14.63   AND3_X1
+        3    4.788   AND4_X1
+       27    35.91   AOI211_X1
+      103  109.592   AOI21_X1
+       11   17.556   AOI221_X1
+        7   14.896   AOI222_X1
+       22    29.26   AOI22_X1
+       65   293.93   DFF_X1
+       65    34.58   INV_X1
+        1    0.532   LOGIC0_X1
+       67  124.754   MUX2_X1
+       67   53.466   NAND2_X1
+       35    37.24   NAND3_X1
+       14    18.62   NAND4_X1
+       88   70.224   NOR2_X1
+       51   54.264   NOR3_X1
+       13    17.29   NOR4_X1
+       10     13.3   OAI211_X1
+       84   89.376   OAI21_X1
+       19   30.324   OAI221_X1
+       20    42.56   OAI222_X1
+       32    42.56   OAI22_X1
+        7   13.034   OAI33_X1
+       14   14.896   OR2_X1
+       22    29.26   OR3_X1
+        9   14.364   OR4_X1
+       66  105.336   XNOR2_X1
+       34   54.264   XOR2_X1
+
+   Chip area for module '$paramod$8fbdfe6a91beeb005859bac4a54d2a2dcba342d8\omega_router': 1402.086000
+     of which used for sequential elements: 293.930000 (20.96%)
+
+=== design hierarchy ===
+
+        +----------Count including submodules.
+        |        +-Area including submodules.
+        |        | 
+   105021 1.36E+05 omega_cell
+      987  1.4E+03 $paramod$8fbdfe6a91beeb005859bac4a54d2a2dcba342d8\omega_router
+
+        +----------Count including submodules.
+        |        +-Area including submodules.
+        |        | 
+   104738        - wires
+   118734        - wire bits
+      168        - public wires
+    13111        - public wire bits
+       49        - ports
+     2483        - port bits
+        -        - memories
+        -        - memory bits
+        -        - processes
+   105021 1.36E+05 cells
+     1711 1.82E+03   AND2_X1
+      538   715.54   AND3_X1
+      117  186.732   AND4_X1
+     4309  5730.97   AOI211_X1
+    12466 1.33E+04   AOI21_X1
+     2680  4277.28   AOI221_X1
+      355   755.44   AOI222_X1
+     5955  7920.15   AOI22_X1
+     4808 2.17E+04   DFF_X1
+     3978 2.12E+03   INV_X1
+        2    1.064   LOGIC0_X1
+     7246 1.35E+04   MUX2_X1
+        1        -   M_omega_cell_dirm
+        1        -   M_omega_cell_node_mem
+        1        -   M_omega_cell_nstk
+        1        -   M_omega_cell_tqm
+        1        -   M_omega_cell_var_mem
+        1        -   M_omega_cell_vstk
+    12092 9.65E+03   NAND2_X1
+     3587 3.82E+03   NAND3_X1
+      373   496.09   NAND4_X1
+    12702 1.01E+04   NOR2_X1
+     3311 3.52E+03   NOR3_X1
+      615   817.95   NOR4_X1
+     3774  5019.42   OAI211_X1
+    12631 1.34E+04   OAI21_X1
+     3669 5.86E+03   OAI221_X1
+      111  236.208   OAI222_X1
+     3028  4027.24   OAI22_X1
+      366  681.492   OAI33_X1
+     1575   1675.8   OR2_X1
+      529   703.57   OR3_X1
+       80   127.68   OR4_X1
+     1752  2.8E+03   XNOR2_X1
+      655  1045.38   XOR2_X1
+        1  1.4E+03 submodules
+        1  1.4E+03   $paramod$8fbdfe6a91beeb005859bac4a54d2a2dcba342d8\omega_router
+
+   Area for cell type \M_omega_cell_dirm is unknown!
+   Area for cell type \M_omega_cell_node_mem is unknown!
+   Area for cell type \M_omega_cell_var_mem is unknown!
+   Area for cell type \M_omega_cell_tqm is unknown!
+   Area for cell type \M_omega_cell_vstk is unknown!
+   Area for cell type \M_omega_cell_nstk is unknown!
+
+   Chip area for top module '\omega_cell': 136068.842000
+     of which used for sequential elements: 21741.776000 (15.98%)
+

@@ -1,0 +1,17 @@
+read_verilog -sv -DSYNTHESIS -I/workspace/work/cpu128/rtl /workspace/work/cpu128/rtl/tx_alu.sv /workspace/work/cpu128/rtl/tx_simd.sv /workspace/work/cpu128/rtl/tx_mul32x4.sv /workspace/work/cpu128/rtl/tx_muldiv.sv /workspace/work/cpu128/rtl/tx_core.sv
+hierarchy -check -top tx_core
+proc
+opt_expr
+opt_clean
+opt -nodffe -nosdff
+memory -nomap
+opt -full
+wreduce
+peepopt
+alumacc
+share
+opt
+memory -nomap
+opt -fast
+rename -enumerate -pattern omem_% t:$mem_v2
+write_rtlil /workspace/work/omega/synth/out/tx_core/pre.il

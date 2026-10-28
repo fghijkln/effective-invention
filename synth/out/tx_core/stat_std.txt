@@ -1,0 +1,461 @@
+11. Printing statistics.
+
+=== $paramod\tx_simd_lanes\W=s32'00000000000000000000000000010000 ===
+
+        +----------Local Count, excluding submodules.
+        |        +-Local Area, excluding submodules.
+        |        | 
+     4780        - wires
+     5805        - wire bits
+       31        - public wires
+     1056        - public wire bits
+        5        - ports
+      645        - port bits
+     4877 5.52E+03 cells
+      135   143.64   AND2_X1
+       26    34.58   AND3_X1
+        4    6.384   AND4_X1
+      165   219.45   AOI211_X1
+      573  609.672   AOI21_X1
+      213  339.948   AOI221_X1
+        3    6.384   AOI222_X1
+       57    75.81   AOI22_X1
+      327  173.964   INV_X1
+      258  480.396   MUX2_X1
+      548  437.304   NAND2_X1
+      127  135.128   NAND3_X1
+       92   122.36   NAND4_X1
+      589  470.022   NOR2_X1
+      117  124.488   NOR3_X1
+       22    29.26   NOR4_X1
+      189   251.37   OAI211_X1
+      643  684.152   OAI21_X1
+       40    63.84   OAI221_X1
+       24    31.92   OAI22_X1
+        3    5.586   OAI33_X1
+      136  144.704   OR2_X1
+       27    35.91   OR3_X1
+        7   11.172   OR4_X1
+      358  571.368   XNOR2_X1
+      194  309.624   XOR2_X1
+
+   Chip area for module '$paramod\tx_simd_lanes\W=s32'00000000000000000000000000010000': 5518.436000
+     of which used for sequential elements: 0.000000 (0.00%)
+
+=== $paramod\tx_simd_lanes\W=s32'00000000000000000000000000100000 ===
+
+        +----------Local Count, excluding submodules.
+        |        +-Local Area, excluding submodules.
+        |        | 
+     4940        - wires
+     5956        - wire bits
+       18        - public wires
+     1034        - public wire bits
+        5        - ports
+      645        - port bits
+     5050 5.77E+03 cells
+      153  162.792   AND2_X1
+       39    51.87   AND3_X1
+       12   19.152   AND4_X1
+      202   268.66   AOI211_X1
+      721  767.144   AOI21_X1
+      185   295.26   AOI221_X1
+       17   36.176   AOI222_X1
+       73    97.09   AOI22_X1
+      285   151.62   INV_X1
+      319  593.978   MUX2_X1
+      618  493.164   NAND2_X1
+      101  107.464   NAND3_X1
+       58    77.14   NAND4_X1
+      598  477.204   NOR2_X1
+       82   87.248   NOR3_X1
+       24    31.92   NOR4_X1
+      269   357.77   OAI211_X1
+      520   553.28   OAI21_X1
+       43   68.628   OAI221_X1
+       23    30.59   OAI22_X1
+        5     9.31   OAI33_X1
+      162  172.368   OR2_X1
+       25    33.25   OR3_X1
+        6    9.576   OR4_X1
+      287  458.052   XNOR2_X1
+      223  355.908   XOR2_X1
+
+   Chip area for module '$paramod\tx_simd_lanes\W=s32'00000000000000000000000000100000': 5766.614000
+     of which used for sequential elements: 0.000000 (0.00%)
+
+=== $paramod\tx_simd_lanes\W=s32'00000000000000000000000001000000 ===
+
+        +----------Local Count, excluding submodules.
+        |        +-Local Area, excluding submodules.
+        |        | 
+     5066        - wires
+     6089        - wire bits
+       12        - public wires
+     1035        - public wire bits
+        5        - ports
+      645        - port bits
+     5182 5.94E+03 cells
+      111  118.104   AND2_X1
+       26    34.58   AND3_X1
+        3    4.788   AND4_X1
+      210    279.3   AOI211_X1
+      708  753.312   AOI21_X1
+      176  280.896   AOI221_X1
+        3    6.384   AOI222_X1
+       71    94.43   AOI22_X1
+      284  151.088   INV_X1
+      471  877.002   MUX2_X1
+      672  536.256   NAND2_X1
+      138  146.832   NAND3_X1
+       51    67.83   NAND4_X1
+      621  495.558   NOR2_X1
+       97  103.208   NOR3_X1
+       21    27.93   NOR4_X1
+      262   348.46   OAI211_X1
+      538  572.432   OAI21_X1
+       46   73.416   OAI221_X1
+       19    25.27   OAI22_X1
+       10    18.62   OAI33_X1
+      188  200.032   OR2_X1
+       17    22.61   OR3_X1
+        8   12.768   OR4_X1
+      258  411.768   XNOR2_X1
+      173  276.108   XOR2_X1
+
+   Chip area for module '$paramod\tx_simd_lanes\W=s32'00000000000000000000000001000000': 5938.982000
+     of which used for sequential elements: 0.000000 (0.00%)
+
+=== tx_core ===
+
+        +----------Local Count, excluding submodules.
+        |        +-Local Area, excluding submodules.
+        |        | 
+    49136        - wires
+    63347        - wire bits
+      283        - public wires
+    13196        - public wire bits
+       27        - ports
+     1995        - port bits
+    49847 8.19E+04 cells
+     1012 1.08E+03   AND2_X1
+      342   454.86   AND3_X1
+       49   78.204   AND4_X1
+     1612  2143.96   AOI211_X1
+     6107  6.5E+03   AOI21_X1
+      910  1452.36   AOI221_X1
+      534 1.14E+03   AOI222_X1
+     1815  2413.95   AOI22_X1
+     6837 3.09E+04   DFF_X1
+     3260  1734.32   INV_X1
+        1    0.532   LOGIC0_X1
+        1    0.532   LOGIC1_X1
+     5390    1E+04   MUX2_X1
+        1        -   M_tx_core_omem_0
+        1        -   M_tx_core_omem_1
+        1        -   M_tx_core_rf_meta
+        1        -   M_tx_core_rf_val
+     3725  2972.55   NAND2_X1
+     1528 1.63E+03   NAND3_X1
+      308   409.64   NAND4_X1
+     3155  2517.69   NOR2_X1
+      656  697.984   NOR3_X1
+      388   516.04   NOR4_X1
+     1244  1654.52   OAI211_X1
+     6565  6985.16   OAI21_X1
+      500      798   OAI221_X1
+       29   61.712   OAI222_X1
+      553   735.49   OAI22_X1
+       32   59.584   OAI33_X1
+      664  706.496   OR2_X1
+       81   107.73   OR3_X1
+       81  129.276   OR4_X1
+     1672 2.67E+03   XNOR2_X1
+      792 1.26E+03   XOR2_X1
+        4        - submodules
+        1        -   tx_alu
+        1        -   tx_mul32x4
+        1        -   tx_muldiv
+        1        -   tx_simd
+
+   Area for cell type \M_tx_core_rf_val is unknown!
+   Area for cell type \M_tx_core_rf_meta is unknown!
+   Area for cell type \M_tx_core_omem_1 is unknown!
+   Area for cell type \M_tx_core_omem_0 is unknown!
+
+   Chip area for module '\tx_core': 81852.988000
+     of which used for sequential elements: 30916.914000 (37.77%)
+
+=== tx_muldiv ===
+
+        +----------Local Count, excluding submodules.
+        |        +-Local Area, excluding submodules.
+        |        | 
+    15508        - wires
+    21100        - wire bits
+       55        - public wires
+     5120        - public wire bits
+       14        - ports
+      810        - port bits
+    16098 2.45E+04 cells
+      563  599.032   AND2_X1
+      121   160.93   AND3_X1
+       10    15.96   AND4_X1
+      296   393.68   AOI211_X1
+     1448 1.54E+03   AOI21_X1
+      254  405.384   AOI221_X1
+        6   12.768   AOI222_X1
+      291   387.03   AOI22_X1
+     1685  7619.57   DFF_X1
+     1256  668.192   INV_X1
+     1172 2.18E+03   MUX2_X1
+     1650   1316.7   NAND2_X1
+      167  177.688   NAND3_X1
+       64    85.12   NAND4_X1
+     1258    1E+03   NOR2_X1
+      208  221.312   NOR3_X1
+       77   102.41   NOR4_X1
+      657   873.81   OAI211_X1
+     1678 1.79E+03   OAI21_X1
+      102  162.792   OAI221_X1
+        2    4.256   OAI222_X1
+       23    30.59   OAI22_X1
+       66  122.892   OAI33_X1
+      319  339.416   OR2_X1
+       63    83.79   OR3_X1
+        7   11.172   OR4_X1
+     1668 2.66E+03   XNOR2_X1
+      987 1.58E+03   XOR2_X1
+
+   Chip area for module '\tx_muldiv': 24544.086000
+     of which used for sequential elements: 7619.570000 (31.04%)
+
+=== tx_mul32x4 ===
+
+        +----------Local Count, excluding submodules.
+        |        +-Local Area, excluding submodules.
+        |        | 
+    17158        - wires
+    18168        - wire bits
+       16        - public wires
+     1026        - public wire bits
+        4        - ports
+      514        - port bits
+    17398 2.15E+04 cells
+      689  733.096   AND2_X1
+      176   234.08   AND3_X1
+       30    47.88   AND4_X1
+      103   136.99   AOI211_X1
+     1263 1.34E+03   AOI21_X1
+       20    31.92   AOI221_X1
+      471   626.43   AOI22_X1
+      421  223.972   INV_X1
+      127  236.474   MUX2_X1
+     1811 1.45E+03   NAND2_X1
+      284  302.176   NAND3_X1
+       22    29.26   NAND4_X1
+     1891 1.51E+03   NOR2_X1
+      108  114.912   NOR3_X1
+       17    22.61   NOR4_X1
+       81   107.73   OAI211_X1
+     1268 1.35E+03   OAI21_X1
+       11   17.556   OAI221_X1
+     1424  1893.92   OAI22_X1
+       26   48.412   OAI33_X1
+      570   606.48   OR2_X1
+      144   191.52   OR3_X1
+        7   11.172   OR4_X1
+     4007  6.4E+03   XNOR2_X1
+     2427 3.87E+03   XOR2_X1
+
+   Chip area for module '\tx_mul32x4': 21532.434000
+     of which used for sequential elements: 0.000000 (0.00%)
+
+=== tx_simd ===
+
+        +----------Local Count, excluding submodules.
+        |        +-Local Area, excluding submodules.
+        |        | 
+      526        - wires
+     1675        - wire bits
+       10        - public wires
+     1159        - public wire bits
+        6        - ports
+      647        - port bits
+      644  649.838 cells
+        1    1.064   AND2_X1
+        2    1.064   INV_X1
+      256  204.288   NAND2_X1
+      256  272.384   NAND3_X1
+      128   170.24   NAND4_X1
+        1    0.798   NOR2_X1
+        4        - submodules
+        1        -   $paramod\tx_simd_lanes\W=s32'00000000000000000000000000001000
+        1        -   $paramod\tx_simd_lanes\W=s32'00000000000000000000000000010000
+        1        -   $paramod\tx_simd_lanes\W=s32'00000000000000000000000000100000
+        1        -   $paramod\tx_simd_lanes\W=s32'00000000000000000000000001000000
+
+   Chip area for module '\tx_simd': 649.838000
+     of which used for sequential elements: 0.000000 (0.00%)
+
+=== $paramod\tx_simd_lanes\W=s32'00000000000000000000000000001000 ===
+
+        +----------Local Count, excluding submodules.
+        |        +-Local Area, excluding submodules.
+        |        | 
+     4654        - wires
+     5654        - wire bits
+       55        - public wires
+     1055        - public wire bits
+        5        - ports
+      645        - port bits
+     4727 5.27E+03 cells
+      141  150.024   AND2_X1
+       56    74.48   AND3_X1
+       15    23.94   AND4_X1
+      144   191.52   AOI211_X1
+      611  650.104   AOI21_X1
+      156  248.976   AOI221_X1
+        9   19.152   AOI222_X1
+      118   156.94   AOI22_X1
+      346  184.072   INV_X1
+      171  318.402   MUX2_X1
+      597  476.406   NAND2_X1
+      166  176.624   NAND3_X1
+       97   129.01   NAND4_X1
+      584  466.032   NOR2_X1
+       69   73.416   NOR3_X1
+       36    47.88   NOR4_X1
+      168   223.44   OAI211_X1
+      482  512.848   OAI21_X1
+       53   84.588   OAI221_X1
+       29    38.57   OAI22_X1
+        4    7.448   OAI33_X1
+      100    106.4   OR2_X1
+       30     39.9   OR3_X1
+        3    4.788   OR4_X1
+      322  513.912   XNOR2_X1
+      220   351.12   XOR2_X1
+
+   Chip area for module '$paramod\tx_simd_lanes\W=s32'00000000000000000000000000001000': 5269.992000
+     of which used for sequential elements: 0.000000 (0.00%)
+
+=== tx_alu ===
+
+        +----------Local Count, excluding submodules.
+        |        +-Local Area, excluding submodules.
+        |        | 
+     6476        - wires
+     6994        - wire bits
+        6        - public wires
+      524        - public wire bits
+        4        - ports
+      389        - port bits
+     6598 7.91E+03 cells
+      162  172.368   AND2_X1
+       54    71.82   AND3_X1
+        4    6.384   AND4_X1
+      153   203.49   AOI211_X1
+      618  657.552   AOI21_X1
+      219  349.524   AOI221_X1
+        5    10.64   AOI222_X1
+       41    54.53   AOI22_X1
+      434  230.888   INV_X1
+      909 1.69E+03   MUX2_X1
+      696  555.408   NAND2_X1
+      259  275.576   NAND3_X1
+       42    55.86   NAND4_X1
+      684  545.832   NOR2_X1
+      174  185.136   NOR3_X1
+       23    30.59   NOR4_X1
+      269   357.77   OAI211_X1
+      697  741.608   OAI21_X1
+       49   78.204   OAI221_X1
+        9   19.152   OAI222_X1
+       41    54.53   OAI22_X1
+       35    65.17   OAI33_X1
+      231  245.784   OR2_X1
+       45    59.85   OR3_X1
+        7   11.172   OR4_X1
+      557  888.972   XNOR2_X1
+      181  288.876   XOR2_X1
+
+   Chip area for module '\tx_alu': 7909.244000
+     of which used for sequential elements: 0.000000 (0.00%)
+
+=== design hierarchy ===
+
+        +----------Count including submodules.
+        |        +-Area including submodules.
+        |        | 
+   110421 1.59E+05 tx_core
+     6598 7.91E+03 tx_alu
+    17398 2.15E+04 tx_mul32x4
+    16098 2.45E+04 tx_muldiv
+      644  649.838 tx_simd
+     4727 5.27E+03   $paramod\tx_simd_lanes\W=s32'00000000000000000000000000001000
+     4877 5.52E+03   $paramod\tx_simd_lanes\W=s32'00000000000000000000000000010000
+     5050 5.77E+03   $paramod\tx_simd_lanes\W=s32'00000000000000000000000000100000
+     5182 5.94E+03   $paramod\tx_simd_lanes\W=s32'00000000000000000000000001000000
+
+        +----------Count including submodules.
+        |        +-Area including submodules.
+        |        | 
+   108244        - wires
+   134788        - wire bits
+      486        - public wires
+    25205        - public wire bits
+       75        - ports
+     6935        - port bits
+        -        - memories
+        -        - memory bits
+        -        - processes
+   110421 1.59E+05 cells
+     2967 3.16E+03   AND2_X1
+      840   1117.2   AND3_X1
+      127  202.692   AND4_X1
+     2885  3837.05   AOI211_X1
+    12049 1.28E+04   AOI21_X1
+     2133  3.4E+03   AOI221_X1
+      577 1.23E+03   AOI222_X1
+     2937  3906.21   AOI22_X1
+     8522 3.85E+04   DFF_X1
+     6615  3519.18   INV_X1
+        1    0.532   LOGIC0_X1
+        1    0.532   LOGIC1_X1
+     8817 1.64E+04   MUX2_X1
+        1        -   M_tx_core_omem_0
+        1        -   M_tx_core_omem_1
+        1        -   M_tx_core_rf_meta
+        1        -   M_tx_core_rf_val
+    10573 8.44E+03   NAND2_X1
+     3026 3.22E+03   NAND3_X1
+      862  1146.46   NAND4_X1
+     9381 7.49E+03   NOR2_X1
+     1511 1.61E+03   NOR3_X1
+      608   808.64   NOR4_X1
+     3139  4174.87   OAI211_X1
+    12391 1.32E+04   OAI21_X1
+      844 1.35E+03   OAI221_X1
+       40    85.12   OAI222_X1
+     2136  2840.88   OAI22_X1
+      181  337.022   OAI33_X1
+     2370  2521.68   OR2_X1
+      432   574.56   OR3_X1
+      126  201.096   OR4_X1
+     9129 1.46E+04   XNOR2_X1
+     5197 8.29E+03   XOR2_X1
+        4 7.71E+04 submodules
+        1 7.91E+03   tx_alu
+        1 2.15E+04   tx_mul32x4
+        1 2.45E+04   tx_muldiv
+        1 2.31E+04   tx_simd
+
+   Area for cell type \M_tx_core_rf_val is unknown!
+   Area for cell type \M_tx_core_rf_meta is unknown!
+   Area for cell type \M_tx_core_omem_1 is unknown!
+   Area for cell type \M_tx_core_omem_0 is unknown!
+
+   Chip area for top module '\tx_core': 158982.614000
+     of which used for sequential elements: 38536.484000 (24.24%)
+
