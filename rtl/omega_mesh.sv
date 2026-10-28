@@ -27,6 +27,8 @@ module omega_mesh #(
   logic  cidle [W][H];
   logic  chung [W][H];
   logic [3:0]  nhung [W][H];
+  logic        croom [W][H];
+  logic [3:0]  nroom [W][H];
   logic  crdy [W][H];
   logic [3:0]  cerr [W][H];
   logic [31:0] cint [W][H];
@@ -38,12 +40,16 @@ module omega_mesh #(
         .clk, .rst, .seed, .jitter, .stall, .pmsg, .fi,
         .in_v(iv[x][y]), .in_f(inf[x][y]), .in_rdy(irdy[x][y]),
         .out_v(ov[x][y]), .out_f(of[x][y]), .out_rdy(ordy[x][y]),
-        .idle(cidle[x][y]), .hungry(chung[x][y]), .nbr_hungry(nhung[x][y]), .ready(crdy[x][y]), .err(cerr[x][y]), .dump,
+        .idle(cidle[x][y]), .hungry(chung[x][y]), .nbr_hungry(nhung[x][y]), .roomy(croom[x][y]), .nbr_roomy(nroom[x][y]), .ready(crdy[x][y]), .err(cerr[x][y]), .dump,
         .cfg_we(1'b0), .cfg_sel(2'd0), .cfg_a(16'd0), .cfg_d(128'd0), .st_inter(cint[x][y]));
       assign nhung[x][y][0] = (y > 0)     ? chung[x][(y > 0) ? y-1 : 0] : 1'b0;
       assign nhung[x][y][1] = (x < W - 1) ? chung[(x < W - 1) ? x+1 : x][y] : 1'b0;
       assign nhung[x][y][2] = (y < H - 1) ? chung[x][(y < H - 1) ? y+1 : y] : 1'b0;
       assign nhung[x][y][3] = (x > 0)     ? chung[(x > 0) ? x-1 : 0][y] : 1'b0;
+      assign nroom[x][y][0] = (y > 0)     ? croom[x][(y > 0) ? y-1 : 0] : 1'b0;
+      assign nroom[x][y][1] = (x < W - 1) ? croom[(x < W - 1) ? x+1 : x][y] : 1'b0;
+      assign nroom[x][y][2] = (y < H - 1) ? croom[x][(y < H - 1) ? y+1 : y] : 1'b0;
+      assign nroom[x][y][3] = (x > 0)     ? croom[(x > 0) ? x-1 : 0][y] : 1'b0;
       // N neighbour (x, y-1): my in[N] <- its out[S]; my out[N] -> its in[S]
       if (y > 0) begin : gn
         assign iv[x][y][0] = ov[x][y-1][2]; assign inf[x][y][0] = of[x][y-1][2];

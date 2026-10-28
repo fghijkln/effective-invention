@@ -57,6 +57,8 @@ module omega_cell #(
   output logic        idle,
   output logic        hungry,              // to neighbours: no local work (demand-driven spawn)
   input  logic [3:0]  nbr_hungry,          // from neighbours N, E, S, W
+  output logic        roomy,               // to neighbours: free node and var slots above the watermark
+  input  logic [3:0]  nbr_roomy,           // from neighbours N, E, S, W
   output logic        ready,               // initialisation finished
   output logic [3:0]  err,
   input  logic        dump,
@@ -181,6 +183,18 @@ module omega_cell #(
       if (!hv_found && EXISTS[d] && nbr_hungry[d]) begin hv_found = 1'b1; hv_dir = d; end
     end
   end
+  // memory-pressure target: first roomy existing neighbour in rotating order (SPEC 9)
+  logic       rv_found;
+  logic [1:0] rv_dir;
+  logic [1:0] mrot;
+  always_comb begin
+    rv_found = 1'b0; rv_dir = 2'd0;
+    for (int k = 0; k < 4; k++) begin
+      logic [1:0] d;
+      d = 2'(mrot + 2'(k));
+      if (!rv_found && EXISTS[d] && nbr_roomy[d] && !MUT[27]) begin rv_found = 1'b1; rv_dir = d; end
+    end
+  end
   function automatic logic [3:0] dir_x(input logic [1:0] d);
     dir_x = (d == 2'd1) ? 4'(X + 1) : (d == 2'd3) ? 4'(X - 1) : 4'(X);
   endfunction
@@ -190,7 +204,7 @@ module omega_cell #(
 
   // ---------------- engine registers ----------------
   logic [63:0] ra, rb;                  // current link (its RAM data was read one cycle ahead)
-  logic        rsp, rsx;
+  logic        rsp, rsx, rfw;            // rfw: PULL second half (send LINK to the partner's cell)
   logic        ej_taken;                // the eject head was consumed last cycle: pop it now (registered pop)                // (ra = REF, rb = partner) is a spawn request: rsp = retry task
                                         // (already counted), rsx = SPAWN message (expand here or forward)
   logic [2:0][SB-1:0] wq_a;             // queued node writes (commutation / SWI), drained in S_WQ
@@ -271,7 +285,7 @@ module omega_cell #(
     rnd_msg   = erng[15:8] < pmsg;
     idle      = (state == S_IDLE) && (tq_tot == 0) && !ej_v && (ob_cnt == 0) && (!rbusy || MUT[15]);
     ready     = state != S_INIT;
-    hungry    = (state == S_IDLE) && (tq_tot == 0) && !ej_v;
+    hungry    = (state == S_IDLE) && (tq_tot == 0) && !ej_v && (roomy || MUT[28]);
   end
 
   // translation of a template port during EXPAND (stamps the expanding owner, relocates via the maps)
@@ -295,7 +309,7 @@ module omega_cell #(
   logic tp; logic [1:0] tpr; logic [63:0] tpp;
   logic fin;                                      // the current step is done: pick new work this cycle
   st_t  nst;
-  logic [63:0] nra, nrb; logic nrsp, nrsx;
+  logic [63:0] nra, nrb; logic nrsp, nrsx, nrfw;
   logic [2:0] nf_pop, nf_push, vf_pop, vf_push, tq_pop, tq_push;
   logic [1:0][SB-1:0] nf_pd; logic [0:0][SB-1:0] vf_pd;
   logic [2:0][129:0] tq_pd;
@@ -320,14 +334,15 @@ module omega_cell #(
       st_msg2 <= '0; st_maxq <= '0; st_links <= '0; st_tasks <= '0;
       st_minfn <= '1; st_minfv <= '1;
       st_traps <= '0; tr_addr <= '0; tr_reason <= '0; tr_owner <= '0; tr_mask <= '0;
-      wq_n <= '0; vq_n <= '0; rsp <= 1'b0; rsx <= 1'b0; ej_taken <= 1'b0;
+      wq_n <= '0; vq_n <= '0; rsp <= 1'b0; rsx <= 1'b0; rfw <= 1'b0; ej_taken <= 1'b0;
+      roomy <= 1'b0; mrot <= 2'(X + Y + 1);
       ncnt <= '0; nsp <= '0; npend <= 1'b0;
       vcnt <= '0; vsp <= '0; vpend <= 1'b0;
       qcnt <= '0; qsp <= (QB+1)'(qinit[0]); qpend <= 1'b0;
     end else begin
       snd = 1'b0; sf = '0; pn = '0; pq = '0;
       tp = 1'b0; tpr = '0; tpp = '0;
-      fin = 1'b0; nst = state; nra = ra; nrb = rb; nrsp = rsp; nrsx = rsx;
+      fin = 1'b0; nst = state; nra = ra; nrb = rb; nrsp = rsp; nrsx = rsx; nrfw = rfw;
       nf_pop = '0; nf_push = '0; nf_pd = '0;
       vf_pop = '0; vf_push = '0; vf_pd = '0;
       tq_pop = '0;
@@ -341,6 +356,11 @@ module omega_cell #(
       if (state != S_INIT && nf_tot < st_minfn) st_minfn <= nf_tot;
       if (state != S_INIT && vf_tot < st_minfv) st_minfv <= vf_tot;
       if (state != S_INIT) cyc <= cyc + 1;
+      // roomy with hysteresis: set above SLOTS/4 free node and var slots, cleared below SLOTS/8
+      if (state != S_INIT) begin
+        if (nf_tot >= (SB+2)'(SLOTS / 4) && vf_tot >= (SB+2)'(SLOTS / 4)) roomy <= 1'b1;
+        else if (nf_tot < (SB+2)'(SLOTS / 8) || vf_tot < (SB+2)'(SLOTS / 8)) roomy <= 1'b0;
+      end
       if (state != S_IDLE && state != S_INIT && state != S_HALT) st_busy <= st_busy + 1;
 
       case (state)
@@ -364,9 +384,15 @@ module omega_cell #(
           logic [3:0] tP, tQ;
           rmt = dvar ? leaves(A) : ((is_node(A) && leaves(A)) || (is_node(B) && leaves(B)));
           tP = ptag(dP); tQ = ptag(dQ);
-          nrsp = 1'b0; nrsx = 1'b0;
+          nrsp = 1'b0; nrsx = 1'b0; nrfw = 1'b0;
           if (xown(A, B) && !(fi[0] && rmt && !rsx)) begin
             tp = 1'b1; tpr = TR_CROSS; tpp = lowown(A, B); fin = 1'b1;
+          end else if (rfw) begin
+            // PULL, second half: ask the partner's cell for its node (its NODE rule migrates it here)
+            if (oob(ra)) begin tp = 1'b1; tpr = TR_OOB; tpp = ra; end
+            else if (can_send) begin snd = 1'b1; sf = {M_LINK, px(ra), py(ra), 64'd0, 64'd0, rb, ra}; end
+            else begin pn = 2'd1; pq[0] = {K_FWD, rb, ra}; st_retry <= st_retry + 1; end
+            fin = 1'b1;
           end else if (rsp || rsx) begin
             sp_go = 1'b1; sp_ref_p = dQ; sp_x_p = dP; sp_local_only = rsx;
           end else if (dvar) begin
@@ -416,7 +442,12 @@ module omega_cell #(
             end else if (nforged(nalloc[SB'(pslot(dP))], dP, n_rd)) begin
               tp = 1'b1; tpr = TR_FORGED; tpp = dP; fin = 1'b1;
             end else if (tP == T_SWI && tQ == T_NUM && pval(dQ) != 0 && nf_tot == 0) begin
-              pn = 2'd1; pq[0] = {K_LINK, dQ, dP}; st_retry <= st_retry + 1; fin = 1'b1;
+              if (rv_found && can_send) begin
+                // no free slot: move the SWI node to a roomy neighbour (it applies the rule there)
+                snd = 1'b1; sf = {M_NODE, dir_x(rv_dir), dir_y(rv_dir), dQ, a2, a1, dP};
+                nf_push = 3'd1; nf_pd[0] = SB'(pslot(dP)); nalloc[SB'(pslot(dP))] <= 1'b0; mrot <= mrot + 2'd1;
+              end else begin pn = 2'd1; pq[0] = {K_LINK, dQ, dP}; st_retry <= st_retry + 1; end
+              fin = 1'b1;
             end else if (tP == T_SWI && tQ == T_NUM && pval(dQ) != 0 && nf_av == 0) begin
               // wait for the free-node cache to refill (hold: same link, same read-ahead)
             end else begin
@@ -478,7 +509,13 @@ module omega_cell #(
               a1 = n_rd[63:0]; a2 = n_rd[127:64]; b1 = n_rd2[63:0]; b2 = n_rd2[127:64];
               sP = SB'(pslot(dP)); sQ = SB'(pslot(dQ));
               if (!anni && (nf_tot < 2 || vf_tot < 4)) begin
-                pn = 2'd1; pq[0] = {K_LINK, dQ, dP}; st_retry <= st_retry + 1; fin = 1'b1;
+                if (rv_found && can_send) begin
+                  // no room for the commutation: PULL protocol (poor -> rich).  The roomy neighbour
+                  // re-homes P and sends LINK(Q ~ P') back; Q then migrates with the ordinary NODE rule.
+                  snd = 1'b1; sf = {M_PULL, dir_x(rv_dir), dir_y(rv_dir), dQ, a2, a1, dP};
+                  nf_push = 3'd1; nf_pd[0] = sP; nalloc[sP] <= 1'b0; mrot <= mrot + 2'd1;
+                end else begin pn = 2'd1; pq[0] = {K_LINK, dQ, dP}; st_retry <= st_retry + 1; end
+                fin = 1'b1;
               end else if (!anni && (nf_av < 2 || vf_av < 4)) begin
                 // wait for the free-slot caches to refill
               end else if (anni) begin
@@ -582,10 +619,13 @@ module omega_cell #(
         end else if (NT > 1) begin
           // not enough room here: forward the SPAWN to a neighbour
           logic [2:0] t;
+          logic [3:0] fx, fy;
           t = (rr == 3'd0) ? 3'd1 : rr;
-          rr <= (t == 3'(NT - 1)) ? 3'd0 : t + 1;
+          fx = tx[t]; fy = ty[t];
+          if (rv_found) begin fx = dir_x(rv_dir); fy = dir_y(rv_dir); mrot <= mrot + 2'd1; end   // prefer a roomy neighbour
+          else rr <= (t == 3'(NT - 1)) ? 3'd0 : t + 1;
           st_retry <= st_retry + 1;
-          if (can_send) begin snd = 1'b1; sf = {M_SPAWN, tx[t], ty[t], 64'd0, 64'd0, sp_x_p, sp_ref_p}; end
+          if (can_send) begin snd = 1'b1; sf = {M_SPAWN, fx, fy, 64'd0, 64'd0, sp_x_p, sp_ref_p}; end
           else begin pn = 2'd1; pq[0] = {K_SPAWN, sp_x_p, sp_ref_p}; end
           fin = 1'b1;
         end else begin
@@ -610,9 +650,9 @@ module omega_cell #(
       // ---- the step finished: pick the next task or message in the same cycle (no IDLE cycle) ----
       if (fin && nst != S_HALT) begin
         logic msg_ok, pick_msg;
-        msg_ok = ej_v && !ej_taken && !(ej_f.kind == M_NODE && (nf_av == 0 || n_we || nf_pop != 0));
+        msg_ok = ej_v && !ej_taken && !((ej_f.kind == M_NODE || ej_f.kind == M_PULL) && (nf_av == 0 || n_we || nf_pop != 0));
         pick_msg = msg_ok && (!q_ok || !can_send || rnd_msg);
-        nst = S_IDLE; nrsp = 1'b0; nrsx = 1'b0;
+        nst = S_IDLE; nrsp = 1'b0; nrsx = 1'b0; nrfw = 1'b0;
         if (stall_now) begin
           // verification knob: skip a cycle
         end else if (pick_msg) begin
@@ -621,7 +661,8 @@ module omega_cell #(
           case (ej_f.kind)
             M_LINK: begin nra = ej_f.p0; nrb = ej_f.p1; nst = S_LINK; end
             M_SPAWN: begin nra = ej_f.p0; nrb = ej_f.p1; nrsx = 1'b1; nst = S_LINK; end
-            default: begin   // M_NODE: re-home the travelling node, then link it with its partner
+            default: begin   // M_NODE / M_PULL: re-home the travelling node, then link it with its partner
+                             // (PULL: forward the link to the partner's cell instead, rfw)
               logic [SB-1:0] s;
               if (xown(ej_f.p0, ej_f.p3)) begin tp = 1'b1; tpr = TR_CROSS; tpp = lowown(ej_f.p0, ej_f.p3); end
               else begin
@@ -630,6 +671,7 @@ module omega_cell #(
                 n_wd = {pown(ej_f.p0), MUT[10] ? {ej_f.p1, ej_f.p2} : {ej_f.p2, ej_f.p1}};
                 nalloc[s] <= 1'b1;
                 nra = withpay(ej_f.p0, here(s)); nrb = ej_f.p3; nst = S_LINK;
+                if (ej_f.kind == M_PULL) begin nra = ej_f.p3; nrb = withpay(ej_f.p0, here(s)); nrfw = 1'b1; end
               end
             end
           endcase
@@ -637,7 +679,7 @@ module omega_cell #(
           logic [129:0] e;
           st_tasks <= st_tasks + 1;
           e = tq_top; tq_pop = 3'd1;
-          nra = e[63:0]; nrb = e[127:64]; nrsp = (e[129:128] == K_SPAWN); nst = S_LINK;
+          nra = e[63:0]; nrb = e[127:64]; nrsp = (e[129:128] == K_SPAWN); nrfw = (e[129:128] == K_FWD); nst = S_LINK;
         end
       end
 
@@ -657,12 +699,12 @@ module omega_cell #(
         pop = l_pop && ob_cnt != 0;
         if (snd) begin
           ob[ob_hd + OB'(ob_cnt)] <= sf;
-          case (sf.kind) M_LINK: st_msg0 <= st_msg0 + 1; M_NODE: st_msg1 <= st_msg1 + 1; default: st_msg2 <= st_msg2 + 1; endcase
+          case (sf.kind) M_LINK: st_msg0 <= st_msg0 + 1; M_NODE, M_PULL: st_msg1 <= st_msg1 + 1; default: st_msg2 <= st_msg2 + 1; endcase
         end
         if (pop) ob_hd <= ob_hd + 1'b1;
         ob_cnt <= ob_cnt + (OB+1)'(snd) - (OB+1)'(pop);
       end
-      state <= nst; ra <= nra; rb <= nrb; rsp <= nrsp; rsx <= nrsx;
+      state <= nst; ra <= nra; rb <= nrb; rsp <= nrsp; rsx <= nrsx; rfw <= nrfw;
 
       // ---- memory writes: one write port per array ----
       if (n_we) node_mem[n_wa] <= n_wd;

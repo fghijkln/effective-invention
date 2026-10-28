@@ -15,9 +15,9 @@ from collections import deque
 from .ports import *
 from . import semantic
 
-MSG_LINK, MSG_NODE, MSG_SPAWN = 0, 1, 2
-MSG_NAMES = ["LINK", "NODE", "SPAWN"]
-T_LINK, T_EXPAND, T_SPAWN = 0, 1, 2
+MSG_LINK, MSG_NODE, MSG_SPAWN, MSG_PULL = 0, 1, 2, 3
+MSG_NAMES = ["LINK", "NODE", "SPAWN", "PULL"]
+T_LINK, T_EXPAND, T_SPAWN, T_FWD = 0, 1, 2, 3
 DIRS = ["N", "E", "S", "W"]
 DXY = {"N": (0, -1), "E": (1, 0), "S": (0, 1), "W": (-1, 0)}
 OPP = {"N": "S", "S": "N", "E": "W", "W": "E"}
@@ -200,6 +200,10 @@ class Cell:
         self.nbrs = [d for d in ("E", "S", "W", "N")
                      if 0 <= x + DXY[d][0] < fab.W and 0 <= y + DXY[d][1] < fab.H]
         self.spawn_targets = [None] + self.nbrs
+        # memory pressure (SPEC 9): roomy = free node and var slots above a watermark, with hysteresis
+        self.room_hi, self.room_lo = img.slots // 4, img.slots // 8
+        self._roomy = False
+        self.update_roomy()
         self.st = {"interactions": 0, "busy": 0, "tasks": 0, "msgs_in": 0, "requeue": 0, "max_q": len(self.queue),
                    "max_nodes": 0}
 
@@ -299,8 +303,28 @@ class Cell:
             return self.oob(a) or not self.local(a)
         return any(is_node(p) and (self.oob(p) or not self.local(p)) for p in (a, b))
 
+    def update_roomy(self):
+        nf, vf = len(self.nfree), len(self.vfree)
+        if nf >= self.room_hi and vf >= self.room_hi:
+            self._roomy = True
+        elif nf < self.room_lo or vf < self.room_lo:
+            self._roomy = False
+
+    def roomy(self):
+        return self._roomy
+
     def hungry(self):
-        return not (self.busy or self.queue or self.eject)
+        return self._roomy and not (self.busy or self.queue or self.eject)
+
+    def roomy_nbr(self):
+        """First roomy neighbour in rotating order (N E S W), or None."""
+        self.mrot = getattr(self, "mrot", self.x + self.y) + 1
+        order = ["N", "E", "S", "W"]
+        for k in range(4):
+            d = order[(self.mrot + k) % 4]
+            if d in self.nbrs and self.fab.cells[self.nbr_xy(d)].roomy():
+                return d
+        return None
 
     def spawn(self, ref, x):
         """Demand-driven work distribution: hand the expansion to a hungry neighbour (one that
@@ -321,8 +345,10 @@ class Cell:
         nn, nv = len(d.nodes), d.nvars
         if len(self.nfree) < nn or len(self.vfree) < nv:
             if self.nbrs:
-                t = self.nbrs[self.rr % len(self.nbrs)]
-                self.rr += 1
+                t = self.roomy_nbr()          # out of memory: prefer a roomy neighbour
+                if t is None:
+                    t = self.nbrs[self.rr % len(self.nbrs)]
+                    self.rr += 1
                 self.send_or_retry(MSG_SPAWN, self.nbr_xy(t), refp, x)
                 self.st["requeue"] += 1
                 return 1
@@ -371,6 +397,12 @@ class Cell:
             if self.forged_node(a):
                 return self.trap(TRAP_FORGED, a)
             if ta == SWI and tb == NUM and payload(b) != 0 and not self.nfree:
+                d = self.roomy_nbr() if self.can_send() else None
+                if d is not None:             # no slot: move the SWI node to a roomy neighbour
+                    a1, a2 = self.free_node(a)
+                    self.send(MSG_NODE, self.nbr_xy(d), a, a1, a2, b)
+                    self.st["offload"] = self.st.get("offload", 0) + 1
+                    return 1
                 self.queue.append((T_LINK, a, b)); self.st["requeue"] += 1
                 return 0
             self.count()
@@ -415,6 +447,14 @@ class Cell:
         if la and lb:
             anni = ta == tb and label(a) == label(b) and ta in (CON, DUP)
             if not anni and (len(self.nfree) < 2 or len(self.vfree) < 4):
+                d = self.roomy_nbr() if self.can_send() else None
+                if d is not None:
+                    # no room for the commutation: PULL protocol, the roomy neighbour re-homes P and
+                    # asks for Q (which then migrates with the ordinary NODE rule); poor -> rich
+                    a1, a2 = self.free_node(a)
+                    self.send(MSG_PULL, self.nbr_xy(d), a, a1, a2, b)
+                    self.st["offload"] = self.st.get("offload", 0) + 1
+                    return 1
                 self.queue.append((T_LINK, a, b)); self.st["requeue"] += 1
                 return 0
             self.count()
@@ -448,6 +488,16 @@ class Cell:
         self.send_or_retry(MSG_LINK, addr_xy(payload(a)), a, b)
         return 0
 
+    def forward(self, q, p):
+        """PULL, second half: send LINK(q ~ p) to q's cell, whose NODE rule migrates q here."""
+        if self.oob(q):
+            return self.trap(TRAP_OOB, q)
+        if self.can_send():
+            self.send(MSG_LINK, addr_xy(payload(q)), q, p)
+        else:
+            self.queue.append((T_FWD, q, p)); self.st["retry"] = self.st.get("retry", 0) + 1
+        return 0
+
     # ---- engine step ----
     def engine(self, rng):
         if self.busy:
@@ -456,7 +506,8 @@ class Cell:
             return
         src = None
         msg_ok = bool(self.eject)
-        if msg_ok and self.eject[0][0] == MSG_NODE and not self.nfree:
+        self.update_roomy()
+        if msg_ok and self.eject[0][0] in (MSG_NODE, MSG_PULL) and not self.nfree:
             msg_ok = False
         if msg_ok and self.queue:
             p = self.fab.p_msg if self.can_send() else 1.0
@@ -477,6 +528,8 @@ class Cell:
                 cost = 1 + self.do_link(a, b)
             elif k == T_SPAWN:
                 cost = 1 + self.spawn(a, b)
+            elif k == T_FWD:
+                cost = 1 + self.forward(a, b)
             else:
                 cost = 1 + self.expand(a, b)
         else:
@@ -496,7 +549,10 @@ class Cell:
                 else:
                     s = self.nfree.pop()
                     self.nodes[s] = [m[4], m[5]]; self.nown[s] = owner(m[3])
-                    cost = 1 + self.do_link(with_payload(m[3], self.here(s)), m[6])
+                    if kind == MSG_PULL:
+                        cost = 1 + self.forward(m[6], with_payload(m[3], self.here(s)))
+                    else:
+                        cost = 1 + self.do_link(with_payload(m[3], self.here(s)), m[6])
         if len(self.queue) > self.fab.qdepth:
             raise FabricError(f"task queue overflow at cell {self.x},{self.y}")
         self.st["max_q"] = max(self.st["max_q"], len(self.queue))
@@ -520,7 +576,7 @@ class Fabric:
         self.slots = self.img.slots
         self.cells = {(x, y): Cell(self, x, y, self.img) for x in range(W) for y in range(H)}
         self.interactions = 0
-        self.msgs = [0, 0, 0]
+        self.msgs = [0, 0, 0, 0]
         self.hops = 0
         self.cycles = 0
 

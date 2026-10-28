@@ -132,6 +132,7 @@ All inter-cell communication is a single wide flit
 | `LINK` | p0 = a, p1 = b | a link whose var (or principal node) lives elsewhere | runs `link(a, b)` locally. The destination is the cell owning the var, or the node for a redex being forwarded |
 | `NODE` | p0 = node pointer (tag, label), p1/p2 = its aux ports, p3 = partner pointer | a binary-binary redex whose nodes are in two cells: the local node **migrates** to its partner's cell | allocates a slot, writes the node there (*re-homing*) and runs `link(new, partner)`. Both nodes are now local |
 | `SPAWN` | p0 = REF id, p1 = partner port | a REF expansion given to a *hungry* neighbour (work distribution), or forwarded because the cell is out of slots | expands the definition locally and links its root with the partner (which may stay remote) |
+| `PULL` | as `NODE` (p0 = node P, p1/p2 = its aux ports, p3 = partner Q, a node in the sender) | a local commutation P ~ Q for which the cell has no free slots (memory pressure, §5): sent to a *roomy* neighbour | re-homes P (P'), then sends `LINK(Q ~ P')` to Q's cell (task kind `K_FWD` if the outbox is full). There the ordinary NODE rule migrates Q to P', so both nodes end up in the roomy cell, which applies the rule |
 
 Correctness argument (also checked by fuzzing):
 1. A var has exactly two occurrences, and each occurrence is consumed by at most one `link`. All
@@ -175,6 +176,20 @@ Correctness argument (also checked by fuzzing):
   sent ~100× more messages and could exhaust a 2×2 fabric's memory, because eager breadth-first
   unfolding filled the cells. The pull-like policy keeps every cell depth-first until a neighbour asks
   for work.
+* **Memory pressure (step 4).** Each cell also drives a 1-bit `roomy` wire: free node slots and free
+  var slots both ≥ SLOTS/4 sets it, either < SLOTS/8 clears it (hysteresis, so the wire does not
+  toggle on every allocation). `hungry` additionally requires `roomy`, so a full cell never asks for
+  work. A cell that lacks slots moves work from poor to rich instead of retrying in place:
+  * a SPAWN it cannot expand goes to a roomy neighbour (round robin over all neighbours only when none
+    is roomy);
+  * a SWI ~ #n>0 that needs a slot sends the SWI node as `NODE` to a roomy neighbour (the partner is a
+    number, so the rule runs there);
+  * a commutation that needs 2 node + 4 var slots sends P as `PULL` to a roomy neighbour, which pulls Q
+    after it (§4);
+  * only when no neighbour is roomy does the task go back on the stack as a retry, as before.
+  None of these change the result or the interaction count (migration is not an interaction), only
+  where a rule runs. `tests/test_mempress.py` pre-fills cell (0,0) with foreign "ballast" so that only
+  4–30 slots are free there: without the mechanism the v3 RTL livelocks on 7 of 30 such cases.
 * **Task stack.** Depth-first (LIFO) order keeps live memory small (HVM2 uses per-thread stacks for the
   same reason). Retry tasks (`K_SPAWN`, re-queued `LINK`) reuse it.
 * **Owner tags.** `nown[SLOTS]` and `vown[SLOTS]` (4 bits each) next to the node and var RAMs; see §12.

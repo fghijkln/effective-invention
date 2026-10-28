@@ -1,28 +1,30 @@
 mutant  0 CAUGHT  erase/copy rule: aux2 receives aux1 instead of the atom -- prog fib(8) on 2x2: got x0 / 15 interactions / 18 nodes, want #21 / 901 / 0
 mutant  1 CAUGHT  OPR: operand order ignores the flip bit -- prog fib(8) on 2x2: got #8 / 10 interactions / 0 nodes, want #21 / 901 / 0
 mutant  2 CAUGHT  OPR: flip bit not toggled when the operator is turned around -- prog sort(6) on 2x2: got #607 / 577 interactions / 0 nodes, want #982 / 632 / 0
-mutant  3 CAUGHT  SWI: predecessor not decremented -- prog list(6) on 2x2: got STATUS 3 err 0 / 44677 interactions / 2764 nodes, want #97 / 341 / 0
+mutant  3 CAUGHT  SWI: predecessor not decremented -- prog list(6) on 2x2: got STATUS 3 err 0 / 42078 interactions / 2691 nodes, want #97 / 341 / 0
 mutant  4 CAUGHT  annihilation ignores DUP labels (commute rule never fires for different labels) -- prog list(6) on 2x2: got * / 327 interactions / 0 nodes, want #97 / 341 / 0
 mutant  5 CAUGHT  annihilation cross-wires aux1 with aux2 -- prog fib(8) on 2x2: got {1 x0 $(< #2 ?((@fib__a1 (* (x1 x1))) (x0 x2)))} / 2 interactions / 7 nodes, want #21 / 901 / 0
-mutant  6 CAUGHT  commutation: second copy of P has its aux ports swapped -- prog list(6) on 2x2: got STATUS 3 err 0 / 1075 interactions / 1619 nodes, want #97 / 341 / 0
+mutant  6 CAUGHT  commutation: second copy of P has its aux ports swapped -- prog list(6) on 2x2: got STATUS 3 err 0 / 2104 interactions / 2707 nodes, want #97 / 341 / 0
 mutant  7 CAUGHT  SPAWN always expands locally (performance-only: no work distribution) -- treesum_direct(8) speedup 4x4/1x1 = 1.00 (bound >= 3.0)
 mutant  8 CAUGHT  ALU: '<' computed as '<=' -- prog fib(8) on 2x2: got #34 / 550 interactions / 0 nodes, want #21 / 901 / 0
 mutant  9 CAUGHT  SWI #0: built (* r) instead of (r *) (wrong branch) -- prog fib(8) on 2x2: got (x0 x0) / 9 interactions / 1 nodes, want #21 / 901 / 0
-mutant 10 CAUGHT  NODE migration: aux ports swapped when re-homed -- prog fib(8) on 2x2: got {1 x0 $(< #2 ?((@fib__a1 (* (x1 x1))) (x0 #8)))} / 2 interactions / 7 nodes, want #21 / 901 / 0
+mutant 10 CAUGHT  NODE migration: aux ports swapped when re-homed -- prog fib(8) on 2x2: got STATUS 3 err 0 / 2129 interactions / 2761 nodes, want #21 / 901 / 0
 mutant 11 CAUGHT  var exchange: substitution chain not followed (link dropped) -- prog fib(8) on 2x2: got x0 / 3 interactions / 6 nodes, want #21 / 901 / 0
 mutant 12 CAUGHT  eraser only reaches aux1 -- prog fib(8) on 2x2: got #21 / 835 interactions / 33 nodes, want #21 / 901 / 0
 mutant 13 CAUGHT  REF ~ DUP expands instead of copying the reference -- prog qsort(5) on 2x2: got #718 / 862 interactions / 0 nodes, want #718 / 852 / 0
-mutant 14 CAUGHT  commutation: two fresh wires share one var -- prog list(6) on 2x2: got STATUS 3 err 0 / 1182 interactions / 2041 nodes, want #97 / 341 / 0
-mutant 15 CAUGHT  quiescence detection ignores in-flight router flits -- prog fib(8) on 2x2: got x0 / 887 interactions / 7 nodes, want #21 / 901 / 0
+mutant 14 CAUGHT  commutation: two fresh wires share one var -- prog list(6) on 2x2: got STATUS 3 err 0 / 2847 interactions / 2728 nodes, want #97 / 341 / 0
+mutant 15 CAUGHT  quiescence detection ignores in-flight router flits -- prog fib(8) on 2x2: got x0 / 888 interactions / 7 nodes, want #21 / 901 / 0
 mutant 16 CAUGHT  security: var slot owner-tag check disabled (forged VAR pointers accepted) -- attack steal-result: write a forged result into the victim's root var on 2x2 fi=0: honest result / trap set differs (rtl traps [], semantic [(2, 9)])
 mutant 17 CAUGHT  security: cross-owner (T1) check disabled -- cross-owner fault injection @main = r & #7 ~ r & (x x) ~ (y y) on 2x2 fi=0: honest result / trap set differs (rtl traps [(2, 1)], semantic [(1, 1)])
 mutant 18 CAUGHT  security: out-of-bounds pointer check disabled -- attack out-of-bounds slot on 2x2 fi=0: honest result / trap set differs (rtl traps [(2, 9)], semantic [(3, 9)])
 mutant 19 CAUGHT  security: expansion does not stamp the tenant's owner (ROM owner 0 leaks into tenants) -- demo fib(12) || qsort(15) on 2x2 fi=0: honest result / trap set differs (rtl traps [(1, 0)], semantic [])
 mutant 20 CAUGHT  security: forged-var trap is recorded but the access is not blocked -- attack steal-result: write a forged result into the victim's root var on 2x2 fi=0: honest result / trap set differs (rtl traps [(2, 9)], semantic [(2, 9)])
 mutant 21 CAUGHT  security: node slot owner-tag check disabled -- attack erase the victim's result node on 2x2 fi=0: honest result / trap set differs (rtl traps [], semantic [(2, 9)])
-mutant 22 CAUGHT  v3 read-ahead: write bypass on node read port 1 disabled (stale node data) -- prog fib(8) on 2x2: got x0 / 1 interactions / 9 nodes, want #21 / 901 / 0
-mutant 23 CAUGHT  v3 S_WQ: leaves after the first queued write (commutation copies / var tags never written) -- prog list(6) on 2x2: got {3 {1 ? $(+ x0 $(+ x1 x2))} #0} / 297 interactions / 145 nodes, want #97 / 341 / 0
+mutant 22 CAUGHT  v3 read-ahead: write bypass on node read port 1 disabled (stale node data) -- prog fib(8) on 2x2: got x0 / 16 interactions / 18 nodes, want #21 / 901 / 0
+mutant 23 CAUGHT  v3 S_WQ: leaves after the first queued write (commutation copies / var tags never written) -- prog list(6) on 2x2: got (x0 x1) / 214 interactions / 57 nodes, want #97 / 341 / 0
 mutant 24 CAUGHT  v3 S_WQ: owner tags of fresh commutation vars not written -- prog list(6) on 2x2: got x0 / 269 interactions / 31 nodes, want #97 / 341 / 0
-mutant 25 CAUGHT  v3 EXPAND allocation pops one node slot fewer than it maps (slot aliasing) -- prog fib(8) on 2x2: got STATUS 3 err 0 / 1069 interactions / 702 nodes, want #21 / 901 / 0
-mutant 26 CAUGHT  v3 EXPAND: template ROM read-ahead lags one entry -- prog fib(8) on 2x2: got STATUS 3 err 0 / 343 interactions / 686 nodes, want #21 / 901 / 0
-mutants: 27/27 caught
+mutant 25 CAUGHT  v3 EXPAND allocation pops one node slot fewer than it maps (slot aliasing) -- prog fib(8) on 2x2: got STATUS 3 err 0 / 2901 interactions / 2581 nodes, want #21 / 901 / 0
+mutant 26 CAUGHT  v3 EXPAND: template ROM read-ahead lags one entry -- prog fib(8) on 2x2: got STATUS 3 err 0 / 1316 interactions / 2632 nodes, want #21 / 901 / 0
+mutant 27 CAUGHT  memory pressure: roomy neighbours ignored (no PULL / NODE offload, OOM SPAWNs round robin) -- ballast list(20) 2x2 keep 8/8: wrong result / timeout
+mutant 28 CAUGHT  memory pressure: hungry does not require roomy (a full cell still asks for work) -- ballast treesum(6) 2x2 keep 4/200: wrong result / timeout
+mutants: 29/29 caught

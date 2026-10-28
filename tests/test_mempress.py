@@ -1,0 +1,97 @@
+"""Memory-pressure tests (SPEC 5, "memory pressure"): a cell that runs out of slots must move work and
+nodes to neighbours with free memory instead of retrying in place.
+
+Every cell drives `roomy` (free node and var slots >= SLOTS/4; cleared below SLOTS/8: hysteresis);
+`hungry` requires `roomy`; an out-of-memory cell forwards SPAWNs to a roomy neighbour; a rule that lacks
+slots moves its node(s) to a roomy neighbour (NODE for SWI, the PULL protocol for a commutation).
+
+Cases
+* ballast: cell (0,0) is pre-filled with unreachable nodes / vars of a foreign owner (14), leaving only
+  a few free slots, and the program is loaded there.  Without the mechanism the cell livelocks retrying
+  rules it has no room for (v3 RTL: 7 of these 30 cases time out); with it all must finish.
+* capacity: programs whose one-cell peak exceeds a (small) cell, on 2x2 / 4x4.
+* the multi-tenant security fuzz case 265 (one cell needed 1217 vars in a 1024-slot cell on the v2 RTL).
+Each case: semantic model (golden) vs fabric model vs RTL: readback, interaction count.
+
+usage: test_mempress.py [--no-rtl] [--mut M] [--quick]
+"""
+import sys, os, time
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from omega import semantic, fabric, progs
+from omega.ports import *
+
+BALLAST = [("fib", 12), ("qsort", 15), ("treesum", 6), ("list", 20), ("sort", 10)]
+BSHAPES = [(2, 2), (3, 2)]
+BKEEP = [(8, 8), (30, 30), (4, 200)]          # free (node, var) slots left in cell (0,0)
+CAPACITY = [("qsort", 24, 256, 2, 2), ("higher", 30, 256, 2, 2), ("sort", 30, 128, 2, 2), ("list", 120, 256, 4, 4),
+            ("qsort", 40, 256, 4, 4)]
+
+
+def ballast_img(book, W, H, slots, keep_n, keep_v):
+    img = fabric.Image(book, W, H, slots, 1024)
+    c = (0, 0)
+    fn = [s for s in range(slots) if img.nodes[c][s] is None]
+    fv = [s for s in range(slots) if img.vars[c][s] is None]
+    for s in fn[keep_n:]:
+        img.nodes[c][s] = [mk(ERA), mk(ERA)]; img.nown[c][s] = 14
+    for s in fv[keep_v:]:
+        img.vars[c][s] = mk(NONE); img.vown[c][s] = 14
+    return img
+
+
+def cases(quick=False):
+    out = []
+    for name, N in BALLAST:
+        for W, H in BSHAPES:
+            for kn, kv in BKEEP:
+                out.append((f"ballast {name}({N}) {W}x{H} keep {kn}/{kv}", name, N, W, H, 1024, (kn, kv)))
+    if not quick:
+        for name, N, slots, W, H in CAPACITY:
+            out.append((f"capacity {name}({N}) slots={slots} {W}x{H}", name, N, W, H, slots, None))
+    return out
+
+
+def run_cases(use_rtl=True, mut=0, verbose=True, quick=False, security=True):
+    n = fails = 0
+    t0 = time.time()
+    for j, (tag, name, N, W, H, slots, keep) in enumerate(cases(quick)):
+        book = progs.book(name, N)
+        ref = semantic.result(book, fuel=10**8)
+        want = progs.expected(name, N)
+        mkimg = (lambda: ballast_img(book, W, H, slots, *keep)) if keep else (lambda: fabric.Image(book, W, H, slots, 1024))
+        n += 1
+        errs = []
+        if mut == 0:
+            try:
+                f = fabric.Fabric(book, W, H, slots=slots, qdepth=1024, seed=j + 1, p_jitter=0.1, img=mkimg()).run()
+                if f.readback() != want or f.interactions != ref["interactions"]:
+                    errs.append(f"fabric {f.readback()[:40]} / {f.interactions} want {want} / {ref['interactions']}")
+            except Exception as e:
+                errs.append(f"fabric error {str(e)[:60]}")
+        if use_rtl:
+            from omega import rtl
+            try:
+                r = rtl.run(book, W, H, slots=slots, img=mkimg(), seed=j + 3, jitter=30, mut=mut, maxcycles=2_000_000, timeout=300)
+                if r["status"] != 0 or r["readback"] != want or r["interactions"] != ref["interactions"]:
+                    errs.append(f"rtl status {r['status']} {r['readback'][:40]} / {r['interactions']} want {want} / {ref['interactions']}")
+            except Exception as e:
+                errs.append(f"rtl error {str(e)[:60]}")
+        if errs:
+            fails += 1
+            if verbose: print(f"FAIL {tag}: " + "; ".join(errs), flush=True)
+            if mut: return n, fails, tag
+    if security and not quick:
+        import test_security as ts
+        book, tenants, W, H, kn, att = ts.fuzz_case(265)
+        n += 1
+        ok, _, _ = ts.check("mt-fuzz 265", book, tenants, W, H, use_rtl, mut=mut, verbose=verbose, **kn)
+        fails += not ok
+    if verbose:
+        print(f"memory-pressure tests: {n - fails}/{n} pass [{'semantic + fabric + RTL' if use_rtl else 'semantic + fabric'}] {time.time() - t0:.0f}s")
+    return n, fails, None
+
+
+if __name__ == "__main__":
+    mut = int(sys.argv[sys.argv.index("--mut") + 1], 0) if "--mut" in sys.argv else 0
+    n, fails, _ = run_cases("--no-rtl" not in sys.argv, mut, quick="--quick" in sys.argv)
+    sys.exit(1 if fails else 0)
