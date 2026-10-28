@@ -130,7 +130,7 @@ All inter-cell communication is a single wide flit
 |---|---|---|---|
 | `LINK` | p0 = a, p1 = b | a link whose var (or principal node) lives elsewhere | runs `link(a, b)` locally. The destination is the cell owning the var, or the node for a redex being forwarded |
 | `NODE` | p0 = node pointer (tag, label), p1/p2 = its aux ports, p3 = partner pointer | a binary-binary redex whose nodes are in two cells: the local node **migrates** to its partner's cell | allocates a slot, writes the node there (*re-homing*) and runs `link(new, partner)`. Both nodes are now local |
-| `SPAWN` | p0 = REF id, p1 = partner port | a REF expansion assigned to a neighbour (work distribution), or forwarded because the cell is out of slots | expands the definition locally and links its root with the partner (which may stay remote) |
+| `SPAWN` | p0 = REF id, p1 = partner port | a REF expansion given to a *hungry* neighbour (work distribution), or forwarded because the cell is out of slots | expands the definition locally and links its root with the partner (which may stay remote) |
 
 Correctness argument (also checked by fuzzing):
 1. A var has exactly two occurrences, and each occurrence is consumed by at most one `link`. All
@@ -166,8 +166,14 @@ Correctness argument (also checked by fuzzing):
   reuse the consumed slots. A full cell never borrows a slot remotely. Instead it (a) migrates its node
   to the partner (NODE) or (b) forwards a SPAWN to a neighbour, so the work moves to free memory
   rather than memory being lent to the work.
-* **Spawn policy.** Each REF-meets-node redex chooses round robin among {self, E, S, W, N} (neighbours
-  that exist). This is the only load-balancing mechanism. It needs no global information.
+* **Spawn policy (demand-driven).** Each cell drives a 1-bit `hungry` wire to its four neighbours:
+  engine idle, task stack empty, nothing ejected. When a REF meets a node, the engine hands the
+  expansion to the first hungry neighbour, scanning N, E, S, W from a rotating start. If no neighbour
+  is hungry it expands locally. This is the only load-balancing mechanism. It uses neighbour-local
+  wires only, with no global information. An earlier round-robin *push* policy (v0, commit fc3d68d)
+  sent ~100× more messages and could exhaust a 2×2 fabric's memory, because eager breadth-first
+  unfolding filled the cells. The pull-like policy keeps every cell depth-first until a neighbour asks
+  for work.
 * **Task stack.** Depth-first (LIFO) order keeps live memory small (HVM2 uses per-thread stacks for the
   same reason). Retry tasks (`K_SPAWN`, re-queued `LINK`) reuse it.
 * **Rule execution.** Reading both nodes, applying the rule, writing up to four node slots and
@@ -182,7 +188,7 @@ Correctness argument (also checked by fuzzing):
 | each link step (local var exchange, chain step, or remote send) | 1 |
 | redex rule, including all node writes and the first resulting link | 1 (same LINK cycle) |
 | each extra resulting link (annihilate/erase/copy: 1, commute: 3) | 1 |
-| SPAWN decision | 1 |
+| SPAWN decision (hungry-neighbour scan) | 1 |
 | EXPAND: header + `nn` node writes + `nr` redex pushes + root link | 1 + nn + nr + 1 |
 | router hop (FIFO to neighbour FIFO) | 1 per hop (+ jitter) |
 

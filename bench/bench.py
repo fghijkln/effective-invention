@@ -23,10 +23,15 @@ def main():
         for W, H in shapes:
             t = time.time()
             r = rtl.run(b, W, H, maxcycles=200_000_000, timeout=3600)
+            slots = 1024
+            if r["status"] != 0 and (W, H) == (1, 1):
+                # the program does not fit one 1024-slot cell: sequential baseline on a 4096-slot cell
+                slots = 4096
+                r = rtl.run(b, W, H, slots=4096, maxcycles=200_000_000, timeout=3600)
             ok = r["readback"] == exp and r["interactions"] == ref["interactions"]
             cyc = r["cycles"]
             base = base or cyc
-            row = dict(prog=f"{name}({n})", mesh=f"{W}x{H}", ok=ok, interactions=r["interactions"], cycles=cyc,
+            row = dict(prog=f"{name}({n})", mesh=f"{W}x{H}" + ("*" if slots != 1024 else ""), ok=ok, interactions=r["interactions"], cycles=cyc,
                        speedup=base / cyc, ipc=r["interactions"] / cyc, util=r["util"],
                        msg_link=r["msgs"]["msg_link"], msg_node=r["msgs"]["msg_node"], msg_spawn=r["msgs"]["msg_spawn"],
                        msgs_per_inter=sum(r["msgs"].values()) / max(1, r["interactions"]),
