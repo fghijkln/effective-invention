@@ -1,0 +1,129 @@
+
+18. Printing statistics.
+
+=== omega_cell ===
+
+        +----------Local Count, excluding submodules.
+        | 
+     2096 wires
+   172004 wire bits
+      148 public wires
+    10715 public wire bits
+       26 ports
+      810 port bits
+     1856 cells
+      129   $alu
+       63   $and
+       12   $bmux
+        1   $dff
+       25   $dffe
+        1   $div
+      106   $eq
+       96   $logic_and
+       53   $logic_not
+       87   $logic_or
+       35   $macc_v2
+        8   $mem_v2
+        1   $mod
+      759   $mux
+       71   $ne
+      114   $not
+       64   $or
+       19   $pmux
+       41   $reduce_and
+       32   $reduce_bool
+       33   $reduce_or
+       13   $sdff
+        2   $sdffce
+       11   $sdffe
+       41   $shift
+       33   $shiftx
+        1   $shl
+        1   $shr
+        4   $xor
+        1 submodules
+        1   $paramod$8fbdfe6a91beeb005859bac4a54d2a2dcba342d8\omega_router
+
+=== $paramod$8fbdfe6a91beeb005859bac4a54d2a2dcba342d8\omega_router ===
+
+        +----------Local Count, excluding submodules.
+        | 
+      871 wires
+    11593 wire bits
+       30 public wires
+     2027 public wire bits
+       17 ports
+     1127 port bits
+      847 cells
+       67   $alu
+        5   $and
+        1   $dff
+        2   $dffe
+      120   $eq
+      104   $logic_and
+       59   $logic_not
+        4   $logic_or
+        6   $macc_v2
+       85   $mux
+       72   $not
+      175   $or
+       31   $reduce_and
+        6   $reduce_bool
+       30   $reduce_or
+        2   $sdff
+        5   $sdffe
+       10   $shift
+       60   $shiftx
+        3   $xor
+
+=== design hierarchy ===
+
+        +----------Count including submodules.
+        | 
+     2703 omega_cell
+      847 $paramod$8fbdfe6a91beeb005859bac4a54d2a2dcba342d8\omega_router
+
+        +----------Count including submodules.
+        | 
+     2967 wires
+   183597 wire bits
+      178 public wires
+    12742 public wire bits
+       43 ports
+     1937 port bits
+        - memories
+        - memory bits
+        - processes
+     2703 cells
+      196   $alu
+       68   $and
+       12   $bmux
+        2   $dff
+       27   $dffe
+        1   $div
+      226   $eq
+      200   $logic_and
+      112   $logic_not
+       91   $logic_or
+       41   $macc_v2
+        8   $mem_v2
+        1   $mod
+      844   $mux
+       71   $ne
+      186   $not
+      239   $or
+       19   $pmux
+       72   $reduce_and
+       38   $reduce_bool
+       63   $reduce_or
+       15   $sdff
+        2   $sdffce
+       16   $sdffe
+       51   $shift
+       93   $shiftx
+        1   $shl
+        1   $shr
+        7   $xor
+        1 submodules
+        1   $paramod$8fbdfe6a91beeb005859bac4a54d2a2dcba342d8\omega_router
+

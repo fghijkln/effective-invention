@@ -1,6 +1,6 @@
 """Benchmarks on the RTL mesh (Verilator, cycle accurate): interactions, cycles, speed-up vs 1x1,
 message traffic, cell utilisation.  Writes results/bench.json and results/bench.md.
-usage: bench.py [--quick]"""
+usage: bench.py [--quick] [--8x8] [--progs fib:20,treesum:9] [--tag NAME]"""
 import sys, os, json, time
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from omega import progs, semantic, rtl
@@ -12,6 +12,8 @@ SHAPES = [(1, 1), (2, 2), (4, 4)]
 
 def main():
     work = QUICK if "--quick" in sys.argv else FULL
+    if "--progs" in sys.argv:
+        work = [(p.split(":")[0], int(p.split(":")[1])) for p in sys.argv[sys.argv.index("--progs") + 1].split(",")]
     shapes = SHAPES + ([(8, 8)] if "--8x8" in sys.argv else [])
     out = []
     for name, n in work:
@@ -44,6 +46,8 @@ def main():
             print(json.dumps(row), flush=True)
     os.makedirs("results", exist_ok=True)
     tag = "_quick" if "--quick" in sys.argv else ""
+    if "--tag" in sys.argv:
+        tag = "_" + sys.argv[sys.argv.index("--tag") + 1]
     json.dump(out, open(f"results/bench{tag}.json", "w"), indent=1)
     with open(f"results/bench{tag}.md", "w") as f:
         f.write("| program | mesh | ok | interactions | cycles | speed-up vs 1x1 | interactions/cycle | cell utilisation | LINK msgs | NODE msgs | SPAWN msgs | msgs/interaction | busiest / idlest cell (interactions) | peak nodes / vars in one cell |\n")

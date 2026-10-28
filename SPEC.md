@@ -192,25 +192,37 @@ Correctness argument (also checked by fuzzing):
   4–30 slots are free there: without the mechanism the v3 RTL livelocks on 7 of 30 such cases.
 * **Task stack.** Depth-first (LIFO) order keeps live memory small (HVM2 uses per-thread stacks for the
   same reason). Retry tasks (`K_SPAWN`, re-queued `LINK`) reuse it.
-* **Owner tags.** `nown[SLOTS]` and `vown[SLOTS]` (4 bits each) next to the node and var RAMs; see §12.
+* **Owner tags.** 4 bits in each node RAM word (`{owner, aux2, aux1}`) and var RAM word (`{owner, port}`); see §12.
 * **Rule execution.** Reading both nodes, applying the rule, writing up to four node slots and
   launching the first resulting link take one cycle. Every further link costs one PUSH cycle, and is
   later popped as a task. The first link is processed immediately (tail-call), with no push.
 
-### 5.1 Engine cost table (cycles, RTL)
+### 5.1 Engine cost table (cycles, v3 RTL)
 
 | operation | cycles |
 |---|---|
-| pick a task or message (IDLE) | 1 |
-| each link step (local var exchange, chain step, or remote send) | 1 |
-| redex rule, including all node writes and the first resulting link | 1 (same LINK cycle) |
-| each extra resulting link (annihilate/erase/copy: 1, commute: 3) | 1 |
-| SPAWN decision (hungry-neighbour scan) | 1 |
-| EXPAND: header + `nn` node writes + `nr` redex pushes + root link | 1 + nn + nr + 1 |
+| pick a task or message | 0 (chosen in the cycle that finishes the previous step; 1 only after real idleness) |
+| each link step (local var exchange, chain step, or remote send) | 1 (RAM data read one cycle ahead, write bypass) |
+| redex rule, including its node writes and the first resulting link | 1 (same cycle as the link step) |
+| extra node writes of a commutation / SWI (queued, `S_WQ`) | 1 each, the last bypassed into the read-ahead |
+| each extra resulting link | 1 push now, 1 link step when popped |
+| SPAWN decision (hungry / roomy neighbour scan) | same cycle as the rule |
+| EXPAND: allocation of up to 4 node + 4 var slots per cycle (first batch in the rule cycle, then `S_EXA`), then node *i*, var tag *i*, redex *i* written together (`S_EXN`) | (⌈max(nn, nv)/4⌉ − 1) + max(nn, nv, nr); the root link follows as an ordinary link step |
 | router hop (FIFO to neighbour FIFO) | 1 per hop (+ jitter) |
 
-The Python fabric model charges the same per-task costs. Its cycle counts are approximate (±20%),
-because it does not model every FSM transition. Only the RTL numbers are reported as cycles.
+Measured: fib(20) on one cell, 3.41 cycles per interaction (v1 register-file cell 5.30, v2 SRAM cell
+8.82). The Python fabric model charges per-task costs and is approximate (±20%); only RTL numbers are
+reported as cycles.
+
+### 5.2 Synthesis and area normalisation
+
+`synth/synth_cell.ys` (Yosys 0.70, `techmap; abc` to generic gates, memories kept as `$mem_v2`), GE =
+NAND2 equivalents from `synth/ge.py`. One v3 cell at 1024 slots (`results/synth/stat_v3_cell_1024.txt`):
+155,725 generic cells, 4,271 flip-flops, **233,164 GE**, 8 memory macros, 1,177,600 bits (node
+1024×132, var 1024×68, task stack 1024×130, free stacks 2×1024×10, node ROM 4096×128, redex ROM
+2048×128, directory 256×128). Area-normalised cost of a run = cells × GE per cell × cycles, compared
+with TACHYON-128's 217,636 GE × its cycles for the same program; memories are excluded on both sides
+(README, "Comparison").
 
 ## 6. Loader and readback
 

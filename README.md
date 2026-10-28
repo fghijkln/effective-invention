@@ -87,7 +87,31 @@ Strong confluence is the test oracle. Any schedule (arbitration, delays, stalls,
 initial placement) must produce exactly the same normal form, the same number of interactions and the
 same number of live nodes. The fuzzers vary all of these on every run.
 
-### Benchmarks (Verilator RTL, cycle accurate, 1024 node + 1024 var slots per cell)
+### Benchmarks, v3 engine (step 5; Verilator RTL, cycle accurate, 1024 node + 1024 var slots per cell)
+
+`python3 bench/bench.py --8x8 --progs fib:20,treesum_direct:14,treesum:9 --tag v3` → `results/bench_v3.{json,md}`.
+
+| program | mesh | ok | interactions | cycles | speed-up vs 1x1 | interactions/cycle | cell utilisation | LINK msgs | NODE msgs | SPAWN msgs | msgs/interaction | busiest / idlest cell (interactions) | peak nodes / vars in one cell |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
+| fib(20) | 1x1 | yes | 295,525 | 1,006,974 | 1.00x | 0.293 | 100% | 0 | 0 | 0 | 0.00 | 295,525 / 295,525 | 69 / 108 |
+| fib(20) | 2x2 | yes | 295,525 | 252,422 | 3.99x | 1.171 | 100% | 185 | 57 | 57 | 0.00 | 73,931 / 73,831 | 66 / 102 |
+| fib(20) | 4x4 | yes | 295,525 | 67,105 | 15.01x | 4.404 | 95% | 8,935 | 2,453 | 2,453 | 0.05 | 19,558 / 17,141 | 70 / 133 |
+| fib(20) | 8x8 | yes | 295,525 | 26,171 | 38.48x | 11.292 | 64% | 38,072 | 10,330 | 10,330 | 0.20 | 7,461 / 2,069 | 65 / 116 |
+| treesum_direct(14) | 1x1 | yes | 245,750 | 753,632 | 1.00x | 0.326 | 100% | 0 | 0 | 0 | 0.00 | 245,750 / 245,750 | 32 / 75 |
+| treesum_direct(14) | 2x2 | yes | 245,750 | 189,110 | 3.99x | 1.300 | 100% | 642 | 144 | 144 | 0.00 | 61,455 / 61,427 | 35 / 88 |
+| treesum_direct(14) | 4x4 | yes | 245,750 | 48,577 | 15.51x | 5.059 | 98% | 6,158 | 1,378 | 1,378 | 0.04 | 15,633 / 15,139 | 48 / 139 |
+| treesum_direct(14) | 8x8 | yes | 245,750 | 23,406 | 32.20x | 10.499 | 57% | 67,937 | 15,409 | 15,409 | 0.40 | 7,397 / 754 | 40 / 113 |
+| treesum(9) | 1x1* | yes | 18,410 | 71,590 | 1.00x | 0.257 | 100% | 0 | 0 | 0 | 0.00 | 18,410 / 18,410 | 1032 / 1563 |
+| treesum(9) | 2x2 | yes | 18,410 | 20,119 | 3.56x | 0.915 | 93% | 1,924 | 715 | 291 | 0.16 | 4,883 / 4,418 | 571 / 872 |
+| treesum(9) | 4x4 | yes | 18,410 | 6,299 | 11.37x | 2.923 | 78% | 4,699 | 1,686 | 768 | 0.39 | 1,481 / 974 | 198 / 315 |
+| treesum(9) | 8x8 | yes | 18,410 | 2,677 | 26.74x | 6.877 | 51% | 10,121 | 3,505 | 1,699 | 0.83 | 538 / 67 | 73 / 126 |
+
+v3 against v1 (register-file cell, table below): fib(20) on one cell drops from 1,565,188 to 1,006,974 cycles
+(**3.41 cycles/interaction**, v1 5.30, v2 8.82); 8×8 from 60,948 to 26,171 cycles (38.5× over one cell,
+64% utilisation). treesum(9) 8×8: 6,830 → 2,677 cycles. The scaling columns improve too, because a
+shorter step makes cells finish and turn `hungry` sooner.
+
+### Benchmarks, v1 register-file cell (historical, commit 97aa2c0)
 
 | program | mesh | ok | interactions | cycles | speed-up vs 1x1 | interactions/cycle | cell utilisation | LINK msgs | NODE msgs | SPAWN msgs | msgs/interaction | busiest / idlest cell (interactions) | peak nodes / vars in one cell |
 |---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
@@ -163,7 +187,11 @@ macros (`synth/synth_cell.ys`, reports in `results/synth/`, GE = NAND2 equivalen
 |---|---:|---:|---:|---|
 | Ω cell v2, 1024 slots (router 1,612 cells) | 92,420 | 4,240 | 147,102 | 7 macros, 886,784 bits (node 135 Kb, var 70 Kb, task stack 133 Kb, free stacks 20 Kb, ROM 524 Kb, dir 4 Kb) |
 | Ω cell v2, 256 slots | 54,403 | 3,152 | 92,741 | 7 macros |
+| **Ω cell v3 + step 4, 1024 slots** (router 1,612 cells; `results/synth/stat_v3_cell_1024.txt`) | **155,725** | 4,271 | **233,164** | 8 macros, 1,177,600 bits (v2 + redex ROM 2048×128 b and a 128-bit directory word) |
 | TACHYON-128 core v4 (`cpu128/results/synth_stat_abc.txt`) | 129,811 | 8,519 | 217,636 | 3 macros (register file ≈ 26 Kbit) |
+
+v3 costs +59% logic over v2 (read-ahead address muxes with write bypass, 4-wide allocation, the
+write queue, the PULL / roomy logic). It is about 1.07× one TACHYON-128 core in logic GE.
 
 Cost of the SRAM discipline: fib(20) on one cell takes 2,605,000 cycles, **8.82 cycles/interaction**
 (v1 register-file cell: 5.30), because every var exchange and node read now waits one cycle for the
@@ -198,24 +226,36 @@ memory pressure 36/36, mutants 29/29 (2 new: roomy neighbours ignored; hungry wi
 | machine | work | cycles | vs TACHYON-128 |
 |---|---|---:|---:|
 | TACHYON-128 v6 (5-stage pipeline, BTB+RAS, tcc128 `-O`; `cpu128/README.md`, cc bench `fib`, includes `printf`) | 274,303 instructions, CPI 1.08 | **296,931** | 1.00 |
-| TACHYON-Ω 1×1 | 295,525 interactions | 1,565,188 | 5.27× slower |
-| TACHYON-Ω 2×2 | | 392,241 | 1.32× slower |
-| TACHYON-Ω 4×4 | | 114,293 | **2.60× faster** |
-| TACHYON-Ω 8×8 | | 60,948 | **4.87× faster** |
+| TACHYON-Ω v3, 1×1 | 295,525 interactions, 3.41 cycles each | 1,006,974 | 3.39× slower |
+| TACHYON-Ω v3, 2×2 | | 252,422 | 1.18× faster |
+| TACHYON-Ω v3, 4×4 | | 67,105 | **4.42× faster** |
+| TACHYON-Ω v3, 8×8 | | 26,171 | **11.35× faster** |
+
+#### Area-normalised (logic GE × cycles, lower is better)
+
+Area × time for one fib(20), counting **logic only** (NAND2-equivalent GE from the same Yosys flow and
+the same `synth/ge.py` weights for both designs; SRAM/ROM excluded on both sides):
+
+| machine | cells | logic GE | fib(20) cycles | GE × cycles | vs TACHYON-128 |
+|---|---:|---:|---:|---:|---:|
+| TACHYON-128 (GE: v4 core synthesis `cpu128/results/synth_stat_abc.txt`; cycles: v6) | 1 | 217,636 | 296,931 | 6.46 × 10¹⁰ | 1.00 |
+| TACHYON-Ω v3, 1×1 | 1 | 233,164 | 1,006,974 | 2.35 × 10¹¹ | 3.63× worse |
+| TACHYON-Ω v3, 2×2 | 4 | 932,656 | 252,422 | 2.35 × 10¹¹ | 3.64× worse |
+| TACHYON-Ω v3, 4×4 | 16 | 3,730,624 | 67,105 | 2.50 × 10¹¹ | 3.87× worse |
+| TACHYON-Ω v3, 8×8 | 64 | 14,922,496 | 26,171 | 3.91 × 10¹¹ | 6.04× worse |
 
 What this comparison does and does not say:
-* **Per engine, Ω is about 5× worse than a pipelined von Neumann core.** A single cell needs about as
-  many rewrites as the CPU needs instructions (295k vs 274k), and each rewrite takes ≈5.3 cycles against
-  a CPI of 1.08. The fabric wins only through parallelism, which the program exposes *automatically*:
-  the same source runs on any mesh with no threads, locks or scheduling code.
-* **Cycles are not time or area.** The comparison does not cover clock frequency, area or energy, and
-  Ω has no synthesis results yet.
-  * Each Ω cell carries ≈330 Kbit of RAM (1024×128 b node + 1024×64 b var + 1024×130 b task stack) plus
-    its FSM and router.
-  * A 4×4 fabric is therefore far more silicon than one TACHYON-128 core (≈130k yosys cells, without
-    memories).
-  * An area-normalised comparison would also have to count the CPU's caches and DRAM, which the fabric
-    does not need.
+* **Per unit of logic, Ω v3 is ≈3.6× less efficient than a pipelined von Neumann core** on this
+  program, and that ratio holds almost flat up to 4×4 (near-linear speed-up). At 8×8 the mesh is only
+  64% utilised, so area × time grows to 6×. The fabric buys *latency* (11× fewer cycles at 8×8) with
+  area, and the parallelism is found automatically: the same source runs on any mesh with no threads,
+  locks or scheduling code.
+* **Memory is not in the table, and it favours the CPU here.** Each Ω cell carries 1.18 Mbit of SRAM/ROM
+  (node, var, task stack, free stacks, definition ROMs; the ROMs are replicated per cell); the CPU's
+  register file is ≈26 Kbit, but a real CPU also needs caches and DRAM, which the fabric does not.
+  Shrinking the per-cell ROM (shared ROM per cluster) is the largest available area win.
+* **GE is technology-independent** (generic gates, no library, no timing). Clock frequency and energy
+  are not compared; the Ω cell's critical path (read-ahead address → SRAM) is unmeasured.
 * **The numbers are 32-bit.** TACHYON-128 computes with 128-bit registers. Ω's NUM atoms are 32-bit.
 
 ## Known gaps
@@ -227,17 +267,17 @@ What this comparison does and does not say:
    The ROM is shared, so tenants see each other's definitions (they cannot forge an owner, but code is
    not confidential). Forged pointers to slots the attacker itself owns are not trapped (no isolation
    issue, but the attacker can corrupt its own graph).
-2. **Synthesis is technology-independent.** Generic-gate cell counts and NAND2 equivalents only; no
+2. **Synthesis is technology-independent; area comparison is logic only.** Generic-gate cell counts and NAND2 equivalents only; no
    standard-cell library, no place and route, no timing. Memories are counted in bits, not area.
    The per-slot `nalloc` valid bits are flip-flops (1 per node slot) and dominate the growth from
-   256 to 1024 slots.
-3. **Out-of-memory handling is detection, not recovery.**
-   * Task-stack overflow (`err = 1`) or a 1×1 cell that cannot place an expansion (`err = 2`) halt the
-     cell.
-   * A globally full fabric can bounce SPAWNs (the RTL times out with status 3, and the Python model
-     reports "no progress").
-   * There is no spilling, and no back-pressure from memory to the spawn policy beyond the `hungry`
-     wire.
+   256 to 1024 slots. The area-normalised comparison with TACHYON-128 counts logic GE only; each Ω
+   cell's 1.18 Mbit of SRAM/ROM (ROMs replicated per cell) is not converted to area. No Fmax.
+3. **Out-of-memory handling: local recovery only.** Step 4 moves work from poor to rich cells
+   (`roomy` wire, SPAWN/NODE/PULL to roomy neighbours), but:
+   * task-stack overflow (`err = 1`) or a 1×1 cell that cannot place an expansion (`err = 2`) still
+     halts the cell;
+   * a *globally* full fabric still bounces work (status 3 / "no progress"); there is no spilling to
+     off-fabric memory and spawning is not throttled when every neighbour is poor.
 4. **Limits on sizes.**
    * One definition may have at most 255 nodes, 255 vars and 255 redexes (8-bit counts), and the ROM
      holds 4096 entries.
@@ -258,22 +298,21 @@ What this comparison does and does not say:
    narrower physical link would serialise them into several flits.
 9. **No optimal (Lamping/Δ-Nets) reduction.** Sharing is plain interaction-combinator duplication.
 
+10. **CI covers the quick subset only**, on Ubuntu 24.04's Verilator 5.020 (units, programs without
+    random cases, 80 RTL fuzz cases, 20 multi-tenant cases, memory-pressure quick set). The full
+    regression (fuzz 600 + big 200, security 420, mutants) runs locally on Verilator 5.052.
+
 ## Next steps (suggested)
 
-2. A banked SRAM cell (1R1W) and yosys/OpenROAD area and Fmax for one cell, giving an area-normalised
-   comparison with TACHYON-128.
-3. Cut the cycles per interaction:
-   * overlap IDLE with the previous task;
-   * process var links that need no message in the same cycle as the rewrite;
-   * a 2-wide engine.
-
-   ≈2.5 cycles/interaction looks reachable.
-4. Smarter placement:
-   * spawn depth limits and locality-aware NODE migration (move the smaller side);
-   * memory-aware `hungry` (free-slot watermark);
-   * spilling to a neighbour when full.
-5. Bigger language: Latent/Bend subset with `fold`/`bend`, signed numbers, strings, and a typed
-   front end. A TACHYON-128 host interface (DMA of graph images, result readback).
+1. Shrink the cell: share one definition ROM per cluster of cells instead of one per cell (the ROMs are
+   ≈ 70% of each cell's 1.18 Mbit), and a standard-cell flow (OpenROAD + a public PDK) for real area
+   and Fmax.
+2. Cut cycles per interaction below 3.4: process a var link that overlaps a rule (2.5-cycle target),
+   or dual-issue independent tasks.
+3. Global memory pressure: throttle spawning when every neighbour is poor, and spill to off-fabric
+   memory.
+4. Bigger language: signed numbers, strings, `fold`/`bend`, typed front end; a TACHYON-128 host
+   interface (DMA of graph images, result readback).
 
 ## Commits
 
@@ -286,4 +325,10 @@ What this comparison does and does not say:
 * `7be478c` frontend: only lift arms that can reduce (value arms inline) - fixes unexpanded REF results at N=0; program tests 268/268
 * `18e4ce5` demand-driven spawn (hungry side-band wires between neighbours) replaces round-robin push: 100x fewer messages, no OOM livelock; per-cell peak occupancy counters; run_all.sh
 * `9cccae8` full regression on demand-driven spawn RTL: units 35/35, programs 268/268, fuzz 600/600 + big 200/200, mutants 16/16; README draft
-* (HEAD) benchmarks with demand-driven spawn, README/SPEC final
+* `97aa2c0` benchmarks (1x1..8x8) with demand-driven spawn; README results, comparison with TACHYON-128, known gaps
+* `e5d714a` CI: GitHub Actions quick regression (Verilator units, programs, 80 RTL fuzz cases)
+* `7f81d51` owner-capability isolation: per-slot owner tags, CROSS/FORGED/OOB traps in all three models; security suite 420/420
+* `10c5346` CI: absolute source paths for Verilator 5.020
+* `9ed3ba7` step 2: SRAM-style cell (1R1W synchronous RAMs), Yosys synthesis of one cell
+* `c37a922` step 3: v3 engine, one link step per cycle (read-ahead addressing, write bypass)
+* `304f5a8` step 4: memory pressure (roomy wire, OOM work moves to roomy neighbours, PULL)
