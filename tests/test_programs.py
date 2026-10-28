@@ -24,6 +24,12 @@ def main():
     fuzz = int(sys.argv[sys.argv.index("--fuzz") + 1]) if "--fuzz" in sys.argv else 0
     n = fails = 0
     t = time.time()
+    # small-N edge cases on the semantic model (N = 0 exercises value arms reaching the root)
+    for name, _ in SUITE:
+        for N in range(6):
+            n += 1
+            if semantic.result(progs.book(name, N))["readback"] != progs.expected(name, N):
+                fails += 1; print(f"FAIL semantic {name}({N})")
     for name, N in SUITE:
         b = progs.book(name, N)
         ref = semantic.result(b)

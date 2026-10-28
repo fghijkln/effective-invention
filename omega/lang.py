@@ -229,8 +229,11 @@ class Compiler:
                 return ("switch", scr, self.resolve(z, bound, owner),
                         ("lam", p, self.resolve(s, bound | {p}, owner)), [])
             fv = sorted((free_vars(z) | free_vars(s, frozenset({p}))) & bound)
-            zr = self.lift(owner, self.wrap(z, fv))
-            sr = self.lift(owner, ("lam", p, self.wrap(s, fv)))
+            # only arms that can reduce on their own are lifted; value arms stay inline (\fv.. body)
+            zw = self.wrap(z, fv)
+            sw = ("lam", p, self.wrap(s, fv))
+            zr = self.lift(owner, zw) if needs_lift(z) else self.resolve(zw, bound - set(fv), owner)
+            sr = self.lift(owner, sw) if needs_lift(s) else self.resolve(sw, bound - set(fv) - {p}, owner)
             return ("switch", scr, zr, sr, fv)
         if k == "match":
             scr = self.resolve(e[1], bound, owner)
@@ -248,7 +251,10 @@ class Compiler:
                 if lifted:
                     arm = self.wrap(b, fv)
                     for f in reversed(fs): arm = ("lam", f, arm)
-                    out = ("app", out, self.lift(owner, arm))
+                    if needs_lift(b):
+                        out = ("app", out, self.lift(owner, arm))
+                    else:
+                        out = ("app", out, self.resolve(arm, bound - set(fv) - set(fs), owner))
                 else:
                     arm = self.resolve(b, bound | set(fs), owner)
                     for f in reversed(fs): arm = ("lam", f, arm)
