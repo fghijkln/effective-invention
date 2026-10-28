@@ -33,7 +33,7 @@ class FabricError(Exception):
 class Image:
     """Initial distribution of @main over the cells + book ROM.  Root var = cell(0,0) var slot 0."""
 
-    def __init__(self, book, W, H, slots=1024, qdepth=1024, main_cells=None):
+    def __init__(self, book, W, H, slots=1024, qdepth=1024, main_cells=None, scatter=None):
         self.book, self.W, self.H, self.slots, self.qdepth = book, W, H, slots, qdepth
         self.nodes = {(x, y): [None] * slots for x in range(W) for y in range(H)}
         self.vars = {(x, y): [None] * slots for x in range(W) for y in range(H)}
@@ -43,8 +43,14 @@ class Image:
         order = main_cells or [(x, y) for y in range(H) for x in range(W)]
         d = book["main"]
 
+        srng = random.Random(scatter) if scatter is not None else None
+
         def alloc(kind):
-            for c in order:
+            seq = order
+            if srng is not None:
+                seq = order[:]
+                srng.shuffle(seq)
+            for c in seq:
                 tab = self.nodes[c] if kind == "n" else self.vars[c]
                 for s in range(slots):
                     if tab[s] is None:

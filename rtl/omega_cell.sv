@@ -118,7 +118,7 @@ module omega_cell import omega_pkg::*; #(
     take_msg  = (state == S_IDLE) && !stall_now && pick_msg;
     take_q    = (state == S_IDLE) && !stall_now && q_ok && !pick_msg;
     ej_pop    = take_msg;
-    idle      = (state == S_IDLE) && (qtop == 0) && !ej_v && (ob_cnt == 0) && !rbusy;
+    idle      = (state == S_IDLE) && (qtop == 0) && !ej_v && (ob_cnt == 0) && (!rbusy || MUT[15]);
     ready     = state != S_INIT;
   end
 
@@ -176,7 +176,7 @@ module omega_cell import omega_pkg::*; #(
                 logic [SB-1:0] s;
                 s = nstack[SB'(ntop - 1)];
                 ntop <= ntop - 1;
-                node_mem[s] <= {ej_f.p2, ej_f.p1};
+                node_mem[s] <= MUT[10] ? {ej_f.p1, ej_f.p2} : {ej_f.p2, ej_f.p1};
                 nalloc[s] <= 1'b1;
                 ra <= withpay(ej_f.p0, here(s));
                 rb <= ej_f.p3;
@@ -212,6 +212,7 @@ module omega_cell import omega_pkg::*; #(
                 vstack[vtop[SB-1:0]] <= sA;
                 vtop <= vtop + 1;
                 ra <= old; rb <= B;            // continue linking old ~ B
+                if (MUT[11]) state <= S_IDLE;
               end
             end else begin
               if (can_send) begin snd = 1'b1; sf = '{M_LINK, px(A), py(A), 64'd0, 64'd0, B, A}; end
@@ -233,7 +234,7 @@ module omega_cell import omega_pkg::*; #(
               if (tQ == T_REF && tP != T_ERA) begin sp_ref <= plab(Q); sp_x <= P; state <= S_SPAWN; end
             end else if (tQ <= T_NUM) begin
               // binary node P ~ nullary Q
-              if (tQ == T_REF && tP != T_DUP) begin
+              if (tQ == T_REF && (tP != T_DUP || MUT[13])) begin
                 st_inter <= st_inter + 1;
                 sp_ref <= plab(Q); sp_x <= P; state <= S_SPAWN;
               end else if (!local_p(P)) begin
@@ -247,13 +248,14 @@ module omega_cell import omega_pkg::*; #(
                   // erase / copy: both aux ports receive Q
                   nfc = 2'd1; nf0 = sP; nalloc[sP] <= 1'b0;
                   pa[1] <= a2; pbv[1] <= (MUT[0] ? a1 : Q);
-                  ra <= a1; rb <= Q; pidx <= 3'd1; state <= S_PUSH;
+                  ra <= a1; rb <= Q; pidx <= 3'd1; state <= MUT[12] && tQ == T_ERA ? S_LINK : S_PUSH;
                 end else if (tP == T_OPR) begin
                   logic [3:0] op; logic s;
                   op = plab(P)[3:0]; s = plab(P)[4];
                   if (ptag(a1) == T_NUM) begin
                     logic [31:0] r;
                     r = s ? alu(op, pval(a1), pval(Q)) : alu(op, pval(Q), pval(a1));
+                    if (MUT[8] && op == 4'd7) r = s ? alu(4'd9, pval(a1), pval(Q)) : alu(4'd9, pval(Q), pval(a1));
                     if (MUT[1]) r = alu(op, pval(a1), pval(Q));
                     nfc = 2'd1; nf0 = sP; nalloc[sP] <= 1'b0;
                     ra <= a2; rb <= mkp(T_NUM, 16'd0, r); state <= S_LINK;
@@ -263,7 +265,7 @@ module omega_cell import omega_pkg::*; #(
                   end
                 end else begin  // SWI ~ NUM
                   if (pval(Q) == 0) begin
-                    node_mem[sP] <= {64'h3000_0000_0000_0000, a2};                 // (a2 *)
+                    node_mem[sP] <= MUT[9] ? {a2, 64'h3000_0000_0000_0000} : {64'h3000_0000_0000_0000, a2};  // (a2 *)
                     ra <= a1; rb <= mkp(T_CON, 16'd0, here(sP)); state <= S_LINK;
                   end else begin
                     logic [SB-1:0] c2;
@@ -299,7 +301,7 @@ module omega_cell import omega_pkg::*; #(
                   v2 = vstack[SB'(vtop - 3)]; v3 = vstack[SB'(vtop - 4)];
                   ntop <= ntop - 2; vtop <= vtop - 4;
                   x11 = mkp(T_VAR, 16'd0, here(v0)); x12 = mkp(T_VAR, 16'd0, here(v1));
-                  x21 = mkp(T_VAR, 16'd0, here(v2)); x22 = mkp(T_VAR, 16'd0, here(v3));
+                  x21 = mkp(T_VAR, 16'd0, here(v2)); x22 = mkp(T_VAR, 16'd0, here(MUT[14] ? v2 : v3));
                   node_mem[sP] <= {x12, x11};               // copy 1 of Q's kind
                   node_mem[n1] <= {x22, x21};               // copy 2 of Q's kind
                   node_mem[sQ] <= {x21, x11};               // copy 1 of P's kind

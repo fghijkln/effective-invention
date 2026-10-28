@@ -6,6 +6,7 @@ from . import fabric
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 RTL = ["rtl/omega_pkg.sv", "rtl/omega_router.sv", "rtl/omega_cell.sv", "rtl/omega_mesh.sv"]
+BUILD = os.environ.get("OMEGA_BUILD", "/tmp/omega_build")
 ENV_SH = os.path.expanduser("~/env.sh")
 
 
@@ -29,11 +30,11 @@ def build(W, H, slots=1024, qdepth=1024, romsz=4096, mut=0, quiet=True):
         _ENV = _env()
     src_hash = hashlib.sha1(b"".join(open(os.path.join(ROOT, f), "rb").read() for f in RTL + ["tb/tb_mesh.cpp"])).hexdigest()[:10]
     name = f"v{W}x{H}_s{slots}_q{qdepth}_r{romsz}_m{mut:x}_{src_hash}"
-    d = os.path.join(ROOT, "build", name)
+    d = os.path.join(BUILD, name)
     exe = os.path.join(d, "vsim")
     if os.path.exists(exe):
         return exe
-    os.makedirs(os.path.join(ROOT, "build"), exist_ok=True)
+    os.makedirs(BUILD, exist_ok=True)
     cmd = ["verilator", "--cc", "--exe", "--build", "-j", "2", "-O3", "-Wno-fatal", "-Wno-WIDTH", "-Wno-UNUSED",
            "-Wno-MULTIDRIVEN", "--top-module", "omega_mesh", f"-GW={W}", f"-GH={H}", f"-GSLOTS={slots}",
            f"-GQDEPTH={qdepth}", f"-GROMSZ={romsz}", f"-GMUT=256'h{mut:x}", "-Mdir", d, "-o", "vsim",
@@ -65,7 +66,7 @@ def run(book, W, H, seed=1, jitter=0, stall=0, pmsg=128, slots=1024, qdepth=1024
     img = img or fabric.Image(book, W, H, slots, qdepth)
     if len(img.rom) > romsz or len(img.dir) > 256:
         raise fabric.FabricError("book does not fit the ROM")
-    tmp = keep or tempfile.mkdtemp(prefix="omg_", dir=os.path.join(ROOT, "build"))
+    tmp = keep or tempfile.mkdtemp(prefix="omg_")
     try:
         img.write_hex(tmp)
         r = subprocess.run([exe, f"+img={tmp}", f"+seed={seed}", f"+jitter={jitter}", f"+stall={stall}",
