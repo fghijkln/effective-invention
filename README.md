@@ -72,7 +72,7 @@ def main = tsum(gen(N))
 
 ## Results
 
-### Verification (final RTL, commit in "Commits" below)
+### Verification (full regression on `1dfad55`: RTL with the FIFO-index fix, frontend step 6)
 
 | suite | result | what it checks |
 |---|---|---|
@@ -81,6 +81,7 @@ def main = tsum(gen(N))
 | RTL differential fuzz, small nets (`tests/fuzz_rtl.py 0 600`) | **600 / 600** | random books (all node kinds, 3 DUP labels, all 16 operators with both flip bits, SWI, REF DAGs) on 1×1, 2×2, 4×4, 3×2, 1×4 with random arbitration seed, link jitter (0–63%), engine stalls, message/task priority and random scatter of `@main` over the cells. Readback, interaction count and live node count must equal the semantic model's (165 diverging nets rejected) |
 | RTL differential fuzz, big nets (`--big`) | **200 / 200** | 3–8 definitions, 20–60 nodes each, deeper trees, more references; only nets with ≥ 30 interactions are kept (avg 375, max 16,239 interactions; 4,088 candidates rejected as diverging or trivial) |
 | owner-capability isolation (`tests/test_security.py --fuzz 300`) | **420 / 420** | 2- and 4-tenant program demos (fib ∥ qsort; treesum ∥ list ∥ sort ∥ higher-order) on 1×1/2×2/4×4/3×2, each tenant gets its known answer with zero traps; 10 attack programs (overwrite / capture the victim's result through a forged root-var pointer, out-of-bounds slot and cell, forged node pointers to the victim's result node, an attack hidden in a lazily expanded definition) and 3 cross-owner fault injections, each with the sender-side check on and off (`fi`); 300 random multi-tenant cases (2–4 random tenants, random owners, half with an attacker carrying random forged redexes). Semantic model, fabric model and RTL must agree on every honest tenant's result and node count, on the trap set and on the interaction count (SPEC §12) |
+| memory pressure (`tests/test_mempress.py`) | **36 / 36** | cell (0,0) pre-filled with foreign ballast so only 4–30 slots are free (30 cases), small-cell capacity cases, security fuzz case 265; semantic model, fabric model and RTL must agree |
 | mutation testing (`tests/mutants.py`) | **29 / 29 caught** | 15 functional mutants of the rule logic / protocol / quiescence + 1 performance mutant (no work distribution, caught by the speed-up bound) + 6 security mutants (each owner-capability check disabled, owner stamping missing, trap not blocking). Two mutants (eraser reaches only aux1; REF~DUP expands instead of copying) produce the *right* answer and are caught only by the node count / interaction count. That is why all three observables are compared. + 5 v3 engine mutants (read-ahead write bypass, write-queue drain, var owner-tag queue, allocation pop count, ROM read-ahead) + 2 memory-pressure mutants (caught by `tests/test_mempress.py`) |
 
 Strong confluence is the test oracle. Any schedule (arbitration, delays, stalls, task/message priority,
@@ -334,3 +335,6 @@ What this comparison does and does not say:
 * `9ed3ba7` step 2: SRAM-style cell (1R1W synchronous RAMs), Yosys synthesis of one cell
 * `c37a922` step 3: v3 engine, one link step per cycle (read-ahead addressing, write bypass)
 * `304f5a8` step 4: memory pressure (roomy wire, OOM work moves to roomy neighbours, PULL)
+* `74bbbd7` fix: explicit FIFO write-index wrap (Verilator 5.020 CI failure); unbuffered CI output
+* `9a19a33` step 5: v3 benchmarks, v3 cell synthesis (233,164 GE), area-normalised comparison
+* `1dfad55` step 6: nested / literal / default patterns, Hindley–Milner type checker
