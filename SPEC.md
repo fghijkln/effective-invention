@@ -286,6 +286,19 @@ types, 32-bit arithmetic and global recursive `def`s.
   a nested switch/match, or a reference) is lifted into its own closed definition. It stays a lazy
   `REF` until selected, and its free variables are passed as extra arguments. This is the Bend
   approach.
+* **Patterns (step 6).** `match` arms take nested constructor patterns, numeric literals, variables and
+  `_` (`Cons(a, Cons(b, t))`, `Cons(0, t)`, `P(T, T)`, `k => …`). A column-wise match compiler
+  (`Desugar` in `omega/lang.py`) turns them into flat one-level Scott matches over every constructor,
+  `==` tests for literals and defaults for binders, before arm lifting; the net-level encoding is
+  unchanged. It rejects wrong constructor arity, unknown constructors, a binder used twice in one
+  pattern, non-exhaustive matches, redundant arms and mixed pattern kinds.
+* **Type checking (step 6).** `omega/typecheck.py`: Hindley–Milner inference with let-polymorphism and
+  no annotations, generalised per strongly connected component of the call graph. Types are `Num`,
+  each user data type (not parameterised; constructor fields get fresh types at every use), functions
+  and type variables. It checks shapes: arithmetic, comparisons and `if` / `switch` conditions are
+  numbers, `match` scrutinees have the matched data type, only functions are applied, arms agree, and
+  `main` is a value. Errors are `SyntaxError` (scope, patterns) or `TypeError` (types), naming the
+  definition.
 
 ## 11. Known gaps (MVP)
 

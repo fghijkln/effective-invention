@@ -76,7 +76,7 @@ def main = tsum(gen(N))
 
 | suite | result | what it checks |
 |---|---|---|
-| directed rule/unit tests (`tests/test_units.py --rtl`) | **35 / 35** | every rule of the rule table (25 hand-written nets with expected normal form *and* interaction count) + 9 frontend programs (closures, Church numerals, Ackermann, mutual recursion, `match`) + IR round trip. Each net runs on the semantic model (random, LIFO, FIFO order), the fabric model and the RTL on 1×1, 2×2, 4×4 with jitter/stalls and scattered loading |
+| directed rule/unit tests (`tests/test_units.py --rtl`) | **42 / 42** | every rule of the rule table (25 hand-written nets with expected normal form *and* interaction count) + 15 frontend programs (closures, Church numerals, Ackermann, mutual recursion, `match`; nested / literal / default patterns, `let`, a polymorphic helper) + 15 programs the frontend must reject (one check) + IR round trip. Each net runs on the semantic model (random, LIFO, FIFO order), the fabric model and the RTL on 1×1, 2×2, 4×4 with jitter/stalls and scattered loading |
 | program tests (`tests/test_programs.py --fuzz 150`) | **268 / 268** | 9 programs × N = 0..5 (semantic), each program on the fabric model and on RTL 1×1/2×2/4×4 × 2 schedules, a performance bound (tree sum 4×4 ≥ 3× 1×1), and 150 random (program, N, mesh incl. 3×2 and 1×4, seed, jitter, stall, priority, scatter) cases |
 | RTL differential fuzz, small nets (`tests/fuzz_rtl.py 0 600`) | **600 / 600** | random books (all node kinds, 3 DUP labels, all 16 operators with both flip bits, SWI, REF DAGs) on 1×1, 2×2, 4×4, 3×2, 1×4 with random arbitration seed, link jitter (0–63%), engine stalls, message/task priority and random scatter of `@main` over the cells. Readback, interaction count and live node count must equal the semantic model's (165 diverging nets rejected) |
 | RTL differential fuzz, big nets (`--big`) | **200 / 200** | 3–8 definitions, 20–60 nodes each, deeper trees, more references; only nets with ≥ 30 interactions are kept (avg 375, max 16,239 interactions; 4,088 candidates rejected as diverging or trivial) |
@@ -288,11 +288,13 @@ What this comparison does and does not say:
 6. **Python fabric model is cycle-approximate**, not lockstep with the RTL. It charges per-task costs.
    Both are checked against the semantic model, not against each other cycle by cycle.
 7. **Frontend.**
-   * No type checker.
+   * The type checker is shape-only: data types are not parameterised and constructor fields are
+     untyped (a list may mix numbers and functions); mutual recursion is monomorphic.
    * DUP labels are allocated one per binder. Programs that duplicate closures that themselves
      duplicate can hit the usual interaction-combinator oracle problem; no such program is in the
      suite.
-   * Arm lifting applies to `switch` and `match` only.
+   * Arm lifting applies to `switch` and `match` only. Pattern matching compiles to nested Scott
+     matches, so a deep pattern costs one match (and possibly one lifted definition) per level.
    * Results that are lazy references at the root (e.g. `def main = Nil`) read back as `@Nil`.
 8. **Mesh flits are 266 bits wide** (one NODE message carries a whole 128-bit node plus two ports). A
    narrower physical link would serialise them into several flits.
@@ -311,7 +313,7 @@ What this comparison does and does not say:
    or dual-issue independent tasks.
 3. Global memory pressure: throttle spawning when every neighbour is poor, and spill to off-fabric
    memory.
-4. Bigger language: signed numbers, strings, `fold`/`bend`, typed front end; a TACHYON-128 host
+4. Bigger language: signed numbers, strings, `fold`/`bend`, parameterised data types; a TACHYON-128 host
    interface (DMA of graph images, result readback).
 
 ## Commits

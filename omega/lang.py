@@ -119,11 +119,26 @@ class P:
         if self.accept("match"):
             e = self.expr(); self.expect("{"); arms = []
             while not self.accept("}"):
-                c = self.ident(); fs = []
-                if self.accept("("): fs = self.idlist(")")
-                self.expect("=>"); arms.append((c, fs, self.expr())); self.accept(";")
-            return ("match", e, arms)
+                pat = self.pattern()
+                self.expect("=>"); arms.append((pat, self.expr())); self.accept(";")
+            return ("pmatch", e, arms)
         return self.binop(0)
+
+    def pattern(self):
+        """pattern := ident | ident '(' pattern, ... ')' | number.  Whether an identifier is a
+        constructor or a binder ('_' = wildcard) is decided after parsing (constructors may be declared later)."""
+        k, v = self.next()
+        if k == "num": return ("pnum", v)
+        if k != "id": raise SyntaxError(f"expected a pattern, got {v!r}")
+        if self.accept("("):
+            subs = []
+            if not self.accept(")"):
+                while True:
+                    subs.append(self.pattern())
+                    if self.accept(")"): break
+                    self.expect(",")
+            return ("pcon", v, subs)
+        return ("pid", v)
 
     def binop(self, lvl):
         if lvl == len(BINOPS): return self.app()
@@ -183,15 +198,132 @@ def needs_lift(e):
     raise ValueError(k)
 
 
+class Desugar:
+    """Nested pattern matching -> flat Scott matches (one level, every constructor, variable fields),
+    numeric literal patterns -> `==` tests, `_` / variable patterns -> defaults (column-wise match
+    compilation).  Also checks patterns: constructor arity, duplicate binders, exhaustiveness and
+    redundant arms."""
+
+    def __init__(self, comp):
+        self.c = comp
+
+    def fresh(self):
+        self.c.gensym += 1
+        return f"%m{self.c.gensym}"
+
+    def expr(self, e, owner):
+        k = e[0]
+        if k in ("num", "var"): return e
+        if k == "lam": return ("lam", e[1], self.expr(e[2], owner))
+        if k == "app": return ("app", self.expr(e[1], owner), self.expr(e[2], owner))
+        if k == "op": return ("op", e[1], self.expr(e[2], owner), self.expr(e[3], owner))
+        if k == "let": return ("let", e[1], self.expr(e[2], owner), self.expr(e[3], owner))
+        if k == "switch": return ("switch", self.expr(e[1], owner), self.expr(e[2], owner), e[3], self.expr(e[4], owner))
+        if k == "pmatch": return self.match(self.expr(e[1], owner), [(self.pat(p, owner), self.expr(b, owner)) for p, b in e[2]], owner)
+        raise ValueError(k)
+
+    def pat(self, p, owner, seen=None):
+        """Normalise a parsed pattern: ('con', C, [subs]) | ('num', n) | ('bind', x) | ('wild',)."""
+        seen = set() if seen is None else seen
+        if p[0] == "pnum": return ("num", p[1] & 0xFFFFFFFF)
+        if p[0] == "pcon" or p[1] in self.c.ctors:
+            c = p[1]; subs = p[2] if p[0] == "pcon" else []
+            if c not in self.c.ctors: raise SyntaxError(f"unknown constructor {c} in a pattern of {owner}")
+            ar = len(self.c.ctors[c][2])
+            if len(subs) != ar: raise SyntaxError(f"constructor {c} has {ar} field(s), a pattern in {owner} gives {len(subs)}")
+            return ("con", c, [self.pat(q, owner, seen) for q in subs])
+        if p[1] == "_": return ("wild",)
+        if p[1] in seen: raise SyntaxError(f"variable {p[1]} bound twice in one pattern of {owner}")
+        seen.add(p[1])
+        return ("bind", p[1])
+
+    def match(self, scr, arms, owner):
+        # one level, every constructor of one type exactly once, variable / wildcard fields: unchanged
+        if arms and all(p[0] == "con" and all(q[0] in ("bind", "wild") for q in p[2]) for p, _ in arms):
+            cs = [p[1] for p, _ in arms]
+            dt = self.c.ctors[cs[0]][0]
+            if len(set(cs)) == len(cs) and set(cs) == set(self.c.datas[dt]):
+                return ("match", scr, [(p[1], [q[1] if q[0] == "bind" else self.fresh() for q in p[2]], b) for p, b in arms])
+        used = [False] * len(arms)
+        rows = [([p], [], b, i) for i, (p, b) in enumerate(arms)]
+        if scr[0] == "var":
+            out = self.compile([scr[1]], rows, used, owner)
+        else:
+            s = self.fresh()
+            out = ("let", s, scr, self.compile([s], rows, used, owner))
+        for i, u in enumerate(used):
+            if not u: raise SyntaxError(f"redundant match arm {i + 1} in {owner}")
+        return out
+
+    def compile(self, xs, rows, used, owner):
+        """xs: scrutinee variable names; rows: (patterns, bindings [(x, var)], body, arm index)."""
+        if not rows: raise SyntaxError(f"non-exhaustive match in {owner}")
+        pats, binds, body, idx = rows[0]
+        if all(p[0] in ("bind", "wild") for p in pats):
+            used[idx] = True
+            binds = binds + [(p[1], x) for p, x in zip(pats, xs) if p[0] == "bind"]
+            for x, v in reversed(binds): body = ("let", x, ("var", v), body)
+            return body
+        col = next(i for i, p in enumerate(pats) if p[0] not in ("bind", "wild"))
+        x = xs[col]
+        kinds = {r[0][col][0] for r in rows} - {"bind", "wild"}
+        if len(kinds) > 1: raise SyntaxError(f"constructor and number patterns in one position in {owner}")
+        if pats[col][0] == "num":
+            n = pats[col][1]
+            yes, no = [], []
+            for ps, bs, b, i in rows:
+                p = ps[col]
+                if p[0] == "num":
+                    if p[1] == n: yes.append((ps[:col] + [("wild",)] + ps[col + 1:], bs, b, i))
+                    else: no.append((ps, bs, b, i))
+                else:
+                    nb = bs + ([(p[1], x)] if p[0] == "bind" else [])
+                    yes.append((ps[:col] + [("wild",)] + ps[col + 1:], nb, b, i)); no.append((ps, bs, b, i))
+            return ("switch", ("op", "==", ("var", x), ("num", n)), self.compile(xs, no, used, owner), "_",
+                    self.compile(xs, yes, used, owner))
+        dt = self.c.ctors[pats[col][1]][0]
+        out = []
+        for c in self.c.datas[dt]:
+            ar = len(self.c.ctors[c][2])
+            fs = [self.fresh() for _ in range(ar)]
+            sub = []
+            for ps, bs, b, i in rows:
+                p = ps[col]
+                if p[0] == "con":
+                    if self.c.ctors[p[1]][0] != dt: raise SyntaxError(f"constructors of different types in one position in {owner}")
+                    if p[1] == c: sub.append((ps[:col] + p[2] + ps[col + 1:], bs, b, i))
+                else:
+                    nb = bs + ([(p[1], x)] if p[0] == "bind" else [])
+                    sub.append((ps[:col] + [("wild",)] * ar + ps[col + 1:], nb, b, i))
+            out.append((c, fs, self.compile(xs[:col] + fs + xs[col + 1:], sub, used, owner)))
+        return ("match", ("var", x), out)
+
+
 class Compiler:
-    def __init__(self, src):
+    def __init__(self, src, typecheck=True):
         datas, defs = P(src).program()
         self.ctors = {}      # ctor -> (data, index, fields)
         self.datas = {}
         self.defs = {}       # name -> AST (closed, params as lambdas)
         self.order = []
         for dname, cs in datas:
+            if dname in self.datas: raise SyntaxError(f"duplicate data type {dname}")
             self.datas[dname] = [c for c, _ in cs]
+            for c, fs in cs:
+                if c in self.ctors: raise SyntaxError(f"duplicate constructor {c}")
+                if len(set(fs)) != len(fs): raise SyntaxError(f"duplicate field name in constructor {c}")
+                self.ctors[c] = (dname, None, fs)
+        user = []
+        for name, ps, body in defs:
+            if len(set(ps)) != len(ps): raise SyntaxError(f"duplicate parameter in {name}")
+            self.gensym = 0
+            user.append((name, ps, Desugar(self).expr(body, name)))
+        self.types = None
+        if typecheck:
+            from .typecheck import check_program
+            self.types = check_program(self, user)
+        defs = user
+        for dname, cs in datas:
             for i, (c, fs) in enumerate(cs):
                 self.ctors[c] = (dname, i, fs)
                 cases = [f"c{j}" for j in range(len(cs))]
@@ -368,9 +500,9 @@ class Compiler:
         return "\n".join(out) + "\n"
 
 
-def compile_source(src):
-    return Compiler(src).compile()
+def compile_source(src, typecheck=True):
+    return Compiler(src, typecheck).compile()
 
 
-def compile_book(src):
-    return ir.parse_book(compile_source(src))
+def compile_book(src, typecheck=True):
+    return ir.parse_book(compile_source(src, typecheck))
