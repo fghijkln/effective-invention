@@ -1,0 +1,6 @@
+// Scott-encoded lists: range, map, sum
+data List = Nil | Cons(h, t)
+def range(n) = switch n { 0 => Nil; p => Cons(n, range(p)) }
+def map(f, xs) = match xs { Nil => Nil; Cons(h, t) => Cons(f(h), map(f, t)) }
+def lsum(xs) = match xs { Nil => 0; Cons(h, t) => h + lsum(t) }
+def main = lsum(map(\x -> x * x + 1, range(N)))

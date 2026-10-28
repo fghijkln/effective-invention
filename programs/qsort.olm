@@ -1,0 +1,9 @@
+// quicksort (parallel recursion on both partitions); same checksum as sort.olm
+data List = Nil | Cons(h, t)
+def rnd(n, s) = switch n { 0 => Nil; p => Cons(s % 100, rnd(p, (s * 1103515245 + 12345) % 2147483648)) }
+def lo(p, xs) = match xs { Nil => Nil; Cons(h, t) => if h < p then Cons(h, lo(p, t)) else lo(p, t) }
+def hi(p, xs) = match xs { Nil => Nil; Cons(h, t) => if h < p then hi(p, t) else Cons(h, hi(p, t)) }
+def app(xs, ys) = match xs { Nil => ys; Cons(h, t) => Cons(h, app(t, ys)) }
+def qs(xs) = match xs { Nil => Nil; Cons(h, t) => app(qs(lo(h, t)), Cons(h, qs(hi(h, t)))) }
+def check(xs, i) = match xs { Nil => 0; Cons(h, t) => i * h + check(t, i + 1) }
+def main = check(qs(rnd(N, 42)), 1)

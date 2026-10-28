@@ -1,0 +1,3 @@
+// factorial (u32 wrap-around)
+def fact(n) = switch n { 0 => 1; p => n * fact(p) }
+def main = fact(N)

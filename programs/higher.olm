@@ -1,0 +1,7 @@
+// closures and higher-order functions: compose / twice / fold
+data List = Nil | Cons(h, t)
+def range(n) = switch n { 0 => Nil; p => Cons(n, range(p)) }
+def foldr(f, z, xs) = match xs { Nil => z; Cons(h, t) => f(h, foldr(f, z, t)) }
+def compose(f, g) = \x -> f(g(x))
+def twice(f) = compose(f, f)
+def main = foldr(\a b -> a + b, 0, range(N)) + twice(\x -> x * 3)(N)

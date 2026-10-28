@@ -1,0 +1,3 @@
+// 1 + 2 + ... + n, via switch (p = n - 1)
+def sum(n) = switch n { 0 => 0; p => n + sum(p) }
+def main = sum(N)
