@@ -7,8 +7,8 @@
 // step consumes node i and redex i together); the data is registered (synchronous ROM read) and
 // steered back to the cell one cycle later.  A cell that is not granted simply re-requests: its
 // EXPAND step holds until the data it asked for has arrived (`rom_v` in omega_cell).
-// Each ROM word holds a PAIR of template entries (the loader aligns every definition to an even
-// entry), so one grant feeds two EXPAND cycles of the requesting cell.
+// Each ROM word holds FOUR template entries (the loader aligns every definition to a multiple of
+// four), so one grant feeds two EXPAND cycles (two entries each) of the requesting cell.
 // Both arrays are written so that synthesis infers NP-read-port ROM macros (1R when NP = 1) with one
 // loader write port.
 `include "omega_defs.svh"
@@ -16,27 +16,27 @@ module omega_rom #(
   parameter int NC = 1, parameter int NP = 1,
   parameter int ROMSZ = 4096, parameter int RDXSZ = 2048,
   parameter int CX = 0, parameter int CY = 0,         // cluster index
-  parameter logic [255:0] MUT = '0                    // mutation-testing knobs (bit 29)
+  parameter logic [511:0] MUT = '0                    // mutation-testing knobs (bit 29)
 ) (
   input  logic                 clk, rst,
   input  logic [NC-1:0]        req,
-  input  logic [NC-1:0][15:0]  an,          // node-template PAIR address per cell
-  input  logic [NC-1:0][15:0]  ar,          // redex-template pair address per cell
+  input  logic [NC-1:0][15:0]  an,          // node-template WORD address per cell (4 entries)
+  input  logic [NC-1:0][15:0]  ar,          // redex-template word address per cell
   output logic [NC-1:0]        gnt,
-  output logic [NC-1:0][255:0] dn,          // read data: a pair of entries (valid the cycle after the grant)
-  output logic [NC-1:0][255:0] dr,
+  output logic [NC-1:0][511:0] dn,          // read data: four entries (valid the cycle after the grant)
+  output logic [NC-1:0][511:0] dr,
   input  logic                 cfg_we,
   input  logic [1:0]           cfg_sel,     // 0 = node ROM, 1 = redex ROM
   input  logic [15:0]          cfg_a,
-  input  logic [255:0]         cfg_d
+  input  logic [511:0]         cfg_d
 );
-  localparam int RB = $clog2(ROMSZ / 2);       // ROM words hold pairs of template entries
-  localparam int RRB = $clog2(RDXSZ / 2);
+  localparam int RB = $clog2(ROMSZ / 4);       // ROM words hold four template entries
+  localparam int RRB = $clog2(RDXSZ / 4);
   localparam int CB = (NC > 1) ? $clog2(NC) : 1;
   localparam int PB = (NP > 1) ? $clog2(NP) : 1;
 
-  logic [255:0] romn [ROMSZ / 2];
-  logic [255:0] romr [RDXSZ / 2];
+  logic [511:0] romn [ROMSZ / 4];
+  logic [511:0] romr [RDXSZ / 4];
 `ifndef SYNTHESIS
   string imgdir;
   initial begin
@@ -64,7 +64,7 @@ module omega_rom #(
   end
 
   // ---- NP synchronous read ports ----
-  logic [NP-1:0][255:0] pdn, pdr;
+  logic [NP-1:0][511:0] pdn, pdr;
   logic [NC-1:0][PB-1:0] psel;             // which port serves cell c (registered with the read)
   always_ff @(posedge clk) begin
     if (rst) begin ptr <= '0; psel <= '0; end

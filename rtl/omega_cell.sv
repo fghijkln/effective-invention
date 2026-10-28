@@ -67,7 +67,7 @@ module omega_cell #(
   output logic        rom_req,
   output logic [15:0] rom_an, rom_ar,
   input  logic        rom_gnt,
-  input  logic [255:0] rom_dn, rom_dr,     // one ROM word = a pair of template entries
+  input  logic [511:0] rom_dn, rom_dr,     // one ROM word = four template entries
   // loader port for the per-cell directory (simulation preloads it with $readmemh)
   input  logic        cfg_we,
   input  logic [1:0]  cfg_sel,             // 2 = directory
@@ -97,10 +97,10 @@ module omega_cell #(
   logic [SB-1:0] vstk [SLOTS];          // free var stack (SRAM part)
   logic [129:0] tqm  [QDEPTH];          // task stack (SRAM part) {kind, b, a}
   // synchronous read data
-  logic [131:0] n_rd, n_rd2;  logic [67:0] v_rd;  logic [127:0] rn_rd, rr_rd, d_rd;
-  logic rom_v;                          // rom_dn / rom_dr carry the template pair requested last cycle (rvp)
-  logic [255:0] bufn, bufr;             // last template pair received (node / redex)
-  logic [6:0]   bufp, rvp;              // pair index within the definition: buffered / arriving
+  logic [131:0] n_rd, n_rd2;  logic [67:0] v_rd, v_rd2;  logic [127:0] rn0, rr0, rn1, rr1, d_rd;
+  logic rom_v;                          // rom_dn / rom_dr carry the template word requested last cycle (rvp)
+  logic [511:0] bufn, bufr;             // last template word received (node / redex)
+  logic [6:0]   bufp, rvp;              // word index within the definition: buffered / arriving
   logic         bufok;
   logic [SB-1:0] nstk_rd, vstk_rd;  logic [129:0] tqm_rd;
   // stack top caches (registers): c[0] bottom .. c[cnt-1] top; sp = entries in the SRAM part
@@ -131,15 +131,15 @@ module omega_cell #(
   initial qinit[0] = '0;
 `endif
 
-  logic [3:0][SB-1:0] nf_top;
-  logic [3:0][SB-1:0] vf_top;
+  logic [7:0][SB-1:0] nf_top;
+  logic [7:0][SB-1:0] vf_top;
   logic [129:0]   tq_top;
   logic [3:0]     nf_av, nf_room, vf_av, vf_room, tq_av, tq_room;
   logic [SB+1:0]  nf_tot, vf_tot;
   logic [QB+1:0]  tq_tot;
   always_comb begin
-    for (int i = 0; i < 4; i++) nf_top[i] = (32'(ncnt) > i) ? nc[32'(ncnt) - 1 - i] : '0;
-    for (int i = 0; i < 4; i++) vf_top[i] = (32'(vcnt) > i) ? vc[32'(vcnt) - 1 - i] : '0;
+    for (int i = 0; i < 8; i++) nf_top[i] = (32'(ncnt) > i) ? nc[32'(ncnt) - 1 - i] : '0;
+    for (int i = 0; i < 8; i++) vf_top[i] = (32'(vcnt) > i) ? vc[32'(vcnt) - 1 - i] : '0;
     tq_top = (qcnt != 0) ? qc[qcnt - 1] : '0;
     nf_av = ncnt; vf_av = vcnt; tq_av = qcnt;
     nf_room = 4'(NK) - ncnt - 4'(npend); vf_room = 4'(VK) - vcnt - 4'(vpend); tq_room = 4'(QK) - qcnt - 4'(qpend);
@@ -207,6 +207,22 @@ module omega_cell #(
   function automatic logic [3:0] dir_y(input logic [1:0] d);
     dir_y = (d == 2'd0) ? 4'(Y - 1) : (d == 2'd2) ? 4'(Y + 1) : 4'(Y);
   endfunction
+
+  // ---------------- var-hop unit (VHU, step 9): a second engine for substitution chains ----------------
+  // The main engine hands a link whose A side is a local var (and that needs no check it cannot do)
+  // to the VHU instead of following the chain itself, and picks its next task in the same cycle.
+  // The VHU does one var exchange per cycle on its own var RAM read port (read ahead like the main
+  // engine's) and var write port 2: an empty var takes B and the VHU is free again; a substituted var
+  // is freed and the chain continues while the next link again has a local var on one side; any
+  // other link (a redex, a remote var, a check that fails) is handed back through `vh_o*` and taken
+  // by the main engine as its next task, before the task stack.  The VHU yields write port 2 to the
+  // main engine and stalls when the main engine's current link names the same var slot, so every var
+  // exchange stays atomic (single owner, one exchange at a time).
+  logic        vh_v;                    // VHU holds a link (busy)
+  logic [63:0] vh_a, vh_b;              // its link: vh_a = local var
+  logic        vh_ov;                   // hand-back: link for the main engine
+  logic [63:0] vh_oa, vh_ob;
+  logic [31:0] st_vhu;
 
   // ---------------- engine registers ----------------
   logic [63:0] ra, rb;                  // current link (its RAM data was read one cycle ahead)
@@ -289,9 +305,9 @@ module omega_cell #(
     q_ok      = tq_av != 0;
     stall_now = (stall != 0) && (erng[7:0] < stall);
     rnd_msg   = erng[15:8] < pmsg;
-    idle      = (state == S_IDLE) && (tq_tot == 0) && !ej_v && (ob_cnt == 0) && (!rbusy || MUT[15]);
+    idle      = (state == S_IDLE) && (tq_tot == 0) && !ej_v && (ob_cnt == 0) && (!rbusy || MUT[15]) && !vh_v;
     ready     = state != S_INIT;
-    hungry    = (state == S_IDLE) && (tq_tot == 0) && !ej_v && (roomy || MUT[28]);
+    hungry    = (state == S_IDLE) && (tq_tot == 0) && !ej_v && (roomy || MUT[28]) && !vh_v;
   end
 
   // translation of a template port during EXPAND (stamps the expanding owner, relocates via the maps)
@@ -308,44 +324,61 @@ module omega_cell #(
     else tr = p;
   endfunction
 
-  // ---------------- cluster ROM request (combinational from registers only) ----------------
-  // The definition templates are stored as PAIRS of entries per ROM word (the loader aligns every
-  // definition to an even entry), so one grant feeds two EXPAND cycles and a cell needs the cluster
-  // ROM on only half of its EXPAND cycles.  Entry i of the running expansion is in pair i/2; the cell
-  // keeps the last pair it received (bufn/bufr) and uses an arriving pair directly (bypass).
-  // The request for the pair the NEXT cycle needs is made from the current registered state: in
-  // S_EXN pair (ex_i or ex_i + 1)/2, in S_EXA pair 0, in S_LINK pair 0 of the definition whose
-  // directory word was read ahead when the link may start an expansion here (dQ is a REF that is not
-  // handed to a hungry neighbour).  A missed grant just holds S_EXN until the pair arrives.
-  logic [7:0] ex_lrom;                  // template entries an expansion reads: max(nodes, redexes)
-  logic       rom_have;                 // entry ex_i is available this cycle
-  logic [6:0] rom_q;                    // pair requested this cycle
+  // ---------------- EXPAND datapath + cluster ROM request (combinational from registers only) ----
+  // v4 EXPAND writes TWO template entries per cycle: node i and i+1 (node RAM write ports 1 and 2),
+  // var tags i and i+1 (var RAM write ports 1 and 2), redexes i and i+1 (two task pushes).  Slot
+  // allocation maps up to 8 node + 8 var slots per cycle from the free-stack caches (first batch in
+  // the rule cycle; the rest in S_EXN cycles that write nothing yet, since a template port may name
+  // any node / var of the definition); then entries are written once their template word is here.
+  // The templates are stored as words of FOUR entries (the loader aligns every definition to a
+  // multiple of four), so one grant of the cluster ROM feeds two EXPAND cycles.  The cell keeps the
+  // last word it received (bufn/bufr) and uses an arriving word directly (bypass).  The request for
+  // the word the NEXT cycle needs is made from the current registered state: in S_EXN the first word
+  // of entries {i', i'+1} (i' = ex_i after this cycle) that is neither buffered nor arriving; in S_LINK
+  // word 0 of the definition whose directory word was read ahead, when the link may start an expansion
+  // here (dQ is a REF not handed to a hungry neighbour).  A missed grant just holds S_EXN.
+  logic [7:0] ex_lrom, ex_lst;          // entries read from the ROM: max(nn, nr); entries in all: max(nn, nv, nr)
+  logic       ex_e0, ex_e1;             // entry ex_i / ex_i + 1 is written this cycle
+  logic [7:0] ex_adv;
+  logic [6:0] rom_q;                    // word requested this cycle
+  function automatic logic [127:0] wsel(input logic [511:0] w, input logic [1:0] k);
+    wsel = (k == 2'd0) ? w[127:0] : (k == 2'd1) ? w[255:128] : (k == 2'd2) ? w[383:256] : w[511:384];
+  endfunction
   always_comb begin
-    logic [7:0] i;
-    logic adv, arr, nbok;
-    logic [6:0] q, nbp;
-    logic [255:0] wn, wr;
+    logic [7:0] j0, j1, ni, ni1;
+    logic a0, a1, h0, h1, ok0, ok1, nbok, c1, c2;
+    logic [6:0] q0, q1, nbp;
+    logic [511:0] w0n, w0r, w1n, w1r;
     logic [15:0] nb, rb2;
+    logic [1:0] k0, k1;
     ex_lrom = (ex_nn > ex_nr) ? ex_nn : ex_nr;
-    q = ex_i[7:1];
-    arr = rom_v && rvp == q;
-    rom_have = arr || (bufok && bufp == q);
-    wn = arr ? rom_dn : bufn; wr = arr ? rom_dr : bufr;
-    rn_rd = (ex_i[0] ^ MUT[26]) ? wn[255:128] : wn[127:0];
-    rr_rd = (ex_i[0] ^ MUT[26]) ? wr[255:128] : wr[127:0];
+    ex_lst = (ex_lrom > ex_nv) ? ex_lrom : ex_nv;
+    j0 = ex_i; j1 = ex_i + 8'd1;
+    q0 = j0[7:2]; q1 = j1[7:2];
+    a0 = rom_v && rvp == q0; h0 = a0 || (bufok && bufp == q0);
+    a1 = rom_v && rvp == q1; h1 = a1 || (bufok && bufp == q1);
+    w0n = a0 ? rom_dn : bufn; w0r = a0 ? rom_dr : bufr;
+    w1n = a1 ? rom_dn : bufn; w1r = a1 ? rom_dr : bufr;
+    k0 = j0[1:0] ^ {1'b0, MUT[26]}; k1 = j1[1:0] ^ {1'b0, MUT[26]};
+    rn0 = wsel(w0n, k0); rr0 = wsel(w0r, k0); rn1 = wsel(w1n, k1); rr1 = wsel(w1r, k1);
+    // every slot of the definition must be mapped first: template ports reference any node / var
+    ok0 = j0 < ex_lst && ex_in >= ex_nn && ex_iv >= ex_nv && (j0 >= ex_lrom || h0 || MUT[30]) && tq_room != 0;
+    ok1 = ok0 && j1 < ex_lst && (j1 >= ex_lrom || h1 || MUT[30]) && tq_room >= 4'd2;
+    ex_e0 = state == S_EXN && ok0;
+    ex_e1 = state == S_EXN && ok1;
+    ex_adv = (MUT[34] && ex_e0) ? 8'd2 : 8'(ex_e0) + 8'(ex_e1);
     nbp = rom_v ? rvp : bufp; nbok = rom_v || bufok;    // buffer contents next cycle
-    rom_req = 1'b0; rom_q = '0; i = '0; adv = 1'b0; nb = ex_nbase; rb2 = ex_rbase;
+    ni = ex_i + ex_adv; ni1 = ni + 8'd1;
+    c1 = ni < ex_lrom && !(nbok && nbp == ni[7:2]);
+    c2 = ni1 < ex_lrom && !(nbok && nbp == ni1[7:2]);
+    rom_req = 1'b0; rom_q = '0; nb = ex_nbase; rb2 = ex_rbase;
     if (state == S_EXN) begin
-      adv = tq_room != 0 && (rom_have || ex_i >= ex_lrom || MUT[30]);
-      i = adv ? ex_i + 8'd1 : ex_i;
-      rom_q = i[7:1];
-      rom_req = i < ex_lrom && !(nbok && nbp == rom_q);
-    end else if (state == S_EXA) begin
-      rom_req = ex_lrom != 0 && !(nbok && nbp == 7'd0);
+      rom_req = c1 || c2;
+      rom_q = c1 ? ni[7:2] : ni1[7:2];
     end else if (state == S_LINK && ptag(dQ) == T_REF && (rsp || rsx || !(hv_found && can_send && !MUT[7]))) begin
       rom_req = 1'b1; nb = d_rd[15:0]; rb2 = d_rd[31:16];       // (the buffer is cleared when the expansion starts)
     end
-    rom_an = (nb >> 1) + 16'(rom_q); rom_ar = (rb2 >> 1) + 16'(rom_q);
+    rom_an = (nb >> 2) + 16'(rom_q); rom_ar = (rb2 >> 2) + 16'(rom_q);
   end
 
   // Per-cycle temporaries of the sequential block (blocking-assigned first thing every cycle, so
@@ -356,18 +389,20 @@ module omega_cell #(
   logic fin;                                      // the current step is done: pick new work this cycle
   st_t  nst;
   logic [63:0] nra, nrb; logic nrsp, nrsx, nrfw;
-  logic [2:0] nf_pop, nf_push, vf_pop, vf_push, tq_pop, tq_push;
-  logic [1:0][SB-1:0] nf_pd; logic [0:0][SB-1:0] vf_pd;
+  logic [3:0] nf_pop, vf_pop;
+  logic [2:0] nf_push, vf_push, tq_pop, tq_push;
+  logic [1:0][SB-1:0] nf_pd; logic [1:0][SB-1:0] vf_pd;
+  logic hand; logic [63:0] nvh_a, nvh_b; logic nvh_v, vh_go; logic [SB-1:0] la_v2;
   logic [2:0][129:0] tq_pd;
   logic n_we, v_we; logic [SB-1:0] n_wa, v_wa; logic [131:0] n_wd; logic [67:0] v_wd;
+  logic n_we2, v_we2; logic [SB-1:0] n_wa2, v_wa2; logic [131:0] n_wd2; logic [67:0] v_wd2;   // second write ports
   logic [NK-1:0][SB-1:0] nc_n; logic [VK-1:0][SB-1:0] vc_n; logic [QK-1:0][129:0] qc_n;
   logic [4:0] cs_m, cs_after; logic cs_spill, cs_fill;
   logic [SB-1:0] la_v, la_n1, la_n2; logic [DB-1:0] la_d;
   logic [63:0] la_A, la_B, la_P, la_Q;
-  logic alloc; logic [7:0] al_nn, al_nv, al_in, al_iv;
+  logic alloc, al_start; logic [7:0] al_nn, al_nv, al_in, al_iv;
   logic [3:0] al_kn, al_kv;
   logic sp_go; logic [63:0] sp_ref_p, sp_x_p; logic sp_local_only;
-  logic [7:0] ex_last;
 
   always_ff @(posedge clk) begin
     if (rst) begin
@@ -380,6 +415,7 @@ module omega_cell #(
       st_msg2 <= '0; st_maxq <= '0; st_links <= '0; st_tasks <= '0;
       st_minfn <= '1; st_minfv <= '1;
       st_traps <= '0; tr_addr <= '0; tr_reason <= '0; tr_owner <= '0; tr_mask <= '0;
+      vh_v <= 1'b0; vh_ov <= 1'b0; st_vhu <= '0;
       wq_n <= '0; vq_n <= '0; bufok <= 1'b0; rom_v <= 1'b0; rsp <= 1'b0; rsx <= 1'b0; rfw <= 1'b0; ej_taken <= 1'b0;
       roomy <= 1'b0; mrot <= 2'(X + Y + 1);
       ncnt <= '0; nsp <= '0; npend <= 1'b0;
@@ -394,9 +430,11 @@ module omega_cell #(
       tq_pop = '0;
       n_we = 1'b0; n_wa = '0; n_wd = '0;
       v_we = 1'b0; v_wa = '0; v_wd = '0;
-      alloc = 1'b0; al_nn = '0; al_nv = '0; al_in = '0; al_iv = '0; al_kn = '0; al_kv = '0;
+      n_we2 = 1'b0; n_wa2 = '0; n_wd2 = '0;
+      v_we2 = 1'b0; v_wa2 = '0; v_wd2 = '0;
+      alloc = 1'b0; al_start = 1'b0;
+      hand = 1'b0; nvh_a = vh_a; nvh_b = vh_b; nvh_v = vh_v; vh_go = 1'b0; al_nn = '0; al_nv = '0; al_in = '0; al_iv = '0; al_kn = '0; al_kv = '0;
       sp_go = 1'b0; sp_ref_p = '0; sp_x_p = '0; sp_local_only = 1'b0;
-      ex_last = '0;
       erng <= xorshift(erng);
       ej_taken <= 1'b0;
       if (rom_v) begin bufn <= rom_dn; bufr <= rom_dr; bufp <= rvp; bufok <= 1'b1; end
@@ -531,9 +569,9 @@ module omega_cell #(
                   c2 = nf_top[0]; nf_pop = 3'd1;
                   n_we = 1'b1; n_wa = sP;
                   n_wd = {pown(dP), a2, mkp(T_NUM, 16'd0, pval(dQ) - (MUT[3] ? 32'd0 : 32'd1))};   // (#n-1 a2)
-                  wq_a[0] <= c2; wq_d[0] <= {pown(dP), mkpo(T_CON, 16'd0, pown(dP), here(sP)), ERA_P}; wq_n <= 2'd1;  // (* c1)
+                  n_we2 = 1'b1; n_wa2 = c2; n_wd2 = {pown(dP), mkpo(T_CON, 16'd0, pown(dP), here(sP)), ERA_P};  // (* c1)
                   nalloc[c2] <= 1'b1;
-                  nra = a1; nrb = mkpo(T_CON, 16'd0, pown(dP), here(c2)); nst = S_WQ;
+                  nra = a1; nrb = mkpo(T_CON, 16'd0, pown(dP), here(c2));
                 end
               end
             end
@@ -581,12 +619,13 @@ module omega_cell #(
                 x11 = mkpo(T_VAR, 16'd0, o, here(v0)); x12 = mkpo(T_VAR, 16'd0, o, here(v1));
                 x21 = mkpo(T_VAR, 16'd0, o, here(v2)); x22 = mkpo(T_VAR, 16'd0, o, here(MUT[14] ? v2 : v3));
                 n_we = 1'b1; n_wa = sP; n_wd = {o, x12, x11};                       // copy 1 of Q's kind
-                wq_a[0] <= n1; wq_d[0] <= {o, x22, x21};                             // copy 2 of Q's kind
-                wq_a[1] <= sQ; wq_d[1] <= {o, x21, x11};                             // copy 1 of P's kind
-                wq_a[2] <= n3; wq_d[2] <= {o, MUT[6] ? {x12, x22} : {x22, x12}};     // copy 2 of P's kind
-                wq_n <= 2'd3;
+                n_we2 = 1'b1; n_wa2 = n1; n_wd2 = {o, x22, x21};                     // copy 2 of Q's kind
+                wq_a[0] <= sQ; wq_d[0] <= {o, x21, x11};                             // copy 1 of P's kind (queued)
+                wq_a[1] <= n3; wq_d[1] <= {o, MUT[6] ? {x12, x22} : {x22, x12}};     // copy 2 of P's kind (queued)
+                wq_n <= 2'd2;
                 v_we = 1'b1; v_wa = v0; v_wd = {o, 64'd0};                           // owner tags of the fresh vars
-                vq_a[0] <= v1; vq_a[1] <= v2; vq_a[2] <= v3; vq_n <= 2'd3; vq_o <= o;
+                v_we2 = 1'b1; v_wa2 = v1; v_wd2 = {o, 64'd0};
+                vq_a[0] <= v2; vq_a[1] <= v3; vq_n <= 2'd2; vq_o <= o;
                 nalloc[n1] <= 1'b1; nalloc[n3] <= 1'b1;
                 pn = 2'd3;
                 pq[0] = {K_LINK, withpay(dQ, here(n1)), a2};
@@ -612,38 +651,44 @@ module omega_cell #(
         end
 
         // ------------------------------------------------------------------ drain queued node / var-tag writes
-        S_WQ: begin
-          if (wq_n != 0) begin
-            n_we = 1'b1; n_wa = wq_a[wq_n - 1]; n_wd = wq_d[wq_n - 1]; wq_n <= wq_n - 1;
-          end
-          if (vq_n != 0) begin
-            v_we = !MUT[24]; v_wa = vq_a[vq_n - 1]; v_wd = {vq_o, 64'd0}; vq_n <= vq_n - 1;
-          end
-          if (MUT[23] || (wq_n <= 1 && vq_n <= 1)) nst = S_LINK;   // the last write is bypassed into the read-ahead
+        S_WQ: begin   // two queued node writes and two var-tag writes, one cycle (both bypassed into the read-ahead)
+          if (wq_n != 0) begin n_we = 1'b1; n_wa = wq_a[0]; n_wd = wq_d[0]; end
+          if (wq_n > 1 && !MUT[23]) begin n_we2 = 1'b1; n_wa2 = wq_a[1]; n_wd2 = wq_d[1]; end
+          if (vq_n != 0) begin v_we = !MUT[24]; v_wa = vq_a[0]; v_wd = {vq_o, 64'd0}; end
+          if (vq_n > 1) begin v_we2 = !MUT[24]; v_wa2 = vq_a[1]; v_wd2 = {vq_o, 64'd0}; end
+          wq_n <= '0; vq_n <= '0;
+          nst = S_LINK;
         end
 
-        // ------------------------------------------------------------------ EXPAND pass 1: allocate the rest of the maps
-        S_EXA: begin
-          alloc = 1'b1; al_nn = ex_nn; al_nv = ex_nv; al_in = ex_in; al_iv = ex_iv;
-        end
-
-        // ------------------------------------------------------------------ EXPAND pass 2: node i, var tag i, redex i per cycle
-        S_EXN: if (tq_room != 0 && (rom_have || ex_i >= ex_lrom || MUT[30])) begin
+        // ------------------------------------------------------------------ EXPAND: entries i and i+1 per cycle, allocation alongside
+        S_EXN: begin
+          logic [7:0] j1;
           logic [SB-1:0] s;
-          ex_last = (ex_nn > ex_nv) ? ex_nn : ex_nv;
-          if (ex_nr > ex_last) ex_last = ex_nr;
-          if (ex_i < ex_nn) begin
+          j1 = ex_i + 8'd1;
+          if (ex_e0 && ex_i < ex_nn) begin
             s = nmap[XB'(ex_i)];
-            n_we = 1'b1; n_wa = s; n_wd = {MUT[19] ? 4'd0 : ex_own, `TR(rn_rd[127:64]), `TR(rn_rd[63:0])};
+            n_we = 1'b1; n_wa = s; n_wd = {MUT[19] ? 4'd0 : ex_own, `TR(rn0[127:64]), `TR(rn0[63:0])};
             nalloc[s] <= 1'b1;
           end
-          if (ex_i < ex_nv) begin
+          if (ex_e0 && ex_i < ex_nv) begin
             v_we = 1'b1; v_wa = vmap[XB'(ex_i)]; v_wd = {MUT[19] ? 4'd0 : ex_own, 64'd0};
           end
-          if (ex_i < ex_nr) begin pn = 2'd1; pq[0] = {K_LINK, `TR(rr_rd[127:64]), `TR(rr_rd[63:0])}; end
-          ex_i <= ex_i + 1;
-          if (32'(ex_i) + 1 >= 32'(ex_last)) begin
+          if (ex_e0 && ex_i < ex_nr) begin pn = 2'd1; pq[0] = {K_LINK, `TR(rr0[127:64]), `TR(rr0[63:0])}; end
+          if (ex_e1 && j1 < ex_nn) begin
+            s = nmap[XB'(j1)];
+            n_we2 = 1'b1; n_wa2 = s; n_wd2 = {MUT[19] ? 4'd0 : ex_own, `TR(rn1[127:64]), `TR(rn1[63:0])};
+            nalloc[s] <= 1'b1;
+          end
+          if (ex_e1 && j1 < ex_nv) begin
+            v_we2 = 1'b1; v_wa2 = MUT[33] ? vmap[XB'(ex_i)] : vmap[XB'(j1)]; v_wd2 = {MUT[19] ? 4'd0 : ex_own, 64'd0};
+          end
+          if (ex_e1 && j1 < ex_nr) begin pq[pn] = {K_LINK, `TR(rr1[127:64]), `TR(rr1[63:0])}; pn = pn + 2'd1; end
+          ex_i <= ex_i + ex_adv;
+          if (32'(ex_i) + 32'(ex_adv) >= 32'(ex_lst)) begin
             nra = `TR(ex_root); nrb = ex_x; nst = S_LINK;
+          end
+          if (ex_in < ex_nn || ex_iv < ex_nv) begin
+            alloc = 1'b1; al_nn = ex_nn; al_nv = ex_nv; al_in = ex_in; al_iv = ex_iv;
           end
         end
 
@@ -662,7 +707,7 @@ module omega_cell #(
           ex_nbase <= d_rd[15:0]; ex_rbase <= d_rd[31:16]; ex_root <= d_rd[127:64];
           ex_nn <= nn; ex_nv <= nv; ex_nr <= nr; ex_own <= pown(sp_ref_p); ex_x <= sp_x_p;
           ex_ref <= plab(sp_ref_p);
-          alloc = 1'b1; al_nn = nn; al_nv = nv; al_in = '0; al_iv = '0;   // first allocation batch now
+          alloc = 1'b1; al_start = 1'b1; al_nn = nn; al_nv = nv; al_in = '0; al_iv = '0;   // first allocation batch now
           if (!MUT[31]) bufok <= 1'b0;                                      // new definition: drop the buffered pair
         end else if (NT > 1) begin
           // not enough room here: forward the SPAWN to a neighbour
@@ -685,14 +730,48 @@ module omega_cell #(
       if (alloc) begin
         logic [7:0] in2, iv2;
         al_kn = 4'd0; al_kv = 4'd0;
-        for (int j = 0; j < 4; j++) begin
+        for (int j = 0; j < 8; j++) begin
           if (32'(al_in) + j < 32'(al_nn) && j < 32'(nf_av)) begin nmap[XB'(32'(al_in) + j)] <= nf_top[j]; al_kn = 4'(j + 1); end
           if (32'(al_iv) + j < 32'(al_nv) && j < 32'(vf_av)) begin vmap[XB'(32'(al_iv) + j)] <= vf_top[j]; al_kv = 4'(j + 1); end
         end
-        nf_pop = 3'(al_kn) - 3'(MUT[25] && al_kn > 4'd1); vf_pop = 3'(al_kv);
+        nf_pop = al_kn - 4'(MUT[25] && al_kn > 4'd1); vf_pop = al_kv;
         in2 = al_in + 8'(al_kn); iv2 = al_iv + 8'(al_kv);
-        ex_in <= in2; ex_iv <= iv2; ex_i <= 8'd0;
-        nst = (in2 >= al_nn && iv2 >= al_nv) ? S_EXN : S_EXA;
+        ex_in <= in2; ex_iv <= iv2;
+        if (al_start) begin ex_i <= 8'd0; nst = S_EXN; end
+      end
+
+      // ---- hand the continuation link to the VHU (it follows the var chain; main picks new work) ----
+      if (!fin && nst == S_LINK && !nrsp && !nrsx && !nrfw && !tp && !vh_v && !MUT[37]) begin
+        logic [63:0] hA, hB;
+        hA = ordA(nra, nrb); hB = ordB(nra, nrb);
+        if (is_var(hA) && !oob(hA) && local_p(hA) && !xown(hA, hB)) begin
+          hand = 1'b1; nvh_v = 1'b1; nvh_a = hA; nvh_b = hB; fin = 1'b1;
+        end
+      end
+
+      // ---- VHU: one var exchange per cycle (write port 2, read port 2) ----
+      if (vh_v && !vh_ov) begin
+        logic conflict;
+        logic [63:0] old, A2, B2;
+        conflict = (state == S_LINK && dvar && local_p(A) && pslot(A) == pslot(vh_a) && !MUT[35]) || v_we2 ||
+                   32'(vf_room) < 32'(vf_push) + 1;        // room in the free-var cache for its push
+        if (!conflict) begin
+          vh_go = 1'b1;
+          st_vhu <= st_vhu + 1;
+          old = v_rd2[63:0];
+          if (v_rd2[67:64] != pown(vh_a) && !MUT[16]) begin
+            vh_ov <= 1'b1; vh_oa <= vh_a; vh_ob <= vh_b;          // forged: the main engine traps it
+          end else if (ptag(old) == T_NONE) begin
+            v_we2 = 1'b1; v_wa2 = SB'(pslot(vh_a)); v_wd2 = {v_rd2[67:64], vh_b};
+            nvh_v = 1'b0;
+          end else begin
+            v_we2 = 1'b1; v_wa2 = SB'(pslot(vh_a)); v_wd2 = {OWN_FREE, 64'd0};
+            vf_pd[vf_push[0]] = SB'(pslot(vh_a)); vf_push = vf_push + 3'd1;
+            A2 = ordA(old, vh_b); B2 = ordB(old, vh_b);
+            if (is_var(A2) && !oob(A2) && local_p(A2) && !xown(A2, B2)) begin nvh_a = A2; nvh_b = B2; end
+            else begin vh_ov <= 1'b1; vh_oa <= old; vh_ob <= vh_b; end   // redex / remote / check: back to main
+          end
+        end
       end
 
       // ---- the step finished: pick the next task or message in the same cycle (no IDLE cycle) ----
@@ -703,6 +782,11 @@ module omega_cell #(
         nst = S_IDLE; nrsp = 1'b0; nrsx = 1'b0; nrfw = 1'b0;
         if (stall_now) begin
           // verification knob: skip a cycle
+        end else if (vh_ov && !MUT[36]) begin
+          // the VHU's hand-back first (frees the VHU)
+          st_tasks <= st_tasks + 1;
+          nra = vh_oa; nrb = vh_ob; nst = S_LINK;
+          vh_ov <= 1'b0; nvh_v = 1'b0;
         end else if (pick_msg) begin
           st_tasks <= st_tasks + 1;
           ej_taken <= 1'b1;
@@ -753,14 +837,17 @@ module omega_cell #(
         ob_cnt <= ob_cnt + (OB+1)'(snd) - (OB+1)'(pop);
       end
       state <= nst; ra <= nra; rb <= nrb; rsp <= nrsp; rsx <= nrsx; rfw <= nrfw;
+      vh_v <= nvh_v; vh_a <= nvh_a; vh_b <= nvh_b;
 
       // ---- memory writes: one write port per array ----
       if (n_we) node_mem[n_wa] <= n_wd;
+      if (n_we2) node_mem[n_wa2] <= n_wd2;
       if (v_we) var_mem[v_wa] <= v_wd;
+      if (v_we2) var_mem[v_wa2] <= v_wd2;
 
       // ---- stack caches: pops, pushes, refill arrival, spill / refill (one SRAM access each per cycle) ----
       `CSTACK(nc, ncnt, nsp, npend, nstk, nstk_rd, NK, 10, 7, nf_pop, nf_push, nf_pd, 2, SLOTS, SB, SB, nc_n)
-      `CSTACK(vc, vcnt, vsp, vpend, vstk, vstk_rd, VK, 10, 7, vf_pop, vf_push, vf_pd, 1, SLOTS, SB, SB, vc_n)
+      `CSTACK(vc, vcnt, vsp, vpend, vstk, vstk_rd, VK, 10, 7, vf_pop, vf_push, vf_pd, 2, SLOTS, SB, SB, vc_n)
       `CSTACK(qc, qcnt, qsp, qpend, tqm, tqm_rd, QK, 5, 2, tq_pop, tq_push, tq_pd, 3, QDEPTH, 130, QB, qc_n)
 
       // ---- read-ahead: the addresses the NEXT cycle's step needs (synchronous reads, write bypass) ----
@@ -768,9 +855,11 @@ module omega_cell #(
       if (qfirst(la_A, la_B)) begin la_P = la_B; la_Q = la_A; end else begin la_P = la_A; la_Q = la_B; end
       la_v = SB'(pslot(la_A)); la_n1 = SB'(pslot(la_P)); la_n2 = SB'(pslot(la_Q));
       la_d = DB'(plab(la_Q));
-      v_rd   <= (v_we && v_wa == la_v)  ? v_wd : var_mem[la_v];
-      n_rd   <= (n_we && n_wa == la_n1 && !MUT[22]) ? n_wd : node_mem[la_n1];
-      n_rd2  <= (n_we && n_wa == la_n2) ? n_wd : node_mem[la_n2];
+      v_rd   <= (v_we2 && v_wa2 == la_v) ? v_wd2 : (v_we && v_wa == la_v) ? v_wd : var_mem[la_v];
+      la_v2 = SB'(pslot(nvh_a));
+      v_rd2  <= (v_we2 && v_wa2 == la_v2) ? v_wd2 : (v_we && v_wa == la_v2 && !MUT[38]) ? v_wd : var_mem[la_v2];
+      n_rd   <= (n_we2 && n_wa2 == la_n1 && !MUT[32]) ? n_wd2 : (n_we && n_wa == la_n1 && !MUT[22]) ? n_wd : node_mem[la_n1];
+      n_rd2  <= (n_we2 && n_wa2 == la_n2) ? n_wd2 : (n_we && n_wa == la_n2) ? n_wd : node_mem[la_n2];
       d_rd   <= dirm[la_d];
       rom_v  <= rom_req && rom_gnt; rvp <= rom_q;
     end
@@ -792,8 +881,8 @@ module omega_cell #(
       $writememh($sformatf("%s/out_node_%0d_%0d.hex", outdir, X, Y), node_mem);
       $writememh($sformatf("%s/out_var_%0d_%0d.hex", outdir, X, Y), var_mem);
       fd = $fopen($sformatf("%s/out_stats_%0d_%0d.txt", outdir, X, Y), "w");
-      $fwrite(fd, "cycles %0d\ninteractions %0d\nbusy %0d\ntasks %0d\nlinks %0d\nretry %0d\nmsg_link %0d\nmsg_node %0d\nmsg_spawn %0d\nmaxq %0d\nfree_nodes %0d\nfree_vars %0d\nerr %0d\npeak_nodes %0d\npeak_vars %0d\ntraps %0d\ntrap_reason %0d\ntrap_owner %0d\ntrap_addr %0d\ntrap_mask %0d\n",
-              cyc, st_inter, st_busy, st_tasks, st_links, st_retry, st_msg0, st_msg1, st_msg2, st_maxq, nf_tot, vf_tot, err, SLOTS - st_minfn, SLOTS - st_minfv, st_traps, tr_reason, tr_owner, tr_addr, tr_mask);
+      $fwrite(fd, "cycles %0d\ninteractions %0d\nbusy %0d\ntasks %0d\nlinks %0d\nretry %0d\nmsg_link %0d\nmsg_node %0d\nmsg_spawn %0d\nmaxq %0d\nfree_nodes %0d\nfree_vars %0d\nerr %0d\npeak_nodes %0d\npeak_vars %0d\nvhu %0d\ntraps %0d\ntrap_reason %0d\ntrap_owner %0d\ntrap_addr %0d\ntrap_mask %0d\n",
+              cyc, st_inter, st_busy, st_tasks, st_links, st_retry, st_msg0, st_msg1, st_msg2, st_maxq, nf_tot, vf_tot, err, SLOTS - st_minfn, SLOTS - st_minfv, st_vhu, st_traps, tr_reason, tr_owner, tr_addr, tr_mask);
       $fclose(fd);
     end
   end

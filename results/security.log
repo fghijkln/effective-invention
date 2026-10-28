@@ -1,1 +1,1 @@
-security tests: 420/420 pass (300 multi-tenant fuzz, 0 rejected) [semantic + fabric + RTL] 74s
+security tests: 420/420 pass (300 multi-tenant fuzz, 0 rejected) [semantic + fabric + RTL] 61s

@@ -7,7 +7,7 @@ module omega_mesh #(
   parameter int ROMSZ = 4096, parameter int DIRSZ = 256, parameter int DEPTH = 4, parameter int RDXSZ = 2048,
   parameter int CW = 1, parameter int CH = 1,      // cluster of CW x CH cells shares one definition ROM
   parameter int RPORTS = 1,                        // read ports of the cluster ROM
-  parameter logic [255:0] MUT = '0
+  parameter logic [511:0] MUT = '0
 ) (
   input  logic        clk, rst,
   input  logic [31:0] seed,
@@ -38,8 +38,8 @@ module omega_mesh #(
   logic [15:0] ran  [W][H];
   logic [15:0] rar  [W][H];
   logic        rgnt [W][H];
-  logic [255:0] rdn [W][H];
-  logic [255:0] rdr [W][H];
+  logic [511:0] rdn [W][H];
+  logic [511:0] rdr [W][H];
 
   // ---- cluster ROMs: cell (x, y) is member (x % CW) + (y % CH) * CW of cluster (x / CW, y / CH) ----
   localparam int NCX = (W + CW - 1) / CW, NCY = (H + CH - 1) / CH;
@@ -47,7 +47,7 @@ module omega_mesh #(
     for (genvar cy = 0; cy < NCY; cy++) begin : gcy
       logic [CW*CH-1:0] req, gnt;
       logic [CW*CH-1:0][15:0] an, ar;
-      logic [CW*CH-1:0][255:0] dn, dr;
+      logic [CW*CH-1:0][511:0] dn, dr;
       for (genvar k = 0; k < CW * CH; k++) begin : gk
         localparam int XX = cx * CW + k % CW, YY = cy * CH + k / CW;
         if (XX < W && YY < H) begin : gin
@@ -59,7 +59,7 @@ module omega_mesh #(
       end
       omega_rom #(.NC(CW * CH), .NP(RPORTS), .ROMSZ(ROMSZ), .RDXSZ(RDXSZ), .CX(cx), .CY(cy), .MUT(MUT)) u_rom (
         .clk, .rst, .req, .an, .ar, .gnt, .dn, .dr,
-        .cfg_we(1'b0), .cfg_sel(2'd0), .cfg_a(16'd0), .cfg_d(256'd0));
+        .cfg_we(1'b0), .cfg_sel(2'd0), .cfg_a(16'd0), .cfg_d(512'd0));
     end
   end
 

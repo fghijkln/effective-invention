@@ -197,21 +197,23 @@ Correctness argument (also checked by fuzzing):
   launching the first resulting link take one cycle. Every further link costs one PUSH cycle, and is
   later popped as a task. The first link is processed immediately (tail-call), with no push.
 
-### 5.1 Engine cost table (cycles, v3 RTL)
+### 5.1 Engine cost table (cycles, v4 RTL: step 9)
 
 | operation | cycles |
 |---|---|
 | pick a task or message | 0 (chosen in the cycle that finishes the previous step; 1 only after real idleness) |
 | each link step (local var exchange, chain step, or remote send) | 1 (RAM data read one cycle ahead, write bypass) |
 | redex rule, including its node writes and the first resulting link | 1 (same cycle as the link step) |
-| extra node writes of a commutation / SWI (queued, `S_WQ`) | 1 each, the last bypassed into the read-ahead |
+| extra node writes of a commutation / SWI | v4: the rule cycle writes two node slots (node RAM write ports 1 and 2); the remaining two commutation copies and the four var-tag writes go in **one** `S_WQ` cycle (both ports, both bypassed into the read-ahead). Commutation 2 + 3 cycles (v3: 2 + 4); SWI needs no `S_WQ` cycle |
 | each extra resulting link | 1 push now, 1 link step when popped |
 | SPAWN decision (hungry / roomy neighbour scan) | same cycle as the rule |
-| EXPAND: allocation of up to 4 node + 4 var slots per cycle (first batch in the rule cycle, then `S_EXA`), then node *i*, var tag *i*, redex *i* written together (`S_EXN`) | (⌈max(nn, nv)/4⌉ − 1) + max(nn, nv, nr); the root link follows as an ordinary link step |
+| EXPAND (v4): up to 8 node + 8 var slots mapped per cycle (first batch in the rule cycle), then **two** entries per cycle: nodes *i*, *i*+1 (node write ports 1, 2), var tags *i*, *i*+1 (var write ports 1, 2), redexes *i*, *i*+1 (two task pushes) (`S_EXN`) | ≈ ⌈max(nn, nv, nr)/2⌉ + allocation cycles beyond the first batch; the root link follows as an ordinary link step |
+| var chain step handed to the var-hop unit (VHU, §5.4) | 0 for the main engine (it picks its next task in the same cycle); the VHU does 1 exchange per cycle in parallel |
 | router hop (FIFO to neighbour FIFO) | 1 per hop (+ jitter) |
 
-Measured: fib(20) on one cell, 3.41 cycles per interaction (v1 register-file cell 5.30, v2 SRAM cell
-8.82). The Python fabric model charges per-task costs and is approximate (±20%); only RTL numbers are
+Measured: fib(20) on one cell, **v4 (step 9) 2.36 cycles per interaction** (fib(12): 14,831 cycles /
+6,274 interactions; fib(20) in the README benchmark table), v3 3.41, v1 register-file cell 5.30, v2
+SRAM cell 8.82. The Python fabric model charges per-task costs and is approximate (±20%); only RTL numbers are
 reported as cycles.
 
 ### 5.2 Synthesis and area normalisation
@@ -231,10 +233,11 @@ cell: 786 Kbit of the cell's 1.18 Mbit. They are now one `omega_rom` per **clust
 (`omega_mesh` parameters `CW`, `CH`, `RPORTS`; default 2×2 with one read port). The per-cell
 directory (256×128 b) stays in the cell, because it is read ahead on every link step.
 
-* **Pair words.** One ROM word holds two template entries (256 b). The loader aligns every definition
-  to an even entry (`fabric.Image`: a padding entry after an odd-sized definition). An EXPAND that
-  writes node *i* / redex *i* per cycle therefore needs the ROM on only half of its cycles; the cell
-  keeps the last pair it received (`bufn`/`bufr`, 512 flip-flops) and uses an arriving pair directly.
+* **Four-entry words (v4, step 9; step 7 used pairs).** One ROM word holds four template entries
+  (512 b). The loader aligns every definition to a multiple of four entries (`fabric.Image` pads with
+  empty entries). The v4 EXPAND writes two entries per cycle, so one grant still feeds two EXPAND
+  cycles; the cell keeps the last word it received (`bufn`/`bufr`, 1024 flip-flops) and uses an
+  arriving word directly. (Step 7 text below says "pair": read "word".)
 * **Request / grant.** A cell's request is combinational from registers only: in `S_EXN` the pair of
   entry `ex_i` (held) or `ex_i + 1` (advancing) unless that pair is already buffered or arriving; in
   `S_EXA` pair 0; in `S_LINK` pair 0 of the definition whose directory word was read ahead, when the
@@ -261,6 +264,33 @@ directory (256×128 b) stays in the cell, because it is read ahead on every link
   port is bandwidth-bound (fib expands a definition every ≈9 interactions).
 * The Python fabric model reserves a cluster port for ⌈max(nn, nr)/2⌉ cycles per EXPAND
   (`Fabric(cluster=(CW, CH, NP))`); it is an approximation of the cycle-by-cycle round robin.
+
+### 5.4 v4 engine (step 9): wide EXPAND, shorter commutation, var-hop unit
+
+* **Second write ports.** The node RAM and the var RAM get a second write port (`n_we2`/`v_we2`).
+  The read-ahead bypasses both write ports (mutants 32, 38). Area: both RAMs become 2W macros
+  (+50% macro area each in the fakeram45-density model of §5.2 / README step 8).
+* **Wide EXPAND.** Entries *i* and *i*+1 (node, var tag, redex) are written in one `S_EXN` cycle; slot
+  allocation maps up to 8 node + 8 var slots per cycle, and every slot of the definition is mapped
+  before the first write (a template port may name any node / var of the definition). ROM words hold
+  four entries (§5.3). Mutants 26, 33, 34.
+* **Commutation.** The rule cycle writes the reused slot and one fresh copy (two ports); the other two
+  copies and the four fresh var owner tags drain in one `S_WQ` cycle (mutant 23: second queued write
+  dropped).
+* **Var-hop unit (VHU).** A link whose A side is a local, correctly tagged var is handed to a second
+  small engine instead of being followed by the main engine, which picks its next task in the same
+  cycle. The VHU has its own var read port (read ahead) and uses var write port 2: an empty var takes
+  B and the VHU is free; a substituted var is freed and the chain continues while the next link again
+  has a local var on one side; any other link (redex, remote var, failed owner check) is handed back
+  (`vh_o*`) and the main engine takes it before the task stack. The VHU yields write port 2 to the main
+  engine and stalls while the main engine's current link names the same var slot, so every var
+  exchange remains atomic (single owner per var slot). `hungry` and `idle` include "VHU idle".
+  Mutants 35–38 (no stall on the same slot, hand-back never taken, VHU disabled = performance mutant
+  caught by a cycle bound, no bypass of write port 1 into the VHU read-ahead).
+* **Free-var cache overflow fix.** A VHU exchange that frees a var slot only proceeds when the free-var
+  cache has room for the push (`vf_room`); before the fix a burst of chain steps could overflow the
+  cache in rare schedules (treesum(7) 2×2 fuzz case hung).
+* The fabric model mirrors the VHU (`Cell.vhu_chain`) and the v4 costs; it stays cycle-approximate.
 
 ## 6. Loader and readback
 

@@ -110,9 +110,9 @@ class Image:
             self.dir3.append(len(self.romn) | (len(self.romr) << 16) | (cnt << 32) | (dd.root << 64))
             self.romn += [(a, b) for (_, a, b) in dd.nodes]
             self.romr += list(dd.redexes)
-            # cluster ROM words hold pairs of entries: align every definition to an even entry
-            if len(self.romn) % 2: self.romn.append((0, 0))
-            if len(self.romr) % 2: self.romr.append((0, 0))
+            # cluster ROM words hold four entries: align every definition to a multiple of four
+            while len(self.romn) % 4: self.romn.append((0, 0))
+            while len(self.romr) % 4: self.romr.append((0, 0))
             for (_, a, b) in dd.nodes:
                 self.rom.append((a, b))
             for a, b in dd.redexes:
@@ -153,12 +153,15 @@ class Image:
             for a, b in self.rom:
                 f.write(h((b << 64) | a, 32) + "\n")
         # v3 cell: node template ROM, redex template ROM, directory {root, nr, nv, nn, rbase, nbase}
-        # cluster ROM (rtl/omega_rom.sv): one 256-bit word = entries 2k (low half) and 2k + 1
-        for nm, tab in (("romn", self.romn), ("romr", self.romr or [(0, 0), (0, 0)])):
+        # cluster ROM (rtl/omega_rom.sv): one 512-bit word = entries 4k (bits 127:0) .. 4k + 3
+        for nm, tab in (("romn", self.romn), ("romr", self.romr or [(0, 0)] * 4)):
             with open(f"{outdir}/{nm}.hex", "w") as f:
-                for k in range(0, len(tab), 2):
-                    (a0, b0), (a1, b1) = tab[k], tab[k + 1]
-                    f.write(h((b1 << 192) | (a1 << 128) | (b0 << 64) | a0, 64) + "\n")
+                for k in range(0, len(tab), 4):
+                    w = 0
+                    for j in range(4):
+                        a, b = tab[k + j]
+                        w |= ((b << 64) | a) << (128 * j)
+                    f.write(h(w, 128) + "\n")
         with open(f"{outdir}/dir.hex", "w") as f:
             for d in self.dir3:
                 f.write(h(d, 32) + "\n")
@@ -208,7 +211,9 @@ class Cell:
         self._roomy = False
         self.update_roomy()
         self.st = {"interactions": 0, "busy": 0, "tasks": 0, "msgs_in": 0, "requeue": 0, "max_q": len(self.queue),
-                   "max_nodes": 0}
+                   "max_nodes": 0, "vhu": 0}
+        # var-hop unit (RTL step 9): follows substitution chains in parallel with the engine
+        self.vh_busy, self.vh_out = 0, None
 
     # ---- helpers ----
     def local(self, p):
@@ -300,6 +305,27 @@ class Cell:
             self.vfree.append(s)
             a = old
 
+    def vhu_chain(self, a, b):
+        """Var-hop unit: exchanges while the link has a local, correctly tagged var on one side and no
+        cross-owner check fails.  Returns (exchanges, link handed back to the engine or None)."""
+        hops = 0
+        while True:
+            if not is_var(a) and is_var(b):
+                a, b = b, a
+            if (not is_var(a) or self.oob(a) or not self.local(a) or self.cross(a, b)
+                    or self.vown[addr_slot(payload(a))] != owner(a)):
+                return hops, ((a, b) if hops else None)
+            s = addr_slot(payload(a))
+            hops += 1
+            old = self.vars[s]
+            if tag(old) == NONE:
+                self.vars[s] = b
+                return hops, None
+            self.vars[s] = None
+            self.vown[s] = OWNER_FREE
+            self.vfree.append(s)
+            a = old
+
     def remote_target(self, a, b):
         """Would this link/redex leave the cell (used only by the fault-injection knob)?"""
         if is_var(a):
@@ -317,7 +343,7 @@ class Cell:
         return self._roomy
 
     def hungry(self):
-        return self._roomy and not (self.busy or self.queue or self.eject)
+        return self._roomy and not (self.busy or self.queue or self.eject or self.vh_busy or self.vh_out)
 
     def roomy_nbr(self):
         """First roomy neighbour in rotating order (N E S W), or None."""
@@ -376,7 +402,8 @@ class Cell:
         self.push(tr(d.root), x)
         for a, b in d.redexes:
             self.push(tr(a), tr(b))
-        return 1 + max(nn, nv) + 1 + len(d.redexes) + self.fab.rom_wait(self, (max(nn, len(d.redexes)) + 1) // 2)
+        # v4 RTL: two entries (node, var tag, redex) per cycle, allocation alongside; one ROM word = 4 entries
+        return 1 + (max(nn, nv, len(d.redexes)) + 1) // 2 + self.fab.rom_wait(self, (max(nn, len(d.redexes)) + 3) // 4)
 
     # ---- redex (SPEC 3, 6) ----
     def redex(self, a, b):
@@ -478,7 +505,7 @@ class Cell:
             self.nodes[n[2]] = [x11, x21]; self.nodes[n[3]] = [x12, x22]
             self.push(a1, with_payload(b, self.here(n[0]))); self.push(a2, with_payload(b, self.here(n[1])))
             self.push(b1, with_payload(a, self.here(n[2]))); self.push(b2, with_payload(a, self.here(n[3])))
-            return 2 + 4
+            return 2 + 3
         if la or lb:
             if not la:
                 a, b = b, a
@@ -503,9 +530,18 @@ class Cell:
 
     # ---- engine step ----
     def engine(self, rng):
+        if self.vh_busy:
+            self.vh_busy -= 1
+            self.st["vhu"] += 1
         if self.busy:
             self.busy -= 1
             self.st["busy"] += 1
+            return
+        if self.vh_out is not None and not self.vh_busy:
+            a, b = self.vh_out
+            self.vh_out = None
+            self.st["tasks"] += 1
+            self.busy = max(0, self.do_link(a, b))
             return
         src = None
         msg_ok = bool(self.eject)
@@ -527,7 +563,13 @@ class Cell:
         self.st["tasks"] += 1
         if src == "q":
             k, a, b = self.queue.pop()   # LIFO task stack (depth-first, bounded memory)
-            if k == T_LINK:
+            vh = None
+            if k == T_LINK and not self.vh_busy and self.vh_out is None:
+                vh = self.vhu_chain(a, b)          # hand the var chain to the VHU (no-op if not a local var link)
+            if vh is not None and vh[0]:
+                self.vh_busy, self.vh_out = vh[0], vh[1]
+                cost = 1
+            elif k == T_LINK:
                 cost = 1 + self.do_link(a, b)
             elif k == T_SPAWN:
                 cost = 1 + self.spawn(a, b)
@@ -564,7 +606,7 @@ class Cell:
         self.busy = max(0, cost - 1)
 
     def idle(self):
-        return not (self.busy or self.queue or self.eject or any(self.inq.values()))
+        return not (self.busy or self.vh_busy or self.vh_out or self.queue or self.eject or any(self.inq.values()))
 
 
 class Fabric:

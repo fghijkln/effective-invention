@@ -72,7 +72,7 @@ def main = tsum(gen(N))
 
 ## Results
 
-### Verification (full regression on step 7: cluster definition ROM, default 2×2 cells per ROM, one port)
+### Verification (full regression on step 9: v4 engine — wide EXPAND, shorter commutation, var-hop unit; default 2×2 cells per ROM, one port)
 
 | suite | result | what it checks |
 |---|---|---|
@@ -82,11 +82,57 @@ def main = tsum(gen(N))
 | RTL differential fuzz, big nets (`--big`) | **200 / 200** | 3–8 definitions, 20–60 nodes each, deeper trees, more references; only nets with ≥ 30 interactions are kept (avg 375, max 16,239 interactions; 4,088 candidates rejected as diverging or trivial) |
 | owner-capability isolation (`tests/test_security.py --fuzz 300`) | **420 / 420** | 2- and 4-tenant program demos (fib ∥ qsort; treesum ∥ list ∥ sort ∥ higher-order) on 1×1/2×2/4×4/3×2, each tenant gets its known answer with zero traps; 10 attack programs (overwrite / capture the victim's result through a forged root-var pointer, out-of-bounds slot and cell, forged node pointers to the victim's result node, an attack hidden in a lazily expanded definition) and 3 cross-owner fault injections, each with the sender-side check on and off (`fi`); 300 random multi-tenant cases (2–4 random tenants, random owners, half with an attacker carrying random forged redexes). Semantic model, fabric model and RTL must agree on every honest tenant's result and node count, on the trap set and on the interaction count (SPEC §12) |
 | memory pressure (`tests/test_mempress.py`) | **36 / 36** | cell (0,0) pre-filled with foreign ballast so only 4–30 slots are free (30 cases), small-cell capacity cases, security fuzz case 265; semantic model, fabric model and RTL must agree |
-| mutation testing (`tests/mutants.py`) | **32 / 32 caught** | 15 functional mutants of the rule logic / protocol / quiescence + 1 performance mutant (no work distribution, caught by the speed-up bound) + 6 security mutants (each owner-capability check disabled, owner stamping missing, trap not blocking). Two mutants (eraser reaches only aux1; REF~DUP expands instead of copying) produce the *right* answer and are caught only by the node count / interaction count. That is why all three observables are compared. + 5 v3 engine mutants (read-ahead write bypass, write-queue drain, var owner-tag queue, allocation pop count, ROM read-ahead) + 2 memory-pressure mutants (caught by `tests/test_mempress.py`) + 3 cluster-ROM mutants (grant beyond the port count, EXPAND not waiting for its template word, stale buffered word) |
+| mutation testing (`tests/mutants.py`) | **39 / 39 caught** | 15 functional mutants of the rule logic / protocol / quiescence + 1 performance mutant (no work distribution, caught by the speed-up bound) + 6 security mutants (each owner-capability check disabled, owner stamping missing, trap not blocking). Two mutants (eraser reaches only aux1; REF~DUP expands instead of copying) produce the *right* answer and are caught only by the node count / interaction count. That is why all three observables are compared. + 5 v3 engine mutants (read-ahead write bypass, write-queue drain, var owner-tag queue, allocation pop count, ROM read-ahead) + 2 memory-pressure mutants (caught by `tests/test_mempress.py`) + 3 cluster-ROM mutants (grant beyond the port count, EXPAND not waiting for its template word, stale buffered word) + 7 v4 mutants (second node write port not bypassed into the read-ahead, second EXPAND entry's var tag to the wrong slot, EXPAND skipping an entry, VHU without the same-slot stall, VHU hand-back never taken, VHU disabled = performance mutant caught by a fib(12) cycle bound, VHU read-ahead without bypass of write port 1) |
 
 Strong confluence is the test oracle. Any schedule (arbitration, delays, stalls, task/message priority,
 initial placement) must produce exactly the same normal form, the same number of interactions and the
 same number of live nodes. The fuzzers vary all of these on every run.
+
+### v4 engine (step 9): 2.36 cycles per interaction
+
+Three changes to `rtl/omega_cell.sv` (SPEC §5.1, §5.4), mirrored in the fabric model:
+
+* **Wide EXPAND**: the node RAM and the var RAM get a second write port, and an expansion writes two
+  template entries (nodes *i*, *i*+1, var tags *i*, *i*+1, redexes *i*, *i*+1) per cycle. Cluster ROM
+  words now hold four entries (512 b; definitions padded to a multiple of four), so one grant still
+  feeds two EXPAND cycles.
+* **Commutation one cycle shorter**: the rule cycle writes two node slots; the remaining two copies
+  and the four fresh var tags drain in one `S_WQ` cycle (2 + 3 instead of 2 + 4).
+* **Var-hop unit (VHU)**: substitution chains (local var links) are followed by a small second engine
+  on its own var read port and var write port 2, while the main engine picks its next task. It stalls
+  when the main engine's link names the same var slot, so var exchanges stay atomic.
+* Fix found by the regression: a VHU step that frees a var waits for room in the free-var cache (a
+  treesum(7) 2×2 fuzz schedule overflowed it and hung; it now passes with 4,586 interactions).
+
+`python3 bench/bench.py --8x8 --progs fib:20,treesum_direct:14,treesum:9 --tag v4` →
+`results/bench_v4.{json,md}` (all columns there). Step-7 default (2×2 cluster, 1 port,
+`results/bench_c2x2p1.json`) against v4 in the same configuration; cycles/interaction is mesh cycles ÷
+interactions (on 1×1 it is the engine's own cost per interaction):
+
+| program | mesh | step 7 cycles | step 7 cycles/interaction | **v4 cycles** | **v4 cycles/interaction** | change | v4 speed-up vs 1×1 | v4 cell utilisation |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| fib(20) | 1x1 | 1,006,974 | 3.41 | **697,478** | **2.36** | -30.7% | 1.00x | 100% |
+| fib(20) | 2x2 | 269,881 | 0.91 | **183,174** | **0.62** | -32.1% | 3.81x | 98% |
+| fib(20) | 4x4 | 70,938 | 0.24 | **50,274** | **0.17** | -29.1% | 13.87x | 90% |
+| fib(20) | 8x8 | 25,635 | 0.09 | **18,669** | **0.06** | -27.2% | 37.36x | 64% |
+| treesum_direct(14) | 1x1 | 753,632 | 3.07 | **521,600** | **2.12** | -30.8% | 1.00x | 100% |
+| treesum_direct(14) | 2x2 | 211,721 | 0.86 | **138,238** | **0.56** | -34.7% | 3.77x | 99% |
+| treesum_direct(14) | 4x4 | 53,077 | 0.22 | **36,354** | **0.15** | -31.5% | 14.35x | 96% |
+| treesum_direct(14) | 8x8 | 19,492 | 0.08 | **16,914** | **0.07** | -13.2% | 30.84x | 59% |
+| treesum(9) | 1x1* | 71,590 | 3.89 | **49,536** | **2.69** | -30.8% | 1.00x | 100% |
+| treesum(9) | 2x2 | 19,306 | 1.05 | **13,967** | **0.76** | -27.7% | 3.55x | 95% |
+| treesum(9) | 4x4 | 6,245 | 0.34 | **4,529** | **0.25** | -27.5% | 10.94x | 80% |
+| treesum(9) | 8x8 | 3,195 | 0.17 | **2,544** | **0.14** | -20.4% | 19.47x | 42% |
+
+* One cell: **3.41 → 2.36 cycles per interaction** on fib(20) (−31%), 3.07 → 2.12 on
+  treesum_direct(14). Every mesh size gains 27–35% up to 4×4.
+* 8×8 gains less (−13% to −27%): the mesh is not saturated (42–64% utilisation), so the run is bound by
+  the demand-driven spawn's spreading, not by the engine step.
+* fib(20) 8×8: **18,669 cycles = 15.9× fewer than TACHYON-128** (296,931).
+* Regression on v4: units 42/42, programs 268/268, fuzz 600/600 + big 200/200, security 420/420,
+  memory pressure 36/36, mutants 39/39 (7 new).
+* Python fabric model: the VHU and the v4 costs are modelled (`Cell.vhu_chain`); it remains
+  cycle-approximate.
 
 ### Benchmarks, v3 engine (step 5; Verilator RTL, cycle accurate, 1024 node + 1024 var slots per cell)
 
@@ -318,6 +364,11 @@ What this comparison does and does not say:
 
 ### Standard-cell area and Fmax (step 8: Nangate45, pre-layout)
 
+> **Not re-synthesised for v4 (step 9).** The area and Fmax numbers below are from commit `03c8f9f`
+> (v3 engine + cluster ROM). The v4 engine adds a second write port to the node and var RAMs (2W macros,
+> roughly +50% macro area each in this model), a 512-bit ROM word buffer and the var-hop unit, so the
+> v4 cell is larger; area × time tables below still use the step-8 cycle counts.
+
 `synth/flow.py` maps the Ω cell, the cluster ROM and the TACHYON-128 core (`cpu128/rtl/tx_core.sv`,
 read-only) onto the **Nangate45 (FreePDK45) Open Cell Library**, typical corner, with one flow:
 Yosys 0.70 (`dfflibmap` + `abc -D 2000`), every memory kept as a black-box macro whose area is
@@ -419,8 +470,8 @@ What this says:
 
 1. Timing: pipeline the read-ahead address (the 35 MHz critical path), then place and route the cell
    (OpenROAD on an x86-64 host) for routed area and Fmax. Shrink the node RAM / task queue.
-2. Cut cycles per interaction below 3.4: process a var link that overlaps a rule (2.5-cycle target),
-   or dual-issue independent tasks.
+2. Re-synthesise the v4 cell (2W RAMs, VHU) and re-do the area × time comparison. Cut cycles per
+   interaction below 2.36: dual-issue independent tasks, or overlap the rule cycle with the next pick.
 3. Global memory pressure: throttle spawning when every neighbour is poor, and spill to off-fabric
    memory.
 4. Bigger language: signed numbers, strings, `fold`/`bend`, parameterised data types; a TACHYON-128 host
@@ -447,4 +498,6 @@ What this says:
 * `74bbbd7` fix: explicit FIFO write-index wrap (Verilator 5.020 CI failure); unbuffered CI output
 * `9a19a33` step 5: v3 benchmarks, v3 cell synthesis (233,164 GE), area-normalised comparison
 * `1dfad55` step 6: nested / literal / default patterns, Hindley–Milner type checker
-* step 7: cluster definition ROM (`rtl/omega_rom.sv`, 2×2 cells per ROM, pair words, round-robin arbiter), benchmarks per configuration
+* `97b3bec` step 7: cluster definition ROM (`rtl/omega_rom.sv`, 2×2 cells per ROM, pair words, round-robin arbiter), benchmarks per configuration
+* `03c8f9f` step 8: standard-cell flow (Yosys → Nangate45, fakeram45 macros, OpenSTA pre-layout), area / Fmax table
+* step 9: v4 engine (wide EXPAND, commutation 2 + 3, var-hop unit, free-var cache overflow fix); fib(20) 1×1 2.36 cycles/interaction; mutants 39/39

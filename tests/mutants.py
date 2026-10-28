@@ -30,15 +30,22 @@ MUTANTS = {
     20: "security: forged-var trap is recorded but the access is not blocked",
     21: "security: node slot owner-tag check disabled",
     22: "v3 read-ahead: write bypass on node read port 1 disabled (stale node data)",
-    23: "v3 S_WQ: leaves after the first queued write (commutation copies / var tags never written)",
+    23: "v4 S_WQ: second queued node write dropped (a commutation copy never written)",
     24: "v3 S_WQ: owner tags of fresh commutation vars not written",
     25: "v3 EXPAND allocation pops one node slot fewer than it maps (slot aliasing)",
-    26: "v3 EXPAND: template pair half select inverted (entry i reads entry i xor 1)",
+    26: "v4 EXPAND: template word entry select wrong (entry i reads entry i xor 1)",
     27: "memory pressure: roomy neighbours ignored (no PULL / NODE offload, OOM SPAWNs round robin)",
     28: "memory pressure: hungry does not require roomy (a full cell still asks for work)",
     29: "cluster ROM: arbiter grants more requesters than it has read ports (they get another cell's data)",
     30: "cluster ROM: EXPAND does not wait for its template pair (proceeds on a missed grant)",
-    31: "cluster ROM: buffered template pair not dropped when a new expansion starts (stale definition)",
+    31: "cluster ROM: buffered template word not dropped when a new expansion starts (stale definition)",
+    32: "v4 read-ahead: write bypass ignores the second node write port (stale node data)",
+    33: "v4 EXPAND: second entry's var tag written to the first entry's var slot",
+    34: "v4 EXPAND: advances by two entries when only one was written (entry skipped)",
+    35: "VHU: no stall when the main engine's link names the same var slot (non-atomic exchange)",
+    36: "VHU: hand-back link never taken by the main engine (redex lost / hang)",
+    37: "VHU disabled (performance only: main engine follows every chain; caught by the cycle bound)",
+    38: "VHU read-ahead: no bypass of the main engine's var write port 1 (stale var data)",
 }
 PROGS = [("fib", 8), ("list", 6), ("sort", 6), ("higher", 5), ("fact", 5), ("treesum", 4), ("qsort", 5), ("sum", 20)]
 
@@ -71,6 +78,11 @@ def try_mutant(bit):
         import test_mempress
         n, fails, tag = test_mempress.run_cases(True, mut, verbose=False, quick=True)
         return bool(fails), (f"{tag}: wrong result / timeout" if fails else f"survived {n} memory-pressure cases")
+    if bit == 37:
+        b = progs.book("fib", 12)
+        c0 = rtl.run(b, 1, 1)["cycles"]
+        c1 = rtl.run(b, 1, 1, mut=mut)["cycles"]
+        return (c1 > 1.1 * c0), f"fib(12) 1x1 cycles {c1} with the mutant vs {c0} (bound: > 1.1x)"
     if bit == 7:
         b = progs.book("treesum_direct", 8)
         c1 = rtl.run(b, 1, 1, mut=mut)["cycles"]
