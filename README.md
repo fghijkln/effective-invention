@@ -81,7 +81,7 @@ def main = tsum(gen(N))
 | RTL differential fuzz, small nets (`tests/fuzz_rtl.py 0 600`) | **600 / 600** | random books (all node kinds, 3 DUP labels, all 16 operators with both flip bits, SWI, REF DAGs) on 1×1, 2×2, 4×4, 3×2, 1×4 with random arbitration seed, link jitter (0–63%), engine stalls, message/task priority and random scatter of `@main` over the cells. Readback, interaction count and live node count must equal the semantic model's (165 diverging nets rejected) |
 | RTL differential fuzz, big nets (`--big`) | **200 / 200** | 3–8 definitions, 20–60 nodes each, deeper trees, more references; only nets with ≥ 30 interactions are kept (avg 375, max 16,239 interactions; 4,088 candidates rejected as diverging or trivial) |
 | owner-capability isolation (`tests/test_security.py --fuzz 300`) | **420 / 420** | 2- and 4-tenant program demos (fib ∥ qsort; treesum ∥ list ∥ sort ∥ higher-order) on 1×1/2×2/4×4/3×2, each tenant gets its known answer with zero traps; 10 attack programs (overwrite / capture the victim's result through a forged root-var pointer, out-of-bounds slot and cell, forged node pointers to the victim's result node, an attack hidden in a lazily expanded definition) and 3 cross-owner fault injections, each with the sender-side check on and off (`fi`); 300 random multi-tenant cases (2–4 random tenants, random owners, half with an attacker carrying random forged redexes). Semantic model, fabric model and RTL must agree on every honest tenant's result and node count, on the trap set and on the interaction count (SPEC §12) |
-| mutation testing (`tests/mutants.py`) | **22 / 22 caught** | 15 functional mutants of the rule logic / protocol / quiescence + 1 performance mutant (no work distribution, caught by the speed-up bound) + 6 security mutants (each owner-capability check disabled, owner stamping missing, trap not blocking). Two mutants (eraser reaches only aux1; REF~DUP expands instead of copying) produce the *right* answer and are caught only by the node count / interaction count. That is why all three observables are compared |
+| mutation testing (`tests/mutants.py`) | **27 / 27 caught** | 15 functional mutants of the rule logic / protocol / quiescence + 1 performance mutant (no work distribution, caught by the speed-up bound) + 6 security mutants (each owner-capability check disabled, owner stamping missing, trap not blocking). Two mutants (eraser reaches only aux1; REF~DUP expands instead of copying) produce the *right* answer and are caught only by the node count / interaction count. That is why all three observables are compared. + 5 v3 engine mutants (read-ahead write bypass, write-queue drain, var owner-tag queue, allocation pop count, ROM read-ahead) |
 
 Strong confluence is the test oracle. Any schedule (arbitration, delays, stalls, task/message priority,
 initial placement) must produce exactly the same normal form, the same number of interactions and the
@@ -168,6 +168,18 @@ macros (`synth/synth_cell.ys`, reports in `results/synth/`, GE = NAND2 equivalen
 Cost of the SRAM discipline: fib(20) on one cell takes 2,605,000 cycles, **8.82 cycles/interaction**
 (v1 register-file cell: 5.30), because every var exchange and node read now waits one cycle for the
 synchronous read. Step 3 below removes that with read-ahead addressing.
+
+### v3 engine: one link step per cycle (step 3)
+
+Every read address is computed one cycle ahead from the engine's *next* state (look-ahead), with a
+write bypass, so a link step finds its var / node data already read from the synchronous RAMs. The
+rule, its node writes and the first resulting link share one cycle; the extra node writes of a
+commutation drain in `S_WQ` (the last one bypassed into the read-ahead); the free stacks and task
+stack are register caches over 1R1W SRAMs (refill/spill one entry per cycle); EXPAND allocates up to
+4 node + 4 var slots per cycle and then writes node *i*, var tag *i* and redex *i* in the same cycle.
+The IDLE cycle is gone: a finishing step picks the next task or message in the same cycle.
+Full regression on v3: units 35/35, programs 268/268, fuzz 600/600 + big 200/200, security 420/420,
+mutants 27/27 (5 new v3 mutants). Cycle numbers: see the benchmark section (step 5).
 
 ### Comparison with TACHYON-128 (same algorithm: naive recursive fib(20))
 

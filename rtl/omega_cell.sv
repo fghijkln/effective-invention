@@ -1,11 +1,13 @@
-// TACHYON-Omega active memory cell (v2: SRAM-style storage).
+// TACHYON-Omega active memory cell (v3: SRAM-style storage, one link step per cycle).
 //
 // Storage is written so that synthesis infers 1R1W synchronous SRAM macros (one write statement and
 // one registered read per array):
-//   node RAM  SLOTS x 132 b  {owner[3:0], aux2, aux1}
+//   node RAM  SLOTS x 132 b  {owner[3:0], aux2, aux1}   2R1W (two read ports: both nodes of a redex)
 //   var RAM   SLOTS x 68 b   {owner[3:0], substitution}
 //   free node / free var stacks and the task stack: a K-entry register top cache over a 1R1W SRAM
-//   (CSTACK macro), definition ROM and directory: synchronous 1R ROMs.
+//   (CSTACK macro); definition node ROM, redex ROM and directory: synchronous 1R ROMs (with a loader
+//   write port).  Every read address is computed one cycle ahead from the engine's NEXT state
+//   (look-ahead), so a link step finds its var / node data already read: one link step per cycle.
 // Flip-flops: the per-slot `nalloc` valid bits (1 bit per node slot), the 64-entry expansion maps,
 // the stack caches, the router FIFOs / outbox and the engine registers.
 //
@@ -38,6 +40,7 @@ module omega_cell #(
   parameter int X = 0, parameter int Y = 0, parameter int W = 1, parameter int H = 1,
   parameter int SLOTS = 1024, parameter int QDEPTH = 1024,
   parameter int ROMSZ = 4096, parameter int DIRSZ = 256, parameter int DEPTH = 4,
+  parameter int RDXSZ = 2048,               // redex template ROM entries
   parameter int XMAP = 64,                  // max nodes / vars per definition (expansion maps)
   parameter logic [255:0] MUT = '0          // mutation-testing knobs (0 = correct design)
 ) (
@@ -59,7 +62,7 @@ module omega_cell #(
   input  logic        dump,
   // loader port for the replicated definition ROM / directory (simulation preloads them with $readmemh)
   input  logic        cfg_we,
-  input  logic        cfg_dir,             // 0 = ROM entry, 1 = directory entry
+  input  logic [1:0]  cfg_sel,             // 0 = node ROM, 1 = redex ROM, 2 = directory
   input  logic [15:0] cfg_a,
   input  logic [127:0] cfg_d,
   output logic [31:0] st_inter
@@ -69,31 +72,29 @@ module omega_cell #(
   localparam int QB = $clog2(QDEPTH);
   localparam int OB = $clog2(DEPTH);
   localparam int RB = $clog2(ROMSZ);
+  localparam int RRB = $clog2(RDXSZ);
   localparam int DB = $clog2(DIRSZ);
   localparam int XB = $clog2(XMAP);
   localparam logic [63:0] ERA_P = 64'h3000_0000_0000_0000;
 
-  typedef enum logic [4:0] {S_INIT, S_IDLE, S_LINK, S_LVAR, S_RDQ, S_RULE, S_PUSH, S_SPAWN,
-                            S_EX0, S_EX1, S_EX2, S_EXA, S_EXN, S_EXR, S_HALT} st_t;
+  typedef enum logic [2:0] {S_INIT, S_IDLE, S_LINK, S_WQ, S_EXA, S_EXN, S_HALT} st_t;
   st_t state;
-  typedef enum logic [1:0] {R_NA, R_BB, R_MIG} rk_t;     // rule kinds read in S_RULE
-  rk_t rkind;
 
   // Memories: every array below has exactly one write statement and one registered read (end of the
   // sequential block), so synthesis infers 1R1W synchronous SRAMs (ROM/dir: 1R).
   logic [131:0] node_mem [SLOTS];       // {owner, aux2, aux1}
   logic [67:0]  var_mem  [SLOTS];       // {owner, substitution}
-  logic [127:0] rom  [ROMSZ];           // definition templates {b, a}
-  logic [15:0]  dirm [DIRSZ];
+  logic [127:0] romn [ROMSZ];           // template nodes {aux2, aux1}
+  logic [127:0] romr [RDXSZ];           // template redexes {b, a}
+  logic [127:0] dirm [DIRSZ];           // {root[63:0], 8'0, nr, nv, nn, rbase[15:0], nbase[15:0]}
   logic [SB-1:0] nstk [SLOTS];          // free node stack (SRAM part)
   logic [SB-1:0] vstk [SLOTS];          // free var stack (SRAM part)
   logic [129:0] tqm  [QDEPTH];          // task stack (SRAM part) {kind, b, a}
   // synchronous read data
-  logic [131:0] n_rd;  logic [67:0] v_rd;  logic [127:0] r_rd;  logic [15:0] d_rd;
+  logic [131:0] n_rd, n_rd2;  logic [67:0] v_rd;  logic [127:0] rn_rd, rr_rd, d_rd;
   logic [SB-1:0] nstk_rd, vstk_rd;  logic [129:0] tqm_rd;
-  logic [SB-1:0] n_ra, v_ra;  logic [RB-1:0] r_ra;  logic [DB-1:0] d_ra;
   // stack top caches (registers): c[0] bottom .. c[cnt-1] top; sp = entries in the SRAM part
-  localparam int NK = 8, VK = 8, QK = 4;
+  localparam int NK = 14, VK = 14, QK = 8;    // (4-bit cache counters: K + pushes <= 15)
   logic [NK-1:0][SB-1:0] nc;  logic [3:0] ncnt;  logic [SB:0] nsp;  logic npend;
   logic [VK-1:0][SB-1:0] vc;  logic [3:0] vcnt;  logic [SB:0] vsp;  logic vpend;
   logic [QK-1:0][129:0]  qc;  logic [3:0] qcnt;  logic [QB:0] qsp;  logic qpend;
@@ -114,21 +115,22 @@ module omega_cell #(
     $readmemh($sformatf("%s/node_%0d_%0d.hex", imgdir, X, Y), node_mem);
     $readmemh($sformatf("%s/var_%0d_%0d.hex", imgdir, X, Y), var_mem);
     $readmemh($sformatf("%s/queue_%0d_%0d.hex", imgdir, X, Y), tqm);
-    $readmemh($sformatf("%s/rom.hex", imgdir), rom);
+    $readmemh($sformatf("%s/romn.hex", imgdir), romn);
+    $readmemh($sformatf("%s/romr.hex", imgdir), romr);
     $readmemh($sformatf("%s/dir.hex", imgdir), dirm);
   end
 `else
   initial qinit[0] = '0;
 `endif
 
-  logic [1:0][SB-1:0] nf_top;
+  logic [3:0][SB-1:0] nf_top;
   logic [3:0][SB-1:0] vf_top;
   logic [129:0]   tq_top;
   logic [3:0]     nf_av, nf_room, vf_av, vf_room, tq_av, tq_room;
   logic [SB+1:0]  nf_tot, vf_tot;
   logic [QB+1:0]  tq_tot;
   always_comb begin
-    for (int i = 0; i < 2; i++) nf_top[i] = (32'(ncnt) > i) ? nc[32'(ncnt) - 1 - i] : '0;
+    for (int i = 0; i < 4; i++) nf_top[i] = (32'(ncnt) > i) ? nc[32'(ncnt) - 1 - i] : '0;
     for (int i = 0; i < 4; i++) vf_top[i] = (32'(vcnt) > i) ? vc[32'(vcnt) - 1 - i] : '0;
     tq_top = (qcnt != 0) ? qc[qcnt - 1] : '0;
     nf_av = ncnt; vf_av = vcnt; tq_av = qcnt;
@@ -187,28 +189,24 @@ module omega_cell #(
   endfunction
 
   // ---------------- engine registers ----------------
-  logic [63:0] ra, rb;                  // current link
-  logic [63:0] rP, rQ;                  // ordered redex being read / executed
-  logic [127:0] pdat;                   // first node read (P) for two-node rules
-  logic [SB-1:0] nhold;                 // node RAM read address held while waiting
-  logic [3:0][63:0] pa, pbv;            // extra links produced by a rule, pushed in S_PUSH
-  logic [2:0]  pcnt;
-  logic [2:0][SB-1:0] wq_a;             // queued node writes (commutation / SWI)
+  logic [63:0] ra, rb;                  // current link (its RAM data was read one cycle ahead)
+  logic        rsp, rsx;
+  logic        ej_taken;                // the eject head was consumed last cycle: pop it now (registered pop)                // (ra = REF, rb = partner) is a spawn request: rsp = retry task
+                                        // (already counted), rsx = SPAWN message (expand here or forward)
+  logic [2:0][SB-1:0] wq_a;             // queued node writes (commutation / SWI), drained in S_WQ
   logic [2:0][131:0]  wq_d;
   logic [1:0]    wq_n;
   logic [2:0][SB-1:0] vq_a;             // queued var owner-tag writes (commutation)
   logic [1:0]    vq_n;
   logic [3:0]    vq_o;
-  logic [15:0] sp_ref;
-  logic [3:0]  sp_own, ex_own;
+  logic [3:0]  ex_own;
   logic [31:0] st_traps, tr_addr;
   logic [1:0]  tr_reason;
   logic [3:0]  tr_owner;
   logic [47:0] tr_mask;                 // (reason, owner) pairs seen: bit (reason-1)*16 + owner
-  logic [63:0] sp_x;
   logic [2:0]  rr;
-  logic [15:0] ex_base;
-  logic [7:0]  ex_nn, ex_nv, ex_nr, ex_i;
+  logic [15:0] ex_nbase, ex_rbase, ex_ref;
+  logic [7:0]  ex_nn, ex_nv, ex_nr, ex_i, ex_in, ex_iv;
   logic [63:0] ex_root, ex_x;
   logic [XMAP-1:0][SB-1:0] nmap;        // expansion: local index -> allocated slot
   logic [XMAP-1:0][SB-1:0] vmap;
@@ -241,42 +239,36 @@ module omega_cell #(
   function automatic logic nforged(input logic valid, input logic [63:0] p, input logic [131:0] w);
     nforged = !MUT[21] && (!valid || w[131:128] != pown(p));
   endfunction
+  // order a link: A = var side if any; P / Q = the pair ordered by (tag, label), bigger first
+  function automatic logic [63:0] ordA(input logic [63:0] x, input logic [63:0] y);
+    ordA = (!is_var(x) && is_var(y)) ? y : x;
+  endfunction
+  function automatic logic [63:0] ordB(input logic [63:0] x, input logic [63:0] y);
+    ordB = (!is_var(x) && is_var(y)) ? x : y;
+  endfunction
+  function automatic logic qfirst(input logic [63:0] a, input logic [63:0] b);   // b is P
+    qfirst = ptag(a) < ptag(b) || (ptag(a) == ptag(b) && plab(a) < plab(b));
+  endfunction
 
   // ---------------- link decode (combinational, from ra/rb) ----------------
   logic [63:0] A, B, dP, dQ;
   logic        dvar, dlP, dlQ;
   always_comb begin
-    if (!is_var(ra) && is_var(rb)) begin A = rb; B = ra; end else begin A = ra; B = rb; end
+    A = ordA(ra, rb); B = ordB(ra, rb);
     dvar = is_var(A);
-    if (ptag(A) < ptag(B) || (ptag(A) == ptag(B) && plab(A) < plab(B))) begin dP = B; dQ = A; end
-    else begin dP = A; dQ = B; end
+    if (qfirst(A, B)) begin dP = B; dQ = A; end else begin dP = A; dQ = B; end
     dlP = is_node(dP) && !oob(dP) && local_p(dP);
     dlQ = is_node(dQ) && !oob(dQ) && local_p(dQ);
   end
 
-  // slots a rule will pop from the stack caches (it waits until the caches hold them; a rule whose
-  // slots are not free at all is re-queued instead, as in v1)
-  int rneed_n, rneed_v;
-  always_comb begin
-    logic anni_;
-    anni_ = (ptag(rP) == ptag(rQ)) && (plab(rP) == plab(rQ)) && (ptag(rP) == T_CON || ptag(rP) == T_DUP);
-    if (MUT[4]) anni_ = (ptag(rP) == ptag(rQ)) && (ptag(rP) == T_CON || ptag(rP) == T_DUP);
-    rneed_n = 0; rneed_v = 0;
-    if (rkind == R_NA && ptag(rP) == T_SWI && ptag(rQ) == T_NUM && pval(rQ) != 0 && nf_tot != 0) rneed_n = 1;
-    if (rkind == R_BB && !anni_ && nf_tot >= 2 && vf_tot >= 4) begin rneed_n = 2; rneed_v = 4; end
-  end
-
-  // ---------------- source selection (combinational, also drives the ejection pop) ----------------
-  logic can_send, msg_ok, q_ok, stall_now, pick_msg, take_msg, take_q;
+  // ---------------- source selection inputs ----------------
+  logic can_send, q_ok, stall_now, rnd_msg;
+  assign ej_pop = ej_taken;
   always_comb begin
     can_send  = ob_cnt < (OB+1)'(DEPTH);
-    msg_ok    = ej_v && !(ej_f.kind == M_NODE && nf_av == 0);
     q_ok      = tq_av != 0;
     stall_now = (stall != 0) && (erng[7:0] < stall);
-    pick_msg  = msg_ok && (!q_ok || !can_send || (erng[15:8] < pmsg));
-    take_msg  = (state == S_IDLE) && !stall_now && pick_msg;
-    take_q    = (state == S_IDLE) && !stall_now && q_ok && !pick_msg;
-    ej_pop    = take_msg;
+    rnd_msg   = erng[15:8] < pmsg;
     idle      = (state == S_IDLE) && (tq_tot == 0) && !ej_v && (ob_cnt == 0) && (!rbusy || MUT[15]);
     ready     = state != S_INIT;
     hungry    = (state == S_IDLE) && (tq_tot == 0) && !ej_v;
@@ -296,35 +288,26 @@ module omega_cell #(
     else tr = p;
   endfunction
 
-  // ---------------- RAM read addresses (held stable while a state waits) ----------------
-  always_comb begin
-    v_ra = SB'(pslot(A));
-    n_ra = nhold;
-    if (state == S_LINK) n_ra = dlP ? SB'(pslot(dP)) : SB'(pslot(dQ));
-    else if (state == S_RDQ) n_ra = SB'(pslot(rQ));
-    d_ra = DB'(sp_ref);
-    r_ra = RB'(ex_base);
-    case (state)
-      S_EX1:  r_ra = RB'(d_rd);
-      S_EX2:  r_ra = RB'(d_rd);
-      S_EXA:  r_ra = RB'(ex_base);                              // first template node
-      S_EXN:  r_ra = RB'(ex_base + 16'(ex_i) + 16'd1);           // prefetch the next entry
-      S_EXR:  r_ra = RB'(ex_base + 16'(ex_nn) + 16'(ex_i) + ((tq_room != 0) ? 16'd1 : 16'd0));
-      default: ;
-    endcase
-  end
-
   // Per-cycle temporaries of the sequential block (blocking-assigned first thing every cycle, so
   // synthesis keeps them combinational; declared here because Yosys mishandles packed-array locals).
   logic snd; flit_t sf;
-  logic qp; logic [129:0] qe;
+  logic [1:0] pn; logic [2:0][129:0] pq;          // task pushes this cycle (up to 3)
   logic tp; logic [1:0] tpr; logic [63:0] tpp;
+  logic fin;                                      // the current step is done: pick new work this cycle
+  st_t  nst;
+  logic [63:0] nra, nrb; logic nrsp, nrsx;
   logic [2:0] nf_pop, nf_push, vf_pop, vf_push, tq_pop, tq_push;
   logic [1:0][SB-1:0] nf_pd; logic [0:0][SB-1:0] vf_pd;
-  logic [0:0][129:0] tq_pd;
+  logic [2:0][129:0] tq_pd;
   logic n_we, v_we; logic [SB-1:0] n_wa, v_wa; logic [131:0] n_wd; logic [67:0] v_wd;
   logic [NK-1:0][SB-1:0] nc_n; logic [VK-1:0][SB-1:0] vc_n; logic [QK-1:0][129:0] qc_n;
   logic [4:0] cs_m, cs_after; logic cs_spill, cs_fill;
+  logic [SB-1:0] la_v, la_n1, la_n2; logic [DB-1:0] la_d; logic [RB-1:0] la_rn; logic [RRB-1:0] la_rr;
+  logic [63:0] la_A, la_B, la_P, la_Q;
+  logic alloc; logic [7:0] al_nn, al_nv, al_in, al_iv;
+  logic [3:0] al_kn, al_kv;
+  logic sp_go; logic [63:0] sp_ref_p, sp_x_p; logic sp_local_only;
+  logic [7:0] ex_last;
 
   always_ff @(posedge clk) begin
     if (rst) begin
@@ -337,20 +320,24 @@ module omega_cell #(
       st_msg2 <= '0; st_maxq <= '0; st_links <= '0; st_tasks <= '0;
       st_minfn <= '1; st_minfv <= '1;
       st_traps <= '0; tr_addr <= '0; tr_reason <= '0; tr_owner <= '0; tr_mask <= '0;
-      wq_n <= '0; vq_n <= '0; pcnt <= '0;
+      wq_n <= '0; vq_n <= '0; rsp <= 1'b0; rsx <= 1'b0; ej_taken <= 1'b0;
       ncnt <= '0; nsp <= '0; npend <= 1'b0;
       vcnt <= '0; vsp <= '0; vpend <= 1'b0;
       qcnt <= '0; qsp <= (QB+1)'(qinit[0]); qpend <= 1'b0;
     end else begin
-      // per-cycle temporaries: module-scope variables assigned with '=' at the top of this block
-      snd = 1'b0; sf = '0; qp = 1'b0; qe = '0;
+      snd = 1'b0; sf = '0; pn = '0; pq = '0;
       tp = 1'b0; tpr = '0; tpp = '0;
-      nf_pop = '0; nf_push = '0; nf_pd[0] = '0; nf_pd[1] = '0;
-      vf_pop = '0; vf_push = '0; vf_pd[0] = '0;
+      fin = 1'b0; nst = state; nra = ra; nrb = rb; nrsp = rsp; nrsx = rsx;
+      nf_pop = '0; nf_push = '0; nf_pd = '0;
+      vf_pop = '0; vf_push = '0; vf_pd = '0;
       tq_pop = '0;
       n_we = 1'b0; n_wa = '0; n_wd = '0;
       v_we = 1'b0; v_wa = '0; v_wd = '0;
+      alloc = 1'b0; al_nn = '0; al_nv = '0; al_in = '0; al_iv = '0; al_kn = '0; al_kv = '0;
+      sp_go = 1'b0; sp_ref_p = '0; sp_x_p = '0; sp_local_only = 1'b0;
+      ex_last = '0;
       erng <= xorshift(erng);
+      ej_taken <= 1'b0;
       if (state != S_INIT && nf_tot < st_minfn) st_minfn <= nf_tot;
       if (state != S_INIT && vf_tot < st_minfv) st_minfv <= vf_tot;
       if (state != S_INIT) cyc <= cyc + 1;
@@ -365,321 +352,294 @@ module omega_cell #(
             if (!nalloc[i]) begin nf_push = 3'd1; nf_pd[0] = i; end
             if (!valloc[i]) begin vf_push = 3'd1; vf_pd[0] = i; end
             init_i <= init_i - 1;
-            if (init_i == 1) state <= S_IDLE;
+            if (init_i == 1) fin = 1'b1;
           end
         end
 
-        // ------------------------------------------------------------------ pick work
-        S_IDLE: begin
-          if (take_msg) begin
-            st_tasks <= st_tasks + 1; st_busy <= st_busy + 1;
-            case (ej_f.kind)
-              M_LINK: begin ra <= ej_f.p0; rb <= ej_f.p1; state <= S_LINK; end
-              M_SPAWN: begin
-                if (xown(ej_f.p0, ej_f.p1)) begin tp = 1'b1; tpr = TR_CROSS; tpp = lowown(ej_f.p0, ej_f.p1); end
-                else begin sp_ref <= plab(ej_f.p0); sp_own <= pown(ej_f.p0); ex_x <= ej_f.p1; state <= S_EX0; end
-              end
-              default: begin   // M_NODE: re-home the travelling node, then link it with its partner
-                logic [SB-1:0] s;
-                if (xown(ej_f.p0, ej_f.p3)) begin tp = 1'b1; tpr = TR_CROSS; tpp = lowown(ej_f.p0, ej_f.p3); end
-                else begin
-                  s = nf_top[0]; nf_pop = 3'd1;
-                  n_we = 1'b1; n_wa = s;
-                  n_wd = {pown(ej_f.p0), MUT[10] ? {ej_f.p1, ej_f.p2} : {ej_f.p2, ej_f.p1}};
-                  nalloc[s] <= 1'b1;
-                  ra <= withpay(ej_f.p0, here(s));
-                  rb <= ej_f.p3;
-                  state <= S_LINK;
-                end
-              end
-            endcase
-          end else if (take_q) begin
-            logic [129:0] e;
-            st_tasks <= st_tasks + 1; st_busy <= st_busy + 1;
-            e = tq_top; tq_pop = 3'd1;
-            if (e[129:128] == K_SPAWN) begin sp_ref <= plab(e[63:0]); sp_own <= pown(e[63:0]); sp_x <= e[127:64]; state <= S_SPAWN; end
-            else begin ra <= e[63:0]; rb <= e[127:64]; state <= S_LINK; end
-          end
-        end
+        S_IDLE: fin = 1'b1;
 
-        // ------------------------------------------------------------------ link / redex dispatch
-        S_LINK: if (tq_room != 0) begin
+        // ------------------------------------------------------------------ one link step (data read ahead)
+        S_LINK: if (tq_room >= 4'd3 && nf_room >= 4'd2 && vf_room != 0) begin
           logic rmt;
           logic [3:0] tP, tQ;
           rmt = dvar ? leaves(A) : ((is_node(A) && leaves(A)) || (is_node(B) && leaves(B)));
           tP = ptag(dP); tQ = ptag(dQ);
-          state <= S_IDLE;
-          if (xown(A, B) && !(fi[0] && rmt)) begin
-            tp = 1'b1; tpr = TR_CROSS; tpp = lowown(A, B);
+          nrsp = 1'b0; nrsx = 1'b0;
+          if (xown(A, B) && !(fi[0] && rmt && !rsx)) begin
+            tp = 1'b1; tpr = TR_CROSS; tpp = lowown(A, B); fin = 1'b1;
+          end else if (rsp || rsx) begin
+            sp_go = 1'b1; sp_ref_p = dQ; sp_x_p = dP; sp_local_only = rsx;
           end else if (dvar) begin
             st_links <= st_links + 1;
             if (oob(A)) begin
-              tp = 1'b1; tpr = TR_OOB; tpp = A;
+              tp = 1'b1; tpr = TR_OOB; tpp = A; fin = 1'b1;
             end else if (local_p(A)) begin
-              state <= S_LVAR;                 // var RAM read issued (v_ra = slot(A))
+              logic [63:0] old;
+              logic forged;
+              forged = v_rd[67:64] != pown(A) && !MUT[16];
+              old = v_rd[63:0];
+              if (forged) begin tp = 1'b1; tpr = TR_FORGED; tpp = A; end
+              if (forged && !MUT[20]) begin
+                fin = 1'b1;                    // dropped
+              end else if (ptag(old) == T_NONE) begin
+                v_we = 1'b1; v_wa = SB'(pslot(A)); v_wd = {v_rd[67:64], B};
+                fin = 1'b1;
+              end else begin
+                v_we = 1'b1; v_wa = SB'(pslot(A)); v_wd = {OWN_FREE, 64'd0};
+                vf_push = 3'd1; vf_pd[0] = SB'(pslot(A));
+                nra = old; nrb = B;            // continue linking old ~ B (next cycle)
+                if (MUT[11]) fin = 1'b1;
+              end
             end else begin
               if (can_send) begin snd = 1'b1; sf = {M_LINK, px(A), py(A), 64'd0, 64'd0, B, A}; end
-              else begin qp = 1'b1; qe = {K_LINK, B, A}; end
+              else begin pn = 2'd1; pq[0] = {K_LINK, B, A}; end
+              fin = 1'b1;
             end
-          end else begin
-            rP <= dP; rQ <= dQ;
-            if (tP <= T_NUM) begin
-              // nullary ~ nullary
-              st_inter <= st_inter + 1;
-              if (tQ == T_REF && tP != T_ERA) begin sp_ref <= plab(dQ); sp_own <= pown(dQ); sp_x <= dP; state <= S_SPAWN; end
-            end else if (tQ <= T_NUM) begin
-              // binary node P ~ nullary Q
-              if (tQ == T_REF && (tP != T_DUP || MUT[13])) begin
-                st_inter <= st_inter + 1;
-                sp_ref <= plab(dQ); sp_own <= pown(dQ); sp_x <= dP; state <= S_SPAWN;
-              end else if (oob(dP)) begin
-                tp = 1'b1; tpr = TR_OOB; tpp = dP;
-              end else if (!local_p(dP)) begin
-                if (can_send) begin snd = 1'b1; sf = {M_LINK, px(dP), py(dP), 64'd0, 64'd0, dQ, dP}; end
-                else begin qp = 1'b1; qe = {K_LINK, dQ, dP}; end
-              end else begin
-                nhold <= SB'(pslot(dP)); rkind <= R_NA; state <= S_RULE;       // read P
-              end
-            end else begin
-              // binary ~ binary
-              if (oob(dP)) begin
-                tp = 1'b1; tpr = TR_OOB; tpp = dP;
-              end else if (oob(dQ)) begin
-                tp = 1'b1; tpr = TR_OOB; tpp = dQ;
-              end else if (dlP && dlQ) begin
-                nhold <= SB'(pslot(dP)); rkind <= R_BB; state <= S_RDQ;        // read P, then Q
-              end else if (dlP || dlQ) begin
-                nhold <= dlP ? SB'(pslot(dP)) : SB'(pslot(dQ)); rkind <= R_MIG; state <= S_RULE;
-              end else begin
-                if (can_send) begin snd = 1'b1; sf = {M_LINK, px(dP), py(dP), 64'd0, 64'd0, dQ, dP}; end
-                else begin qp = 1'b1; qe = {K_LINK, dQ, dP}; end
-              end
-            end
-          end
-        end
-
-        // ------------------------------------------------------------------ local var exchange (data from the var RAM)
-        S_LVAR: if (vf_room != 0) begin
-          logic [63:0] old;
-          logic forged;
-          logic [SB-1:0] sA;
-          sA = SB'(pslot(A));
-          forged = v_rd[67:64] != pown(A) && !MUT[16];
-          old = v_rd[63:0];
-          state <= S_IDLE;
-          if (forged) begin tp = 1'b1; tpr = TR_FORGED; tpp = A; end
-          if (forged && !MUT[20]) begin
-            // dropped
-          end else if (ptag(old) == T_NONE) begin
-            v_we = 1'b1; v_wa = sA; v_wd = {v_rd[67:64], B};
-          end else begin
-            v_we = 1'b1; v_wa = sA; v_wd = {OWN_FREE, 64'd0};
-            vf_push = 3'd1; vf_pd[0] = sA;
-            ra <= old; rb <= B;            // continue linking old ~ B
-            state <= MUT[11] ? S_IDLE : S_LINK;
-          end
-        end
-
-        // ------------------------------------------------------------------ second node read
-        S_RDQ: begin
-          pdat <= n_rd[127:0];
-          nhold <= SB'(pslot(rQ));
-          if (nforged(nalloc[SB'(pslot(rP))], rP, n_rd)) begin tp = 1'b1; tpr = TR_FORGED; tpp = rP; state <= S_IDLE; end
-          else state <= S_RULE;
-        end
-
-        // ------------------------------------------------------------------ apply a rule (node data from the node RAM)
-        S_RULE: if (tq_room != 0 && nf_room >= 2 && 32'(nf_av) >= rneed_n && 32'(vf_av) >= rneed_v) begin
-          logic [63:0] P, Q, a1, a2, b1, b2;
-          logic [3:0] tP, tQ;
-          logic [SB-1:0] sP, sQ;
-          P = rP; Q = rQ;
-          tP = ptag(P); tQ = ptag(Q);
-          sP = SB'(pslot(P)); sQ = SB'(pslot(Q));
-          state <= S_IDLE;
-          if (rkind == R_NA) begin
+          end else if (tP <= T_NUM) begin
+            // nullary ~ nullary
+            st_inter <= st_inter + 1;
+            if (tQ == T_REF && tP != T_ERA) begin sp_go = 1'b1; sp_ref_p = dQ; sp_x_p = dP; end
+            else fin = 1'b1;
+          end else if (tQ <= T_NUM) begin
+            // binary node P ~ nullary Q (node P read ahead on port 1)
+            logic [63:0] a1, a2;
             a1 = n_rd[63:0]; a2 = n_rd[127:64];
-            if (nforged(nalloc[SB'(pslot(P))], P, n_rd)) begin
-              tp = 1'b1; tpr = TR_FORGED; tpp = P;
-            end else if (tP == T_SWI && tQ == T_NUM && pval(Q) != 0 && nf_tot == 0) begin
-              qp = 1'b1; qe = {K_LINK, Q, P}; st_retry <= st_retry + 1;
+            if (tQ == T_REF && (tP != T_DUP || MUT[13])) begin
+              st_inter <= st_inter + 1;
+              sp_go = 1'b1; sp_ref_p = dQ; sp_x_p = dP;
+            end else if (oob(dP)) begin
+              tp = 1'b1; tpr = TR_OOB; tpp = dP; fin = 1'b1;
+            end else if (!local_p(dP)) begin
+              if (can_send) begin snd = 1'b1; sf = {M_LINK, px(dP), py(dP), 64'd0, 64'd0, dQ, dP}; end
+              else begin pn = 2'd1; pq[0] = {K_LINK, dQ, dP}; end
+              fin = 1'b1;
+            end else if (nforged(nalloc[SB'(pslot(dP))], dP, n_rd)) begin
+              tp = 1'b1; tpr = TR_FORGED; tpp = dP; fin = 1'b1;
+            end else if (tP == T_SWI && tQ == T_NUM && pval(dQ) != 0 && nf_tot == 0) begin
+              pn = 2'd1; pq[0] = {K_LINK, dQ, dP}; st_retry <= st_retry + 1; fin = 1'b1;
+            end else if (tP == T_SWI && tQ == T_NUM && pval(dQ) != 0 && nf_av == 0) begin
+              // wait for the free-node cache to refill (hold: same link, same read-ahead)
             end else begin
+              logic [SB-1:0] sP;
+              sP = SB'(pslot(dP));
               st_inter <= st_inter + 1;
               if (tQ == T_ERA || tQ == T_REF || tP == T_CON || tP == T_DUP) begin
                 // erase / copy: both aux ports receive Q
                 nf_push = 3'd1; nf_pd[0] = sP; nalloc[sP] <= 1'b0;
-                pa[1] <= a2; pbv[1] <= (MUT[0] ? a1 : Q);
-                ra <= a1; rb <= Q; pcnt <= 3'd1; state <= MUT[12] && tQ == T_ERA ? S_LINK : S_PUSH;
+                if (MUT[12] && tQ == T_ERA) pn = 2'd0;
+                else begin pn = 2'd1; pq[0] = {K_LINK, (MUT[0] ? a1 : dQ), a2}; end
+                nra = a1; nrb = dQ;
               end else if (tP == T_OPR) begin
                 logic [3:0] op; logic s;
-                op = P[47:44]; s = P[48];
+                op = dP[47:44]; s = dP[48];
                 if (ptag(a1) == T_NUM) begin
                   logic [31:0] r;
-                  r = s ? alu(op, pval(a1), pval(Q)) : alu(op, pval(Q), pval(a1));
-                  if (MUT[8] && op == 4'd7) r = s ? alu(4'd9, pval(a1), pval(Q)) : alu(4'd9, pval(Q), pval(a1));
-                  if (MUT[1]) r = alu(op, pval(a1), pval(Q));
+                  r = s ? alu(op, pval(a1), pval(dQ)) : alu(op, pval(dQ), pval(a1));
+                  if (MUT[8] && op == 4'd7) r = s ? alu(4'd9, pval(a1), pval(dQ)) : alu(4'd9, pval(dQ), pval(a1));
+                  if (MUT[1]) r = alu(op, pval(a1), pval(dQ));
                   nf_push = 3'd1; nf_pd[0] = sP; nalloc[sP] <= 1'b0;
-                  ra <= a2; rb <= mkp(T_NUM, 16'd0, r); state <= S_LINK;
+                  nra = a2; nrb = mkp(T_NUM, 16'd0, r);
                 end else begin
-                  n_we = 1'b1; n_wa = sP; n_wd = {pown(P), a2, Q};       // reuse the slot for the flipped operator
-                  ra <= a1; rb <= mkpo(T_OPR, {11'd0, MUT[2] ? s : ~s, op}, pown(P), here(sP)); state <= S_LINK;
+                  n_we = 1'b1; n_wa = sP; n_wd = {pown(dP), a2, dQ};       // reuse the slot for the flipped operator
+                  nra = a1; nrb = mkpo(T_OPR, {11'd0, MUT[2] ? s : ~s, op}, pown(dP), here(sP));
                 end
               end else begin  // SWI ~ NUM
-                if (pval(Q) == 0) begin
+                if (pval(dQ) == 0) begin
                   n_we = 1'b1; n_wa = sP;
-                  n_wd = {pown(P), MUT[9] ? {a2, ERA_P} : {ERA_P, a2}};    // (a2 *)
-                  ra <= a1; rb <= mkpo(T_CON, 16'd0, pown(P), here(sP)); state <= S_LINK;
+                  n_wd = {pown(dP), MUT[9] ? {a2, ERA_P} : {ERA_P, a2}};    // (a2 *)
+                  nra = a1; nrb = mkpo(T_CON, 16'd0, pown(dP), here(sP));
                 end else begin
                   logic [SB-1:0] c2;
                   c2 = nf_top[0]; nf_pop = 3'd1;
                   n_we = 1'b1; n_wa = sP;
-                  n_wd = {pown(P), a2, mkp(T_NUM, 16'd0, pval(Q) - (MUT[3] ? 32'd0 : 32'd1))};   // (#n-1 a2)
-                  wq_a[0] <= c2; wq_d[0] <= {pown(P), mkpo(T_CON, 16'd0, pown(P), here(sP)), ERA_P}; wq_n <= 2'd1;  // (* c1)
+                  n_wd = {pown(dP), a2, mkp(T_NUM, 16'd0, pval(dQ) - (MUT[3] ? 32'd0 : 32'd1))};   // (#n-1 a2)
+                  wq_a[0] <= c2; wq_d[0] <= {pown(dP), mkpo(T_CON, 16'd0, pown(dP), here(sP)), ERA_P}; wq_n <= 2'd1;  // (* c1)
                   nalloc[c2] <= 1'b1;
-                  ra <= a1; rb <= mkpo(T_CON, 16'd0, pown(P), here(c2)); pcnt <= 3'd0; state <= S_PUSH;
+                  nra = a1; nrb = mkpo(T_CON, 16'd0, pown(dP), here(c2)); nst = S_WQ;
                 end
               end
             end
-          end else if (rkind == R_BB) begin
-            logic anni;
-            a1 = pdat[63:0]; a2 = pdat[127:64];
-            b1 = n_rd[63:0]; b2 = n_rd[127:64];
-            anni = (tP == tQ) && (plab(P) == plab(Q)) && (tP == T_CON || tP == T_DUP);
-            if (MUT[4]) anni = (tP == tQ) && (tP == T_CON || tP == T_DUP);
-            if (nforged(nalloc[SB'(pslot(Q))], Q, n_rd)) begin
-              tp = 1'b1; tpr = TR_FORGED; tpp = Q;
-            end else if (!anni && (nf_tot < 2 || vf_tot < 4)) begin
-              qp = 1'b1; qe = {K_LINK, Q, P}; st_retry <= st_retry + 1;
-            end else if (anni) begin
-              st_inter <= st_inter + 1;
-              nf_push = 3'd2; nf_pd[0] = sP; nf_pd[1] = sQ; nalloc[sP] <= 1'b0; nalloc[sQ] <= 1'b0;
-              pa[1] <= a2; pbv[1] <= b2;
-              ra <= a1; rb <= (MUT[5] ? b2 : b1); pcnt <= 3'd1; state <= S_PUSH;
-            end else begin
-              logic [SB-1:0] n1, n3, v0, v1, v2, v3;
-              logic [63:0] x11, x12, x21, x22;
-              logic [3:0] o;
-              st_inter <= st_inter + 1;
-              o = pown(P);
-              n1 = nf_top[0]; n3 = nf_top[1]; nf_pop = 3'd2;
-              v0 = vf_top[0]; v1 = vf_top[1]; v2 = vf_top[2]; v3 = vf_top[3]; vf_pop = 3'd4;
-              x11 = mkpo(T_VAR, 16'd0, o, here(v0)); x12 = mkpo(T_VAR, 16'd0, o, here(v1));
-              x21 = mkpo(T_VAR, 16'd0, o, here(v2)); x22 = mkpo(T_VAR, 16'd0, o, here(MUT[14] ? v2 : v3));
-              n_we = 1'b1; n_wa = sP; n_wd = {o, x12, x11};                       // copy 1 of Q's kind
-              wq_a[0] <= n1; wq_d[0] <= {o, x22, x21};                             // copy 2 of Q's kind
-              wq_a[1] <= sQ; wq_d[1] <= {o, x21, x11};                             // copy 1 of P's kind
-              wq_a[2] <= n3; wq_d[2] <= {o, MUT[6] ? {x12, x22} : {x22, x12}};     // copy 2 of P's kind
-              wq_n <= 2'd3;
-              v_we = 1'b1; v_wa = v0; v_wd = {o, 64'd0};                           // owner tags of the fresh vars
-              vq_a[0] <= v1; vq_a[1] <= v2; vq_a[2] <= v3; vq_n <= 2'd3; vq_o <= o;
-              nalloc[n1] <= 1'b1; nalloc[n3] <= 1'b1;
-              pa[1] <= a2; pbv[1] <= withpay(Q, here(n1));
-              pa[2] <= b1; pbv[2] <= withpay(P, here(sQ));
-              pa[3] <= b2; pbv[3] <= withpay(P, here(n3));
-              ra <= a1; rb <= withpay(Q, here(sP)); pcnt <= 3'd3; state <= S_PUSH;
-            end
           end else begin
-            // R_MIG: one side local -> migrate the local node to the partner's cell (MSG NODE)
-            logic [63:0] L, R;
-            logic lP;
-            lP = local_p(P) && !oob(P);
-            L = lP ? P : Q; R = lP ? Q : P;
-            if (nforged(nalloc[SB'(pslot(L))], L, n_rd)) begin
-              tp = 1'b1; tpr = TR_FORGED; tpp = L;
-            end else if (can_send) begin
-              snd = 1'b1; sf = {M_NODE, px(R), py(R), R, n_rd[127:64], n_rd[63:0], L};
-              nf_push = 3'd1; nf_pd[0] = SB'(pslot(L)); nalloc[SB'(pslot(L))] <= 1'b0;
-            end else begin qp = 1'b1; qe = {K_LINK, Q, P}; st_retry <= st_retry + 1; end
+            // binary ~ binary (P on read port 1, Q on read port 2)
+            logic anni;
+            anni = (tP == tQ) && (plab(dP) == plab(dQ)) && (tP == T_CON || tP == T_DUP);
+            if (MUT[4]) anni = (tP == tQ) && (tP == T_CON || tP == T_DUP);
+            if (oob(dP)) begin
+              tp = 1'b1; tpr = TR_OOB; tpp = dP; fin = 1'b1;
+            end else if (oob(dQ)) begin
+              tp = 1'b1; tpr = TR_OOB; tpp = dQ; fin = 1'b1;
+            end else if (dlP && nforged(nalloc[SB'(pslot(dP))], dP, n_rd)) begin
+              tp = 1'b1; tpr = TR_FORGED; tpp = dP; fin = 1'b1;
+            end else if (dlQ && nforged(nalloc[SB'(pslot(dQ))], dQ, n_rd2)) begin
+              tp = 1'b1; tpr = TR_FORGED; tpp = dQ; fin = 1'b1;
+            end else if (dlP && dlQ) begin
+              logic [63:0] a1, a2, b1, b2;
+              logic [SB-1:0] sP, sQ;
+              a1 = n_rd[63:0]; a2 = n_rd[127:64]; b1 = n_rd2[63:0]; b2 = n_rd2[127:64];
+              sP = SB'(pslot(dP)); sQ = SB'(pslot(dQ));
+              if (!anni && (nf_tot < 2 || vf_tot < 4)) begin
+                pn = 2'd1; pq[0] = {K_LINK, dQ, dP}; st_retry <= st_retry + 1; fin = 1'b1;
+              end else if (!anni && (nf_av < 2 || vf_av < 4)) begin
+                // wait for the free-slot caches to refill
+              end else if (anni) begin
+                st_inter <= st_inter + 1;
+                nf_push = 3'd2; nf_pd[0] = sP; nf_pd[1] = sQ; nalloc[sP] <= 1'b0; nalloc[sQ] <= 1'b0;
+                pn = 2'd1; pq[0] = {K_LINK, b2, a2};
+                nra = a1; nrb = (MUT[5] ? b2 : b1);
+              end else begin
+                logic [SB-1:0] n1, n3, v0, v1, v2, v3;
+                logic [63:0] x11, x12, x21, x22;
+                logic [3:0] o;
+                st_inter <= st_inter + 1;
+                o = pown(dP);
+                n1 = nf_top[0]; n3 = nf_top[1]; nf_pop = 3'd2;
+                v0 = vf_top[0]; v1 = vf_top[1]; v2 = vf_top[2]; v3 = vf_top[3]; vf_pop = 3'd4;
+                x11 = mkpo(T_VAR, 16'd0, o, here(v0)); x12 = mkpo(T_VAR, 16'd0, o, here(v1));
+                x21 = mkpo(T_VAR, 16'd0, o, here(v2)); x22 = mkpo(T_VAR, 16'd0, o, here(MUT[14] ? v2 : v3));
+                n_we = 1'b1; n_wa = sP; n_wd = {o, x12, x11};                       // copy 1 of Q's kind
+                wq_a[0] <= n1; wq_d[0] <= {o, x22, x21};                             // copy 2 of Q's kind
+                wq_a[1] <= sQ; wq_d[1] <= {o, x21, x11};                             // copy 1 of P's kind
+                wq_a[2] <= n3; wq_d[2] <= {o, MUT[6] ? {x12, x22} : {x22, x12}};     // copy 2 of P's kind
+                wq_n <= 2'd3;
+                v_we = 1'b1; v_wa = v0; v_wd = {o, 64'd0};                           // owner tags of the fresh vars
+                vq_a[0] <= v1; vq_a[1] <= v2; vq_a[2] <= v3; vq_n <= 2'd3; vq_o <= o;
+                nalloc[n1] <= 1'b1; nalloc[n3] <= 1'b1;
+                pn = 2'd3;
+                pq[0] = {K_LINK, withpay(dQ, here(n1)), a2};
+                pq[1] = {K_LINK, withpay(dP, here(sQ)), b1};
+                pq[2] = {K_LINK, withpay(dP, here(n3)), b2};
+                nra = a1; nrb = withpay(dQ, here(sP)); nst = S_WQ;
+              end
+            end else if (dlP || dlQ) begin
+              // one side local: migrate the local node to the partner's cell (MSG NODE)
+              logic [63:0] L, R; logic [131:0] ld;
+              L = dlP ? dP : dQ; R = dlP ? dQ : dP; ld = dlP ? n_rd : n_rd2;
+              if (can_send) begin
+                snd = 1'b1; sf = {M_NODE, px(R), py(R), R, ld[127:64], ld[63:0], L};
+                nf_push = 3'd1; nf_pd[0] = SB'(pslot(L)); nalloc[SB'(pslot(L))] <= 1'b0;
+              end else begin pn = 2'd1; pq[0] = {K_LINK, dQ, dP}; st_retry <= st_retry + 1; end
+              fin = 1'b1;
+            end else begin
+              if (can_send) begin snd = 1'b1; sf = {M_LINK, px(dP), py(dP), 64'd0, 64'd0, dQ, dP}; end
+              else begin pn = 2'd1; pq[0] = {K_LINK, dQ, dP}; end
+              fin = 1'b1;
+            end
           end
         end
 
-        // ------------------------------------------------------------------ push extra links and drain queued writes, then continue with (ra, rb)
-        S_PUSH: if (tq_room != 0) begin
-          if (pcnt != 0) begin qp = 1'b1; qe = {K_LINK, pbv[pcnt[1:0]], pa[pcnt[1:0]]}; pcnt <= pcnt - 1; end
+        // ------------------------------------------------------------------ drain queued node / var-tag writes
+        S_WQ: begin
           if (wq_n != 0) begin
             n_we = 1'b1; n_wa = wq_a[wq_n - 1]; n_wd = wq_d[wq_n - 1]; wq_n <= wq_n - 1;
           end
           if (vq_n != 0) begin
-            v_we = 1'b1; v_wa = vq_a[vq_n - 1]; v_wd = {vq_o, 64'd0}; vq_n <= vq_n - 1;
+            v_we = !MUT[24]; v_wa = vq_a[vq_n - 1]; v_wd = {vq_o, 64'd0}; vq_n <= vq_n - 1;
           end
-          if (pcnt <= 1 && wq_n <= 1 && vq_n <= 1) state <= S_LINK;
+          if (MUT[23] || (wq_n <= 1 && vq_n <= 1)) nst = S_LINK;   // the last write is bypassed into the read-ahead
         end
 
-        // ------------------------------------------------------------------ choose where a REF expands
-        S_SPAWN: begin
-          // give the expansion to a hungry neighbour if there is one, otherwise expand here
-          hrot <= hrot + 2'd1;
-          if (!hv_found || !can_send || MUT[7]) begin
-            ex_x <= sp_x; state <= S_EX0;
-          end else begin
-            snd = 1'b1; sf = {M_SPAWN, dir_x(hv_dir), dir_y(hv_dir), 64'd0, 64'd0, sp_x, mkpo(T_REF, sp_ref, sp_own, 32'd0)};
-            state <= S_IDLE;
-          end
-        end
-
-        // ------------------------------------------------------------------ EXPAND: directory read, header read
-        S_EX0: state <= S_EX1;                 // dir read issued (d_ra = sp_ref)
-        S_EX1: state <= S_EX2;                 // header read issued (r_ra = dir)
-        S_EX2: if (tq_room != 0) begin
-          logic [7:0] nn, nv, nr;
-          nn = r_rd[71:64]; nv = r_rd[79:72]; nr = r_rd[87:80];
-          if ((SB+2)'(nn) <= nf_tot && (SB+2)'(nv) <= vf_tot && (32'(tq_tot) + 32'(nr) + 1) < QDEPTH) begin
-            ex_base <= d_rd + 1; ex_nn <= nn; ex_nv <= nv; ex_nr <= nr; ex_root <= r_rd[63:0];
-            ex_own <= sp_own; ex_i <= 8'd0;
-            state <= S_EXA;
-          end else if (NT > 1) begin
-            // not enough room here: forward the SPAWN to a neighbour
-            logic [2:0] t;
-            t = (rr == 3'd0) ? 3'd1 : rr;
-            rr <= (t == 3'(NT - 1)) ? 3'd0 : t + 1;
-            st_retry <= st_retry + 1;
-            if (can_send) begin snd = 1'b1; sf = {M_SPAWN, tx[t], ty[t], 64'd0, 64'd0, ex_x, mkpo(T_REF, sp_ref, sp_own, 32'd0)}; end
-            else begin qp = 1'b1; qe = {K_SPAWN, ex_x, mkpo(T_REF, sp_ref, sp_own, 32'd0)}; end
-            state <= S_IDLE;
-          end else begin
-            err <= 4'd2; state <= S_HALT;    // out of memory on a 1x1 fabric
-          end
-        end
-
-        // pass 1: allocate one node slot and one var slot per cycle into the maps; tag the vars
+        // ------------------------------------------------------------------ EXPAND pass 1: allocate the rest of the maps
         S_EXA: begin
-          logic needn, needv;
-          needn = ex_i < ex_nn; needv = ex_i < ex_nv;
-          if ((!needn || nf_av != 0) && (!needv || vf_av != 0)) begin
-            if (needn) begin nmap[XB'(ex_i)] <= nf_top[0]; nf_pop = 3'd1; end
-            if (needv) begin
-              vmap[XB'(ex_i)] <= vf_top[0]; vf_pop = 3'd1;
-              v_we = 1'b1; v_wa = vf_top[0]; v_wd = {MUT[19] ? 4'd0 : ex_own, 64'd0};
-            end
-            ex_i <= ex_i + 1;
-            if (ex_i + 1 >= ex_nn && ex_i + 1 >= ex_nv) begin
-              ex_i <= 8'd0;
-              state <= (ex_nn != 0) ? S_EXN : S_EXR;   // r_ra = ex_base: template node 0 is being read
-            end
-          end
+          alloc = 1'b1; al_nn = ex_nn; al_nv = ex_nv; al_in = ex_in; al_iv = ex_iv;
         end
 
-        // pass 2: one template node per cycle (ROM read pipelined one ahead)
-        S_EXN: begin
+        // ------------------------------------------------------------------ EXPAND pass 2: node i, var tag i, redex i per cycle
+        S_EXN: if (tq_room != 0) begin
           logic [SB-1:0] s;
-          s = nmap[XB'(ex_i)];
-          n_we = 1'b1; n_wa = s; n_wd = {MUT[19] ? 4'd0 : ex_own, `TR(r_rd[127:64]), `TR(r_rd[63:0])};
-          nalloc[s] <= 1'b1;
+          ex_last = (ex_nn > ex_nv) ? ex_nn : ex_nv;
+          if (ex_nr > ex_last) ex_last = ex_nr;
+          if (ex_i < ex_nn) begin
+            s = nmap[XB'(ex_i)];
+            n_we = 1'b1; n_wa = s; n_wd = {MUT[19] ? 4'd0 : ex_own, `TR(rn_rd[127:64]), `TR(rn_rd[63:0])};
+            nalloc[s] <= 1'b1;
+          end
+          if (ex_i < ex_nv) begin
+            v_we = 1'b1; v_wa = vmap[XB'(ex_i)]; v_wd = {MUT[19] ? 4'd0 : ex_own, 64'd0};
+          end
+          if (ex_i < ex_nr) begin pn = 2'd1; pq[0] = {K_LINK, `TR(rr_rd[127:64]), `TR(rr_rd[63:0])}; end
           ex_i <= ex_i + 1;
-          if (ex_i == ex_nn - 1) begin ex_i <= 8'd0; state <= S_EXR; end
-        end
-
-        S_EXR: if (tq_room != 0) begin
-          if (ex_i < ex_nr) begin
-            qp = 1'b1; qe = {K_LINK, `TR(r_rd[127:64]), `TR(r_rd[63:0])};
-            ex_i <= ex_i + 1;
-          end else begin
-            ra <= `TR(ex_root); rb <= ex_x; state <= S_LINK;
+          if (32'(ex_i) + 1 >= 32'(ex_last)) begin
+            nra = `TR(ex_root); nrb = ex_x; nst = S_LINK;
           end
         end
 
         default: ;   // S_HALT
       endcase
+
+      // ---- a REF expansion: hand it to a hungry neighbour, or expand here (header read ahead) ----
+      if (sp_go) begin
+        logic [7:0] nn, nv, nr;
+        nn = d_rd[39:32]; nv = d_rd[47:40]; nr = d_rd[55:48];
+        hrot <= hrot + 2'd1;
+        if (!sp_local_only && hv_found && can_send && !MUT[7]) begin
+          snd = 1'b1; sf = {M_SPAWN, dir_x(hv_dir), dir_y(hv_dir), 64'd0, 64'd0, sp_x_p, sp_ref_p};
+          fin = 1'b1;
+        end else if ((SB+2)'(nn) <= nf_tot && (SB+2)'(nv) <= vf_tot && (32'(tq_tot) + 32'(nr) + 1) < QDEPTH) begin
+          ex_nbase <= d_rd[15:0]; ex_rbase <= d_rd[31:16]; ex_root <= d_rd[127:64];
+          ex_nn <= nn; ex_nv <= nv; ex_nr <= nr; ex_own <= pown(sp_ref_p); ex_x <= sp_x_p;
+          ex_ref <= plab(sp_ref_p);
+          alloc = 1'b1; al_nn = nn; al_nv = nv; al_in = '0; al_iv = '0;   // first allocation batch now
+        end else if (NT > 1) begin
+          // not enough room here: forward the SPAWN to a neighbour
+          logic [2:0] t;
+          t = (rr == 3'd0) ? 3'd1 : rr;
+          rr <= (t == 3'(NT - 1)) ? 3'd0 : t + 1;
+          st_retry <= st_retry + 1;
+          if (can_send) begin snd = 1'b1; sf = {M_SPAWN, tx[t], ty[t], 64'd0, 64'd0, sp_x_p, sp_ref_p}; end
+          else begin pn = 2'd1; pq[0] = {K_SPAWN, sp_x_p, sp_ref_p}; end
+          fin = 1'b1;
+        end else begin
+          err <= 4'd2; nst = S_HALT;    // out of memory on a 1x1 fabric
+        end
+      end
+
+      // ---- map allocation: up to 4 node slots and 4 var slots per cycle from the stack caches ----
+      if (alloc) begin
+        logic [7:0] in2, iv2;
+        al_kn = 4'd0; al_kv = 4'd0;
+        for (int j = 0; j < 4; j++) begin
+          if (32'(al_in) + j < 32'(al_nn) && j < 32'(nf_av)) begin nmap[XB'(32'(al_in) + j)] <= nf_top[j]; al_kn = 4'(j + 1); end
+          if (32'(al_iv) + j < 32'(al_nv) && j < 32'(vf_av)) begin vmap[XB'(32'(al_iv) + j)] <= vf_top[j]; al_kv = 4'(j + 1); end
+        end
+        nf_pop = 3'(al_kn) - 3'(MUT[25] && al_kn > 4'd1); vf_pop = 3'(al_kv);
+        in2 = al_in + 8'(al_kn); iv2 = al_iv + 8'(al_kv);
+        ex_in <= in2; ex_iv <= iv2; ex_i <= 8'd0;
+        nst = (in2 >= al_nn && iv2 >= al_nv) ? S_EXN : S_EXA;
+      end
+
+      // ---- the step finished: pick the next task or message in the same cycle (no IDLE cycle) ----
+      if (fin && nst != S_HALT) begin
+        logic msg_ok, pick_msg;
+        msg_ok = ej_v && !ej_taken && !(ej_f.kind == M_NODE && (nf_av == 0 || n_we || nf_pop != 0));
+        pick_msg = msg_ok && (!q_ok || !can_send || rnd_msg);
+        nst = S_IDLE; nrsp = 1'b0; nrsx = 1'b0;
+        if (stall_now) begin
+          // verification knob: skip a cycle
+        end else if (pick_msg) begin
+          st_tasks <= st_tasks + 1;
+          ej_taken <= 1'b1;
+          case (ej_f.kind)
+            M_LINK: begin nra = ej_f.p0; nrb = ej_f.p1; nst = S_LINK; end
+            M_SPAWN: begin nra = ej_f.p0; nrb = ej_f.p1; nrsx = 1'b1; nst = S_LINK; end
+            default: begin   // M_NODE: re-home the travelling node, then link it with its partner
+              logic [SB-1:0] s;
+              if (xown(ej_f.p0, ej_f.p3)) begin tp = 1'b1; tpr = TR_CROSS; tpp = lowown(ej_f.p0, ej_f.p3); end
+              else begin
+                s = nf_top[0]; nf_pop = 3'd1;
+                n_we = 1'b1; n_wa = s;
+                n_wd = {pown(ej_f.p0), MUT[10] ? {ej_f.p1, ej_f.p2} : {ej_f.p2, ej_f.p1}};
+                nalloc[s] <= 1'b1;
+                nra = withpay(ej_f.p0, here(s)); nrb = ej_f.p3; nst = S_LINK;
+              end
+            end
+          endcase
+        end else if (q_ok) begin
+          logic [129:0] e;
+          st_tasks <= st_tasks + 1;
+          e = tq_top; tq_pop = 3'd1;
+          nra = e[63:0]; nrb = e[127:64]; nrsp = (e[129:128] == K_SPAWN); nst = S_LINK;
+        end
+      end
 
       // ---- apply side effects ----
       if (tp) begin
@@ -687,13 +647,10 @@ module omega_cell #(
         tr_mask[(32'(tpr) - 1) * 16 + 32'(pown(tpp))] <= 1'b1;
         if (st_traps == 0) begin tr_reason <= tpr; tr_owner <= pown(tpp); tr_addr <= pval(tpp); end
       end
-      tq_push = 3'd0; tq_pd[0] = qe;
-      if (qp) begin
-        if (tq_tot >= (QB+2)'(QDEPTH)) begin err <= 4'd1; state <= S_HALT; end
-        else begin
-          tq_push = 3'd1;
-          if (32'(tq_tot) + 1 > st_maxq) st_maxq <= 32'(tq_tot) + 1;
-        end
+      tq_push = 3'(pn); tq_pd = pq;
+      if (pn != 0) begin
+        if (32'(tq_tot) + 32'(pn) > QDEPTH) begin err <= 4'd1; nst = S_HALT; tq_push = '0; end
+        else if (32'(tq_tot) + 32'(pn) > st_maxq) st_maxq <= 32'(tq_tot) + 32'(pn);
       end
       begin
         logic pop;
@@ -705,31 +662,48 @@ module omega_cell #(
         if (pop) ob_hd <= ob_hd + 1'b1;
         ob_cnt <= ob_cnt + (OB+1)'(snd) - (OB+1)'(pop);
       end
+      state <= nst; ra <= nra; rb <= nrb; rsp <= nrsp; rsx <= nrsx;
 
-      // ---- memory ports: one write and one registered read per array ----
+      // ---- memory writes: one write port per array ----
       if (n_we) node_mem[n_wa] <= n_wd;
       if (v_we) var_mem[v_wa] <= v_wd;
 
       // ---- stack caches: pops, pushes, refill arrival, spill / refill (one SRAM access each per cycle) ----
-      `CSTACK(nc, ncnt, nsp, npend, nstk, nstk_rd, NK, 5, 4, nf_pop, nf_push, nf_pd, 2, SLOTS, SB, SB, nc_n)
-      `CSTACK(vc, vcnt, vsp, vpend, vstk, vstk_rd, VK, 6, 5, vf_pop, vf_push, vf_pd, 1, SLOTS, SB, SB, vc_n)
-      `CSTACK(qc, qcnt, qsp, qpend, tqm, tqm_rd, QK, 3, 2, tq_pop, tq_push, tq_pd, 1, QDEPTH, 130, QB, qc_n)
-    end
-    n_rd <= node_mem[n_ra];
-    v_rd <= var_mem[v_ra];
-    if (cfg_we && !cfg_dir) rom[RB'(cfg_a)] <= cfg_d;
-    if (cfg_we && cfg_dir) dirm[DB'(cfg_a)] <= cfg_d[15:0];
-    r_rd <= rom[r_ra];
-    d_rd <= dirm[d_ra];
-  end
+      `CSTACK(nc, ncnt, nsp, npend, nstk, nstk_rd, NK, 10, 7, nf_pop, nf_push, nf_pd, 2, SLOTS, SB, SB, nc_n)
+      `CSTACK(vc, vcnt, vsp, vpend, vstk, vstk_rd, VK, 10, 7, vf_pop, vf_push, vf_pd, 1, SLOTS, SB, SB, vc_n)
+      `CSTACK(qc, qcnt, qsp, qpend, tqm, tqm_rd, QK, 5, 2, tq_pop, tq_push, tq_pd, 3, QDEPTH, 130, QB, qc_n)
 
+      // ---- read-ahead: the addresses the NEXT cycle's step needs (synchronous reads, write bypass) ----
+      la_A = ordA(nra, nrb); la_B = ordB(nra, nrb);
+      if (qfirst(la_A, la_B)) begin la_P = la_B; la_Q = la_A; end else begin la_P = la_A; la_Q = la_B; end
+      la_v = SB'(pslot(la_A)); la_n1 = SB'(pslot(la_P)); la_n2 = SB'(pslot(la_Q));
+      la_d = DB'(plab(la_Q));
+      if (nst == S_EXN) begin
+        logic [7:0] i;
+        i = (state == S_EXN && tq_room != 0 && !MUT[26]) ? ex_i + 8'd1 : ((state == S_EXN) ? ex_i : 8'd0);
+        la_rn = RB'(ex_nbase + 16'(i)); la_rr = RRB'(ex_rbase + 16'(i));
+        if (state != S_EXN && state != S_EXA) begin la_rn = RB'(d_rd[15:0]); la_rr = RRB'(d_rd[31:16]); end
+      end else begin
+        la_rn = '0; la_rr = '0;
+      end
+      v_rd   <= (v_we && v_wa == la_v)  ? v_wd : var_mem[la_v];
+      n_rd   <= (n_we && n_wa == la_n1 && !MUT[22]) ? n_wd : node_mem[la_n1];
+      n_rd2  <= (n_we && n_wa == la_n2) ? n_wd : node_mem[la_n2];
+      d_rd   <= dirm[la_d];
+      rn_rd  <= romn[la_rn];
+      rr_rd  <= romr[la_rr];
+    end
+    if (cfg_we && cfg_sel == 2'd0) romn[RB'(cfg_a)] <= cfg_d;
+    if (cfg_we && cfg_sel == 2'd1) romr[RRB'(cfg_a)] <= cfg_d;
+    if (cfg_we && cfg_sel == 2'd2) dirm[DB'(cfg_a)] <= cfg_d;
+  end
 
 `ifndef SYNTHESIS
   // ---------------- debug trace (+trace) ----------------
   bit trace_on;
   initial trace_on = $test$plusargs("trace");
   always @(posedge clk) if (trace_on && !rst && state != S_INIT)
-    $display("c%0d,%0d st=%0d ra=%h rb=%h q=%0d/%0d/%0d top=%h rd=%h m1=%h nf=%0d vf=%0d inter=%0d", X, Y, state, ra, rb, qcnt, qsp, qpend, tq_top, tqm_rd, tqm[1], nf_tot, vf_tot, st_inter);
+    $display("c%0d,%0d st=%0d ra=%h rb=%h sp=%0d%0d q=%0d/%0d nf=%0d vf=%0d inter=%0d", X, Y, state, ra, rb, rsp, rsx, qcnt, qsp, nf_tot, vf_tot, st_inter);
   // ---------------- dump (testbench) ----------------
   always @(posedge clk) begin
     if (dump) begin

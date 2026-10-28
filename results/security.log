@@ -1,2 +1,1 @@
-FAIL mt-fuzz 265 (attacker=0) 2x2 seed=236978724 fi=1: rtl 2x2 status 3
-security tests: 419/420 pass (300 multi-tenant fuzz, 0 rejected) [semantic + fabric + RTL] 47s
+security tests: 420/420 pass (300 multi-tenant fuzz, 0 rejected) [semantic + fabric + RTL] 49s

@@ -4,7 +4,7 @@
 `include "omega_defs.svh"
 module omega_mesh #(
   parameter int W = 2, parameter int H = 2, parameter int SLOTS = 1024, parameter int QDEPTH = 1024,
-  parameter int ROMSZ = 4096, parameter int DIRSZ = 256, parameter int DEPTH = 4,
+  parameter int ROMSZ = 4096, parameter int DIRSZ = 256, parameter int DEPTH = 4, parameter int RDXSZ = 2048,
   parameter logic [255:0] MUT = '0
 ) (
   input  logic        clk, rst,
@@ -34,12 +34,12 @@ module omega_mesh #(
   for (genvar x = 0; x < W; x++) begin : gx
     for (genvar y = 0; y < H; y++) begin : gy
       omega_cell #(.X(x), .Y(y), .W(W), .H(H), .SLOTS(SLOTS), .QDEPTH(QDEPTH), .ROMSZ(ROMSZ),
-                   .DIRSZ(DIRSZ), .DEPTH(DEPTH), .MUT(MUT)) u_cell (
+                   .DIRSZ(DIRSZ), .DEPTH(DEPTH), .RDXSZ(RDXSZ), .MUT(MUT)) u_cell (
         .clk, .rst, .seed, .jitter, .stall, .pmsg, .fi,
         .in_v(iv[x][y]), .in_f(inf[x][y]), .in_rdy(irdy[x][y]),
         .out_v(ov[x][y]), .out_f(of[x][y]), .out_rdy(ordy[x][y]),
         .idle(cidle[x][y]), .hungry(chung[x][y]), .nbr_hungry(nhung[x][y]), .ready(crdy[x][y]), .err(cerr[x][y]), .dump,
-        .cfg_we(1'b0), .cfg_dir(1'b0), .cfg_a(16'd0), .cfg_d(128'd0), .st_inter(cint[x][y]));
+        .cfg_we(1'b0), .cfg_sel(2'd0), .cfg_a(16'd0), .cfg_d(128'd0), .st_inter(cint[x][y]));
       assign nhung[x][y][0] = (y > 0)     ? chung[x][(y > 0) ? y-1 : 0] : 1'b0;
       assign nhung[x][y][1] = (x < W - 1) ? chung[(x < W - 1) ? x+1 : x][y] : 1'b0;
       assign nhung[x][y][2] = (y < H - 1) ? chung[x][(y < H - 1) ? y+1 : y] : 1'b0;

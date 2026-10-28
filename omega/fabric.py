@@ -99,6 +99,7 @@ class Image:
         # book ROM: dir[id] = entry index of header; header = (root, counts); then nodes, then redexes
         self.rom = []
         self.dir = []
+        self.romn, self.romr, self.dir3 = [], [], []
         for dd in book.defs:
             self.dir.append(len(self.rom))
             cnt = len(dd.nodes) | (dd.nvars << 8) | (len(dd.redexes) << 16)
@@ -106,6 +107,9 @@ class Image:
                 raise FabricError(f"definition @{dd.name} too large for one EXPAND "
                                   f"({len(dd.nodes)} nodes / {dd.nvars} vars, limit {XMAP})")
             self.rom.append((dd.root, cnt))
+            self.dir3.append(len(self.romn) | (len(self.romr) << 16) | (cnt << 32) | (dd.root << 64))
+            self.romn += [(a, b) for (_, a, b) in dd.nodes]
+            self.romr += list(dd.redexes)
             for (_, a, b) in dd.nodes:
                 self.rom.append((a, b))
             for a, b in dd.redexes:
@@ -145,9 +149,16 @@ class Image:
         with open(f"{outdir}/rom.hex", "w") as f:
             for a, b in self.rom:
                 f.write(h((b << 64) | a, 32) + "\n")
+        # v3 cell: node template ROM, redex template ROM, directory {root, nr, nv, nn, rbase, nbase}
+        with open(f"{outdir}/romn.hex", "w") as f:
+            for a, b in self.romn:
+                f.write(h((b << 64) | a, 32) + "\n")
+        with open(f"{outdir}/romr.hex", "w") as f:
+            for a, b in self.romr or [(0, 0)]:
+                f.write(h((b << 64) | a, 32) + "\n")
         with open(f"{outdir}/dir.hex", "w") as f:
-            for d in self.dir:
-                f.write(h(d, 4) + "\n")
+            for d in self.dir3:
+                f.write(h(d, 32) + "\n")
         with open(f"{outdir}/rom_size.txt", "w") as f:
             f.write(f"{len(self.rom)} {len(self.dir)}\n")
 

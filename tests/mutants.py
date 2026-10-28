@@ -29,6 +29,11 @@ MUTANTS = {
     19: "security: expansion does not stamp the tenant's owner (ROM owner 0 leaks into tenants)",
     20: "security: forged-var trap is recorded but the access is not blocked",
     21: "security: node slot owner-tag check disabled",
+    22: "v3 read-ahead: write bypass on node read port 1 disabled (stale node data)",
+    23: "v3 S_WQ: leaves after the first queued write (commutation copies / var tags never written)",
+    24: "v3 S_WQ: owner tags of fresh commutation vars not written",
+    25: "v3 EXPAND allocation pops one node slot fewer than it maps (slot aliasing)",
+    26: "v3 EXPAND: template ROM read-ahead lags one entry",
 }
 PROGS = [("fib", 8), ("list", 6), ("sort", 6), ("higher", 5), ("fact", 5), ("treesum", 4), ("qsort", 5), ("sum", 20)]
 
@@ -55,7 +60,7 @@ def try_security(mut):
 
 def try_mutant(bit):
     mut = 1 << bit
-    if bit >= 16:
+    if 16 <= bit <= 21:
         return try_security(mut)
     if bit == 7:
         b = progs.book("treesum_direct", 8)
