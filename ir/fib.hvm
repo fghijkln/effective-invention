@@ -6,4 +6,4 @@
   & @fib ~ (a fa)
   & @fib ~ (q1 fb)
   & fa ~ $(+ fb r)
-@main = r & @fib ~ (#15 r)
+@main = r & @fib ~ (#10 r)
