@@ -78,13 +78,13 @@ def main = tsum(gen(N))
 
 ## Results
 
-### Verification (full regression on step 14: v4 engine + retry slot + spawn threshold / fork hints + local-first link orientation + producer hint / message-budget governor + fork deque; default 2×2 cells per ROM, one port)
+### Verification (full regression on step 15: v4 engine + retry slot + spawn threshold / fork hints + local-first link orientation + producer hint / message-budget governor + fork deque with the step-15 deque hint; default 2×2 cells per ROM, one port)
 
 | suite | result | what it checks |
 |---|---|---|
 | directed rule/unit tests (`tests/test_units.py --rtl`) | **42 / 42** | every rule of the rule table (25 hand-written nets with expected normal form *and* interaction count) + 15 frontend programs (closures, Church numerals, Ackermann, mutual recursion, `match`; nested / literal / default patterns, `let`, a polymorphic helper) + 15 programs the frontend must reject (one check) + IR round trip. Each net runs on the semantic model (random, LIFO, FIFO order), the fabric model and the RTL on 1×1, 2×2, 4×4 with jitter/stalls and scattered loading |
-| program tests (`tests/test_programs.py --fuzz 150`) | **306 / 306** | 9 programs × N = 0..5 (semantic), the step-11 fork hint and the step-13 producer hint of all 9 programs (exactly the divide-and-conquer recursions are fork targets, exactly the data-emitting linear recursions are producers), each program on the fabric model and on RTL 1×1/2×2/4×4 × 2 schedules + a third on 2×2/4×4 (schedule 0: default spawn policy with the governor; schedule 1: the step-10 policy; schedule 2: fixed producer threshold, governor off, so every decision path stays covered), a performance bound (tree sum 4×4 ≥ 3× 1×1), a message bound (qsort(20) and list(40) on 4×4 ≤ 0.6 messages per interaction and no slower than 1×1), and 150 random (program, N, mesh incl. 3×2 and 1×4, seed, jitter, stall, priority, scatter, spawn thresholds, producer threshold, governor budget, link orientation, fork-deque mode) cases; the three fixed schedules run with the step-14 default |
-| step-14 cross-check (`tests/test_s14.py`) | **90 / 90** | fib, treesum, treesum_direct, qsort, list, higher on 2×2 / 4×4 / 3×2 with fork-deque mode 0 / 1 / 2 and the governor relax on (nb5l1) / off: fabric model and RTL both equal the semantic reducer (readback, interactions, RTL node count), and the oldest-fork give happens in *both* models exactly where it should (fork programs in mode 1 and 2, qsort only in mode 1, never in mode 0); the fabric-only knob suite `tests/test_fabric_var.py` (default, mode 1, step 13, s14c) passes 324 / 324 |
+| program tests (`tests/test_programs.py --fuzz 150`) | **315 / 315** | 9 programs × N = 0..5 (semantic), the step-11 fork hint, the step-13 producer hint and the step-15 fork-deque hint (bit 59) of all 9 programs (exactly the divide-and-conquer recursions are fork targets, exactly the data-emitting linear recursions are producers, exactly the numeric non-stream-fed forks go on the deque), each program on the fabric model and on RTL 1×1/2×2/4×4 × 2 schedules + a third on 2×2/4×4 (schedule 0: default spawn policy with the governor; schedule 1: the step-10 policy; schedule 2: fixed producer threshold, governor off, so every decision path stays covered), a performance bound (tree sum 4×4 ≥ 3× 1×1), a message bound (qsort(20) and list(40) on 4×4 ≤ 0.6 messages per interaction and no slower than 1×1), and 150 random (program, N, mesh incl. 3×2 and 1×4, seed, jitter, stall, priority, scatter, spawn thresholds, producer threshold, governor budget, link orientation, fork-deque mode) cases; the three fixed schedules run with the step-14 default |
+| step-14 cross-check (`tests/test_s14.py`) | **90 / 90** | fib, treesum, treesum_direct, qsort, list, higher on 2×2 / 4×4 / 3×2 with fork-deque mode 0 / 1 / 2 and the governor relax on (nb5l1) / off: fabric model and RTL both equal the semantic reducer (readback, interactions, RTL node count), and the oldest-fork give happens in *both* models exactly where it should (fork programs in mode 1 and 2, qsort only in mode 1, never in mode 0); the fabric-only knob suite `tests/test_fabric_var.py` passes 1,782 / 1,782 over all 22 knob configurations (step 15 run; step 14 ran 4 of them, 324 / 324) |
 | RTL differential fuzz, small nets (`tests/fuzz_rtl.py 0 600`) | **600 / 600** | random books (all node kinds, 3 DUP labels, all 16 operators with both flip bits, SWI, REF DAGs) on 1×1, 2×2, 4×4, 3×2, 1×4 with random arbitration seed, link jitter (0–63%), engine stalls, message/task priority, random scatter of `@main` over the cells, random spawn thresholds / fork-hint use (step 11), link orientation (step 12), producer threshold and governor budget 0–200 (step 13), fork-deque mode 0 / 1 / 2 (step 14). Readback, interaction count and live node count must equal the semantic model's (165 diverging nets rejected) |
 | RTL differential fuzz, big nets (`--big`) | **200 / 200** | 3–8 definitions, 20–60 nodes each, deeper trees, more references; only nets with ≥ 30 interactions are kept (avg 375, max 16,239 interactions; 4,088 candidates rejected as diverging or trivial) |
 | owner-capability isolation (`tests/test_security.py --fuzz 300`) | **420 / 420** | 2- and 4-tenant program demos (fib ∥ qsort; treesum ∥ list ∥ sort ∥ higher-order) on 1×1/2×2/4×4/3×2, each tenant gets its known answer with zero traps; 10 attack programs (overwrite / capture the victim's result through a forged root-var pointer, out-of-bounds slot and cell, forged node pointers to the victim's result node, an attack hidden in a lazily expanded definition) and 3 cross-owner fault injections, each with the sender-side check on and off (`fi`); 300 random multi-tenant cases (2–4 random tenants, random owners, half with an attacker carrying random forged redexes); link orientation (step 12) varies with the seed. Semantic model, fabric model and RTL must agree on every honest tenant's result and node count, on the trap set and on the interaction count (SPEC §12) |
@@ -134,6 +134,63 @@ slower than one cell (sum(1000) on 1×1 needs a 4,096-slot cell: 29,018 cycles v
 step 12 the cost was qsort: on meshes it was 16–27% slower than with step 10's eager spreading,
 because its filter chains (lo/hi/app) stayed where they started; step 13 (next section) fixes that. treesum(9)
 on 8×8 varies ±20% with the arbitration seed; over seeds 1–4 the mean is 2,374 vs 2,470 for step 10.
+
+### Data-walking forks stay off the fork deque (step 15)
+
+Step 14 raised treesum(9) on 8×8 from 0.431 to 0.526 messages per interaction (target < 0.5). Per-kind RTL
+counts, 8 seeds (`results/s15/ref14/`: `+s14=0` and step 14's bit 59 re-run on the same binary, which
+reproduces `results/s14/final_8x8.jsonl` cycle for cycle):
+
+| treesum(9) 8×8, mean of 8 seeds | LINK | NODE | SPAWN | total | oldest-fork gives | msgs/int |
+|---|---:|---:|---:|---:|---:|---:|
+| step 13 (`+s14=0`) | 4,116 | 2,538 | 1,280 | 7,934 | – | 0.431 |
+| step 14 | 5,049 | 2,969 | 1,666 | 9,684 | 1,543 | 0.526 |
+| **step 15** | 4,325 | 2,825 | 1,433 | **8,583** | 909 | **0.466** |
+
+* **Root cause: gives of `tsum` tasks.** In mode 2 the deque took every fork definition that is not
+  stream-fed, and treesum's fork SCCs are `gen` (builds the tree) *and* `tsum` (walks it). A `tsum` task is
+  `REF ~ CON(tree, ret)`; giving the oldest one hands the walk to a neighbour while the tree it matches on
+  stays at the giver, so the first match step goes back as a LINK, the tree node migrates (NODE), and so on
+  down the subtree, plus the result wire. Leaving `tsum` off the deque removes 634 of the 1,543 gives and
+  1,101 of the 1,750 extra messages (≈ 1.7 messages per `tsum` give). The other candidates do not show up:
+  a give is never retried (it happens only with outbox room and a hungry neighbour; otherwise the task is
+  just popped later), and the deque push / pop never leaves the cell. The remaining +649 messages over
+  step 13 come from `gen` gives: those subtrees are built on the receiver, and part of the walk follows them.
+* **Fix: a narrower directory bit 59 (loader only, no RTL change).** A fork SCC is *data-walking* when one
+  of its templates takes its first argument apart as a Scott value (the root's argument var meets a CON node
+  in a template redex: treesum's `tsum`, `qs`); a numeric fork switches or computes on its argument (fib,
+  gen, the direct tsum). Bit 59 now marks forks that are neither stream-fed nor data-walking. The RTL reads
+  the bit into the same per-cell hint vector as in step 14, so the cell, its area and its timing are
+  unchanged; `OMEGA_DQF_DATA=1` (fabric model and `omega/rtl.py`) restores step 14's bit. Screened first on
+  the fabric model (`bench/probe15.py`: treesum(9) 8×8 0.454 → 0.417, 4×4 0.147 → 0.107 msgs/int).
+  `tests/test_programs.py` checks the bit for all 9 programs.
+
+RTL, Verilator, arbitration seeds 1–8, default configuration (`results/s15/final_*.jsonl`, `ts_8x8.jsonl`,
+`bench/table15.py` → `results/s15/table15.md`; every run checked against the semantic reducer):
+
+| program | mesh | step 14 cycles mean (sd / range) | **step 15 cycles mean (sd / range)** | Δ mean | step 14 msgs/int | **step 15 msgs/int** |
+|---|---|---:|---:|---:|---:|---:|
+| qsort(40) | 4×4 | 11,454 (801 / 2,345) | **11,454** (801 / 2,345) | 0 | 0.390 | **0.390** |
+| list(120) | 4×4 | 8,396 (541 / 1,576) | **8,396** (541 / 1,576) | 0 | 0.389 | **0.389** |
+| sum(1000) | 4×4 | 28,952 (22 / 75) | **28,952** (22 / 75) | 0 | 0.022 | **0.022** |
+| sort(20) | 4×4 | 5,988 (207 / 618) | **5,988** (207 / 618) | 0 | 0.306 | **0.306** |
+| higher(100) | 4×4 | 7,633 (226 / 728) | **7,633** (226 / 728) | 0 | 0.330 | **0.330** |
+| fib(20) | 4×4 | 46,272 (402 / 1,208) | **46,272** (402 / 1,208) | 0 | 0.025 | **0.025** |
+| treesum(9) | 4×4 | 3,970 (149 / 397) | **3,994** (152 / 481) | +0.6% | 0.167 | **0.159** |
+| treesum_direct(14) | 4×4 | 35,205 (162 / 398) | **35,205** (162 / 398) | 0 | 0.021 | **0.021** |
+| qsort(40) | 8×8 | 10,844 (816 / 2,054) | **10,844** (816 / 2,054) | 0 | 0.405 | **0.405** |
+| list(120) | 8×8 | 8,406 (195 / 486) | **8,406** (195 / 486) | 0 | 0.403 | **0.403** |
+| sum(1000) | 8×8 | 28,962 (35 / 92) | **28,962** (35 / 92) | 0 | 0.022 | **0.022** |
+| sort(20) | 8×8 | 6,054 (186 / 523) | **6,054** (186 / 523) | 0 | 0.304 | **0.304** |
+| higher(100) | 8×8 | 7,800 (98 / 320) | **7,800** (98 / 320) | 0 | 0.348 | **0.348** |
+| fib(20) | 8×8 | 16,626 (1,199 / 3,691) | **16,626** (1,199 / 3,691) | 0 | 0.156 | **0.156** |
+| treesum(9) | 8×8 | 2,255 (209 / 522) | **2,126** (173 / 521) | **−5.7%** | 0.526 | **0.466** |
+| treesum_direct(14) | 8×8 | 12,846 (527 / 1,217) | **12,846** (527 / 1,217) | 0 | 0.209 | **0.209** |
+
+* treesum(9) 8×8: below 0.5 msgs/interaction again and 5.7% faster than step 14 (11.2% faster than step
+  13's 2,395). Every program whose bit 59 did not change (all but treesum) runs cycle for cycle as in step 14,
+  so the step-14 gains on fib and treesum_direct are kept exactly. treesum(9) on 4×4 is +0.6% (24 cycles,
+  within one seed's spread; range 3,777–4,258) at fewer messages (0.167 → 0.159).
 
 ### Fork deque and oldest-fork give (step 14)
 
@@ -701,7 +758,7 @@ What this says:
     closure) is classed strict. The adaptive part is a per-cell message budget, not a per-definition
     measurement: per-definition granularity counters were tried and rejected (README step 13). The
     governor reacts after 32 interactions, so very short programs run at the reset level. treesum(9)
-    on 8×8 still varies with the arbitration seed (step 13: 2,017–2,792 over seeds 1–8; step 14: 1,984–2,506), list(120) on 2×2 is 0.7% slower
+    on 8×8 still varies with the arbitration seed (step 13: 2,017–2,792 over seeds 1–8; step 14: 1,984–2,506; step 15: 1,914–2,435), list(120) on 2×2 is 0.7% slower
     than step 12 (within seed noise), and every policy number is for programs of this suite only.
     Going from 4×4 to 8×8 does not help the low-parallel programs: sort(20) 5,910 → 6,004 (+1.6%) and
     higher(100) 7,605 → 7,780 (+2.3%) cycles, higher's msgs/interaction 0.320 → 0.347 (mean of 4 seeds);
@@ -714,8 +771,9 @@ What this says:
     RTL by up to 9.8% (and pushes higher(100) 4×4 to 0.52 msgs/interaction), and the milder k = 3 gains
     nothing, so it ships as a knob (`+govnb`, `+govl0`), default off. The RTL does not reproduce the
     fabric model's variance result in full: treesum(9) 8×8 sd −23% (fabric −59%), fib(20) 8×8 sd +34%
-    (though every seed is faster than the step-13 mean), and treesum(9) 8×8 rises from 0.43 to 0.53
-    msgs/interaction. The low-parallel programs (qsort, list, sort, higher, sum) gain nothing from step
+    (though every seed is faster than the step-13 mean). treesum(9) 8×8's rise from 0.43 to 0.53
+    msgs/interaction is fixed in step 15 (0.466: data-walking forks stay off the deque); its remaining +8% over
+    step 13 comes from `gen` gives, whose subtrees the walk partly follows. The low-parallel programs (qsort, list, sort, higher, sum) gain nothing from step
     14. The area figure is an estimate (≈ 8% of the cell's standard-cell part, not synthesised).
 
 ## Next steps (suggested)
@@ -729,8 +787,9 @@ What this says:
    to off-fabric memory.
 4. Bigger language: signed numbers, strings, `fold`/`bend`, parameterised data types; a TACHYON-128 host
    interface (DMA of graph images, result readback).
-5. Fork deque: narrower entries (`{REF label, owner, x}`, 76 b) and one hint vector; a locality test for
-   giving data-carrying fork tasks (treesum's `tsum` raises msgs/interaction); a governor signal that
+5. Fork deque: narrower entries (`{REF label, owner, x}`, 76 b) and one hint vector; a dynamic locality
+   test (give a data-walking task when its argument has already left the cell) instead of step 15's static
+   bit; a governor signal that
    separates "neighbour idle because the program is sequential" from "neighbour starving", so the relax
    helps qsort without hurting list / higher.
 6. Spawn policy: ship the partner node with a SPAWN when it lives at the sender (the expanded root
