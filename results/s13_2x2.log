@@ -1,0 +1,6 @@
+{"prog": "qsort(40)", "mesh": "2x2", "cfg": [16, 4, 16, 0], "seed": 1, "ok": true, "cycles": 18925, "inter": 13855, "mpi": 0.3105, "util": 0.6248, "msgs": {"msg_link": 2649, "msg_node": 1461, "msg_spawn": 192}, "wall": 45.7}
+{"prog": "qsort(40)", "mesh": "2x2", "cfg": [16, 4, 4, 0], "seed": 1, "ok": true, "cycles": 15550, "inter": 13855, "mpi": 0.338, "util": 0.7719, "msgs": {"msg_link": 2897, "msg_node": 1600, "msg_spawn": 186}, "wall": 0.1}
+{"prog": "qsort(40)", "mesh": "2x2", "cfg": [16, 4, 4, 50], "seed": 1, "ok": true, "cycles": 15264, "inter": 13855, "mpi": 0.3218, "util": 0.784, "msgs": {"msg_link": 2740, "msg_node": 1523, "msg_spawn": 195}, "wall": 0.1}
+{"prog": "sum(1000)", "mesh": "2x2", "cfg": [16, 4, 16, 0], "seed": 1, "ok": true, "cycles": 29011, "inter": 13008, "mpi": 0.0223, "util": 0.244, "msgs": {"msg_link": 174, "msg_node": 58, "msg_spawn": 58}, "wall": 0.1}
+{"prog": "sum(1000)", "mesh": "2x2", "cfg": [16, 4, 4, 0], "seed": 1, "ok": true, "cycles": 29011, "inter": 13008, "mpi": 0.0223, "util": 0.244, "msgs": {"msg_link": 174, "msg_node": 58, "msg_spawn": 58}, "wall": 0.2}
+{"prog": "sum(1000)", "mesh": "2x2", "cfg": [16, 4, 4, 50], "seed": 1, "ok": true, "cycles": 29011, "inter": 13008, "mpi": 0.0223, "util": 0.244, "msgs": {"msg_link": 174, "msg_node": 58, "msg_spawn": 58}, "wall": 0.2}

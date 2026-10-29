@@ -78,6 +78,8 @@ so allocation needs no initialisation write.
 and `nr` redex entries `{b, a}`. Template ports carry local indices in their payload: `VAR i` means
 fresh var *i*, and `CON j` etc. mean fresh node *j*. The ROM is a table of graph templates, comparable
 to a microcode/constant ROM. It is never fetched sequentially and holds no control flow.
+The per-cell directory word also carries the loader's spawn hints (§5): bit 56 fork, bit 57 rec,
+bit 58 prod (step 13).
 
 ### 2.5 Text IR (HVM2 style)
 ```
@@ -216,6 +218,27 @@ Correctness argument (also checked by fuzzing):
   cell below K ≈ 12), spawn_k2 the one for constructors (treesum(9) 8×8, mean of 4 seeds: 2,178
   cycles with K2 = no threshold, 2,374 with 4, 2,646 with 2; qsort/list exceed 0.5 msgs/interaction
   with no threshold).
+* **Producer recursions and the message-budget governor (step 13).** Measuring the granularity of
+  handed-out work per definition does not separate the cases that matter (`results/gran13_probes.md`):
+  a spawned job almost never runs where it lands (its root meets a partner that lives at the sender
+  and migrates straight back), and the job of a strict counter (`sum`) and that of a list generator
+  (`rnd`, `range`) look the same at the receiver. Two adaptive schemes built on such counters were
+  rejected (run length: positive feedback relaxes the strict chain; data affinity: unsampled cells
+  start optimistic). What separates them is the call graph: the loader marks bit 58 **prod** on every
+  linear recursion (rec, not fork) whose SCC calls a non-recursive definition outside the SCC (a
+  constructor or a lifted arm), i.e. a recursion that emits a data structure piece by piece (rnd, lo,
+  hi, app, range, map, insert). Its consumer can work on the head while the tail is being made, and
+  the pieces stay spread over the cells that made them. Strict recursions (sum, fact, check, lsum,
+  foldr into an operator) only feed their own pending operators. A producer REF is given while more
+  than `kp_eff` tasks wait; strict recursions keep `spawn_k`, non-recursive definitions `spawn_k2`.
+  `kp_eff` = `spawn_kp` (`+spawnkp`, default 4, 255 = always) unless the per-cell **message-budget
+  governor** is on (`+govb` = budget B in messages per 100 interactions, 0 = off, default off): a
+  3-bit level (reset 2) selects `kp_eff` = 0 / 2 / 4 / 8 / 16; after every epoch of 32 interactions the
+  cell compares the messages it sent in the epoch (saturating 8-bit count) with B: more than B per 100
+  interactions moves the level up (tighter), less than half moves it down. Cost: 6 + 8 + 3 flip-flops,
+  a 32-bit copy of the interaction counter and two constant multiplies per cell; the decision stays in
+  S_LINK. Fork and non-recursive definitions are untouched, so fib and both tree sums run exactly as in
+  step 12.
 * **Memory pressure (step 4).** Each cell also drives a 1-bit `roomy` wire: free node slots and free
   var slots both ≥ SLOTS/4 sets it, either < SLOTS/8 clears it (hysteresis, so the wire does not
   toggle on every allocation). `hungry` additionally requires `roomy`, so a full cell never asks for

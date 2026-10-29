@@ -51,6 +51,8 @@ module omega_cell #(
   input  logic [7:0]  spawn_k,             // step 11 spawn policy (configuration, SPEC 5): threshold K for linear recursions, 255 = always
   input  logic        spawn_hint,          //   and use of the fork / recursion hints (directory bits 56 / 57)
   input  logic [7:0]  spawn_k2,            //   threshold for non-recursive definitions (255 = always)
+  input  logic [7:0]  spawn_kp,            // step 13: threshold for producer recursions (directory bit 58; 255 = always)
+  input  logic [7:0]  gov_b,               //   message-budget governor: messages per 100 interactions (0 = off: spawn_kp)
   input  logic        link_local,          // step 12: local-first orientation of var ~ var links
   input  logic [3:0]  in_v,
   input  flit_t [3:0] in_f,
@@ -336,12 +338,27 @@ module omega_cell #(
   // stack; any other (non-recursive: constructors, arms) while more than spawn_k2 wait (255 = no
   // threshold).  Without spawn_hint every REF uses spawn_k.  The directory word d_rd of the REF in dQ is read ahead, so the
   // decision is known in S_LINK.
+  // Step 13 (SPEC 5.2): a producer recursion (directory bit 58: a linear recursion whose templates call
+  // a constructor or another non-recursive definition, i.e. it emits a data structure piece by piece)
+  // uses its own threshold kp_eff; strict linear recursions keep spawn_k.  With the governor on
+  // (gov_b != 0) kp_eff is 0 / 2 / 4 / 8 / 16 by the 3-bit level gv_lvl (reset 2), which the cell moves
+  // after every epoch of 32 interactions: up (tighter) when it sent more than gov_b messages per 100
+  // interactions in the epoch, down (looser) when it sent less than half of that.
+  logic [2:0]  gv_lvl;
+  logic [5:0]  ep_i;
+  logic [7:0]  ep_m;
+  logic [31:0] gv_pi;
+  logic [7:0]  kp_eff;
   logic sp_give;
-  always_comb
+  always_comb begin
+    kp_eff = (gov_b != 8'd0) ? ((gv_lvl == 3'd0) ? 8'd0 : (8'd1 << gv_lvl)) : spawn_kp;
     sp_give = hv_found && can_send && !MUT[7] &&
               (MUT[42] || (spawn_hint && d_rd[56] && !MUT[43]) ||
-               ((!spawn_hint || d_rd[57]) ? (spawn_k == 8'hFF || 32'(tq_tot) > 32'(spawn_k))
-                                          : (spawn_k2 == 8'hFF || 32'(tq_tot) > 32'(spawn_k2))));
+               ((!spawn_hint || d_rd[57])
+                  ? ((spawn_hint && d_rd[58] && !MUT[45]) ? (kp_eff == 8'hFF || 32'(tq_tot) > 32'(kp_eff))
+                                                         : (spawn_k == 8'hFF || 32'(tq_tot) > 32'(spawn_k)))
+                  : (spawn_k2 == 8'hFF || 32'(tq_tot) > 32'(spawn_k2))));
+  end
 
   // translation of a template port during EXPAND (stamps the expanding owner, relocates via the maps)
   // (nmap / vmap entries are looked up by the caller: functions may not read module arrays in Yosys)
@@ -452,6 +469,7 @@ module omega_cell #(
       wq_n <= '0; vq_n <= '0; bufok <= 1'b0; rom_v <= 1'b0; rsp <= 1'b0; rsx <= 1'b0; rfw <= 1'b0; ej_taken <= 1'b0;
       roomy <= 1'b0; mrot <= 2'(X + Y + 1);
       rs_v <= 1'b0; rs_e <= '0; rs_tm <= '0; rs_n <= '0; cur_rs <= 1'b0; cur_rsn <= '0; st_park <= '0;
+      gv_lvl <= 3'd2; ep_i <= '0; ep_m <= '0; gv_pi <= '0;
       ncnt <= '0; nsp <= '0; npend <= 1'b0;
       vcnt <= '0; vsp <= '0; vpend <= 1'b0;
       qcnt <= '0; qsp <= (QB+1)'(qinit[0]); qpend <= 1'b0;
@@ -892,6 +910,25 @@ module omega_cell #(
         end
         if (pop) ob_hd <= ob_hd + 1'b1;
         ob_cnt <= ob_cnt + (OB+1)'(snd) - (OB+1)'(pop);
+      end
+      begin   // step 13 message-budget governor (one interaction and one send at most per cycle)
+        logic [5:0] gi;
+        logic [7:0] gm;
+        gi = ep_i + 6'(st_inter != gv_pi);
+        gm = (ep_m == 8'hFF) ? ep_m : ep_m + 8'(snd);
+        gv_pi <= st_inter;
+        if (gov_b == 8'd0) begin
+          ep_i <= '0; ep_m <= '0;
+        end else if (gi == 6'd32) begin
+          if (32'd100 * 32'(gm) > 32'd32 * 32'(gov_b)) begin
+            if (gv_lvl != 3'd4 && !MUT[46]) gv_lvl <= gv_lvl + 3'd1;
+          end else if (32'd200 * 32'(gm) < 32'd32 * 32'(gov_b)) begin
+            if (gv_lvl != 3'd0) gv_lvl <= gv_lvl - 3'd1;
+          end
+          ep_i <= '0; ep_m <= '0;
+        end else begin
+          ep_i <= gi; ep_m <= gm;
+        end
       end
       state <= nst; ra <= nra; rb <= nrb; rsp <= nrsp; rsx <= nrsx; rfw <= nrfw;
       vh_v <= nvh_v; vh_a <= nvh_a; vh_b <= nvh_b;

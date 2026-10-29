@@ -34,6 +34,9 @@ def case(i, mut=0, big=False):
     sp = random.Random(i * 104729 + 7)
     knobs["spawn"] = (sp.choice([-1, 0, 1, 3, 8, 8, 32]), sp.choice([0, 1, 1]))
     knobs["link_local"] = sp.choice([0, 1, 1])        # step 12 local-first link orientation
+    # step 13 producer threshold and message-budget governor (own stream again)
+    s13 = random.Random(i * 15485863 + 13)
+    knobs["spawn"] += (fabric.SPAWN_K2, s13.choice([-1, 0, 2, 4, 4, 16]), s13.choice([0, 0, 10, 50, 200]))
     r = rtl.run(b, W, H, img=img, mut=mut, maxcycles=2_000_000, **knobs)
     ok = (r["readback"] == ref["readback"] and r["interactions"] == ref["interactions"]
           and r["node_count"] == ref["nodes"] and r["status"] == 0)

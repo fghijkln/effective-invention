@@ -78,17 +78,17 @@ def main = tsum(gen(N))
 
 ## Results
 
-### Verification (full regression on steps 11–12: v4 engine + retry slot + sender-side spawn threshold / fork hints + local-first link orientation; default 2×2 cells per ROM, one port)
+### Verification (full regression on step 13: v4 engine + retry slot + spawn threshold / fork hints + local-first link orientation + producer hint / message-budget governor; default 2×2 cells per ROM, one port)
 
 | suite | result | what it checks |
 |---|---|---|
 | directed rule/unit tests (`tests/test_units.py --rtl`) | **42 / 42** | every rule of the rule table (25 hand-written nets with expected normal form *and* interaction count) + 15 frontend programs (closures, Church numerals, Ackermann, mutual recursion, `match`; nested / literal / default patterns, `let`, a polymorphic helper) + 15 programs the frontend must reject (one check) + IR round trip. Each net runs on the semantic model (random, LIFO, FIFO order), the fabric model and the RTL on 1×1, 2×2, 4×4 with jitter/stalls and scattered loading |
-| program tests (`tests/test_programs.py --fuzz 150`) | **279 / 279** | 9 programs × N = 0..5 (semantic), the step-11 fork hint of all 9 programs (exactly the divide-and-conquer recursions are fork targets), each program on the fabric model and on RTL 1×1/2×2/4×4 × 2 schedules (schedule 0: default spawn policy and link orientation; schedule 1: the step-10 policy, so both decision paths stay covered), a performance bound (tree sum 4×4 ≥ 3× 1×1), a message bound (qsort(20) and list(40) on 4×4 ≤ 0.6 messages per interaction and no slower than 1×1), and 150 random (program, N, mesh incl. 3×2 and 1×4, seed, jitter, stall, priority, scatter, spawn thresholds, link orientation) cases |
-| RTL differential fuzz, small nets (`tests/fuzz_rtl.py 0 600`) | **600 / 600** | random books (all node kinds, 3 DUP labels, all 16 operators with both flip bits, SWI, REF DAGs) on 1×1, 2×2, 4×4, 3×2, 1×4 with random arbitration seed, link jitter (0–63%), engine stalls, message/task priority, random scatter of `@main` over the cells, random spawn thresholds / fork-hint use (step 11) and link orientation (step 12). Readback, interaction count and live node count must equal the semantic model's (165 diverging nets rejected) |
+| program tests (`tests/test_programs.py --fuzz 150`) | **306 / 306** | 9 programs × N = 0..5 (semantic), the step-11 fork hint and the step-13 producer hint of all 9 programs (exactly the divide-and-conquer recursions are fork targets, exactly the data-emitting linear recursions are producers), each program on the fabric model and on RTL 1×1/2×2/4×4 × 2 schedules + a third on 2×2/4×4 (schedule 0: default spawn policy with the governor; schedule 1: the step-10 policy; schedule 2: fixed producer threshold, governor off, so every decision path stays covered), a performance bound (tree sum 4×4 ≥ 3× 1×1), a message bound (qsort(20) and list(40) on 4×4 ≤ 0.6 messages per interaction and no slower than 1×1), and 150 random (program, N, mesh incl. 3×2 and 1×4, seed, jitter, stall, priority, scatter, spawn thresholds, producer threshold, governor budget, link orientation) cases |
+| RTL differential fuzz, small nets (`tests/fuzz_rtl.py 0 600`) | **600 / 600** | random books (all node kinds, 3 DUP labels, all 16 operators with both flip bits, SWI, REF DAGs) on 1×1, 2×2, 4×4, 3×2, 1×4 with random arbitration seed, link jitter (0–63%), engine stalls, message/task priority, random scatter of `@main` over the cells, random spawn thresholds / fork-hint use (step 11), link orientation (step 12), producer threshold and governor budget 0–200 (step 13). Readback, interaction count and live node count must equal the semantic model's (165 diverging nets rejected) |
 | RTL differential fuzz, big nets (`--big`) | **200 / 200** | 3–8 definitions, 20–60 nodes each, deeper trees, more references; only nets with ≥ 30 interactions are kept (avg 375, max 16,239 interactions; 4,088 candidates rejected as diverging or trivial) |
 | owner-capability isolation (`tests/test_security.py --fuzz 300`) | **420 / 420** | 2- and 4-tenant program demos (fib ∥ qsort; treesum ∥ list ∥ sort ∥ higher-order) on 1×1/2×2/4×4/3×2, each tenant gets its known answer with zero traps; 10 attack programs (overwrite / capture the victim's result through a forged root-var pointer, out-of-bounds slot and cell, forged node pointers to the victim's result node, an attack hidden in a lazily expanded definition) and 3 cross-owner fault injections, each with the sender-side check on and off (`fi`); 300 random multi-tenant cases (2–4 random tenants, random owners, half with an attacker carrying random forged redexes); link orientation (step 12) varies with the seed. Semantic model, fabric model and RTL must agree on every honest tenant's result and node count, on the trap set and on the interaction count (SPEC §12) |
 | memory pressure (`tests/test_mempress.py`) | **43 / 43** | cell (0,0) pre-filled with foreign ballast so only 4–30 slots are free (30 cases), small-cell capacity cases (5), **global pressure (step 10, 5 cases): every cell except the far corner holds ballast (8 free node / 8 free var slots), so the room is up to 6 hops away** (fib(12) 3×3, treesum(6) 3×3, list(20) 3×2, qsort(15) 4×4, sort(10) 3×3), security fuzz case 265 — semantic model, fabric model and RTL must agree; **2 overfull cases** (the whole 2×2 fabric too small) must end in status 3 without a wrong answer |
-| mutation testing (`tests/mutants.py`) | **45 / 45 caught** | 15 functional mutants of the rule logic / protocol / quiescence + 1 performance mutant (no work distribution, caught by the speed-up bound) + 6 security mutants (each owner-capability check disabled, owner stamping missing, trap not blocking). Two mutants (eraser reaches only aux1; REF~DUP expands instead of copying) produce the *right* answer and are caught only by the node count / interaction count. That is why all three observables are compared. + 5 v3 engine mutants (read-ahead write bypass, write-queue drain, var owner-tag queue, allocation pop count, ROM read-ahead) + 2 memory-pressure mutants (caught by `tests/test_mempress.py`) + 3 cluster-ROM mutants (grant beyond the port count, EXPAND not waiting for its template word, stale buffered word) + 7 v4 mutants (second node write port not bypassed into the read-ahead, second EXPAND entry's var tag to the wrong slot, EXPAND skipping an entry, VHU without the same-slot stall, VHU hand-back never taken, VHU disabled = performance mutant caught by a fib(12) cycle bound, VHU read-ahead without bypass of write port 1) + 3 retry-slot mutants (39 parked retry never taken, 40 quiescence ignores the slot, 41 no escalation). Mutant 27 (roomy offload disabled) now survives on its own, because escalation also rescues every pressure case (roomy offload became a fast path); it is run together with 41 and caught. + 3 step-11/12 performance mutants, each caught by its own bound: 42 spawn threshold ignored (qsort(20) 4×4 > 0.6 messages per interaction), 43 fork hint ignored (fib(12) 4×4 > 1.3× slower), 44 local-first link orientation disabled (treesum(7) 4×4 > 1.3× more LINKs) |
+| mutation testing (`tests/mutants.py`) | **47 / 47 caught** | 15 functional mutants of the rule logic / protocol / quiescence + 1 performance mutant (no work distribution, caught by the speed-up bound) + 6 security mutants (each owner-capability check disabled, owner stamping missing, trap not blocking). Two mutants (eraser reaches only aux1; REF~DUP expands instead of copying) produce the *right* answer and are caught only by the node count / interaction count. That is why all three observables are compared. + 5 v3 engine mutants (read-ahead write bypass, write-queue drain, var owner-tag queue, allocation pop count, ROM read-ahead) + 2 memory-pressure mutants (caught by `tests/test_mempress.py`) + 3 cluster-ROM mutants (grant beyond the port count, EXPAND not waiting for its template word, stale buffered word) + 7 v4 mutants (second node write port not bypassed into the read-ahead, second EXPAND entry's var tag to the wrong slot, EXPAND skipping an entry, VHU without the same-slot stall, VHU hand-back never taken, VHU disabled = performance mutant caught by a fib(12) cycle bound, VHU read-ahead without bypass of write port 1) + 3 retry-slot mutants (39 parked retry never taken, 40 quiescence ignores the slot, 41 no escalation). Mutant 27 (roomy offload disabled) now survives on its own, because escalation also rescues every pressure case (roomy offload became a fast path); it is run together with 41 and caught. + 3 step-11/12 performance mutants, each caught by its own bound: 42 spawn threshold ignored (qsort(20) 4×4 > 0.6 messages per interaction), 43 fork hint ignored (fib(12) 4×4 > 1.3× slower), 44 local-first link orientation disabled (treesum(7) 4×4 > 1.3× more LINKs) + 2 step-13 performance mutants: 45 producer hint ignored (qsort(30) 4×4 > 1.15× slower: 11,383 vs 9,118 cycles), 46 governor never tightens (qsort(30) 4×4 > 1.15× more messages per interaction: 0.529 vs 0.398) |
 
 Strong confluence is the test oracle. Any schedule (arbitration, delays, stalls, task/message priority,
 initial placement) must produce exactly the same normal form, the same number of interactions and the
@@ -129,10 +129,76 @@ Seed 1, 1024-slot cells, cluster ROM 2×2:1 (`results/bench_msgs.md`; base = ste
 | treesum_direct(14) | 16,914 → 13,983 (−17.3%) | 37.3× | 0.317 → 0.198 | 59% → 67% | 36,354 → 36,608 | 0.046 → 0.047 |
 
 All three low-parallel programs are below 0.5 messages per interaction on 2×2, 4×4 and 8×8 and no
-slower than one cell (sum(1000) on 1×1 needs a 4,096-slot cell: 29,018 cycles vs 28,943 on 8×8). The
-cost is qsort: on meshes it is 16–27% slower than with step 10's eager spreading, because its filter
-chains (lo/hi/app) now stay where they start; it is still 2.3–2.8× faster than one cell. treesum(9)
+slower than one cell (sum(1000) on 1×1 needs a 4,096-slot cell: 29,018 cycles vs 28,943 on 8×8). In
+step 12 the cost was qsort: on meshes it was 16–27% slower than with step 10's eager spreading,
+because its filter chains (lo/hi/app) stayed where they started; step 13 (next section) fixes that. treesum(9)
 on 8×8 varies ±20% with the arbitration seed; over seeds 1–4 the mean is 2,374 vs 2,470 for step 10.
+
+### Producer recursions and an adaptive message budget (step 13)
+
+Step 12 held every linear recursion back until more than 16 tasks waited, which kept sum(1000) as fast
+as one cell but left qsort's filters and its input generator where they started: qsort(40) on 8×8 was
+24% slower than with step 10's eager spreading. Step 13 asked for thresholds that adapt to the
+measured granularity of each definition. What the measurements showed (`results/gran13_probes.md`):
+
+* **Granularity per definition does not separate the cases that matter.** A handed-out job almost
+  never runs where it lands: its root meets a partner that lives at the sender and migrates straight
+  back (≈ 1 NODE per job, ≈ 0 interactions at the receiver). The job of the strict counter `sum` and
+  that of the list generator `rnd` look the same at the receiver, yet giving `rnd` makes qsort faster
+  *and* cheaper (fabric ablation: −14% cycles, msgs/interaction 0.43 → 0.41), while giving `sum` only
+  adds a hop to its critical path.
+* **Two adaptive per-definition schemes were built and rejected** (fabric model, code kept in
+  `bench/experiments/`): 2-bit run-length counters (positive feedback: once relaxed, a strict chain
+  stays longer at each receiver and learns "coarse"; sum 8×8 +12% cycles, 0.05 → 0.27 msgs/int) and
+  data-affinity counters that credit a job when consumers migrate to the data it left behind (neutral
+  start: nothing gets sampled; optimistic start: every fresh cell on a chain's path relaxes sum too).
+
+What was built (SPEC §5 "Producer recursions and the message-budget governor", mirrored in
+`omega/fabric.py`; all knobs are mesh configuration inputs, one build serves every setting):
+
+* **Producer hint (loader, directory bit 58).** A linear recursion is a *producer* when its SCC calls
+  a non-recursive definition outside the SCC (a constructor or a lifted arm): it emits a data
+  structure piece by piece (rnd, lo, hi, app, range, map, insert). Its consumer can work on the head
+  while the tail is being made, and the pieces stay spread over the cells that made them. Strict
+  recursions (sum, fact, check, lsum, a fold into an operator) keep `spawn_k` = 16. Fork and
+  non-recursive definitions are unchanged, so fib and both tree sums run cycle for cycle as in step 12.
+* **Message-budget governor (per cell, adaptive).** A producer REF is given while more than `kp_eff`
+  tasks wait. A 3-bit level (reset 2) selects `kp_eff` = 0 / 2 / 4 / 8 / 16; after every 32
+  interactions the cell compares the messages it sent in that epoch with the budget `gov_b` = 30 per
+  100 interactions: above it, one level tighter; below half of it, one level looser. With
+  `+govb=0` the fixed `spawn_kp` (default 4) is used instead. Cost per cell: 17 flip-flops, a copy of
+  the interaction counter and two constant comparisons; the decision stays in S_LINK.
+
+RTL, Verilator, mean of arbitration seeds 1–4 (`results/s13_*.jsonl`, `bench/sweep13.py`,
+`bench/table13.py`; step 12 = `spawn_kp` = 16, which reproduces the step-12 cycle counts exactly):
+
+| program | mesh | step 12 cycles | **step 13 cycles** | change | step 12 msgs/int | **step 13 msgs/int** | util 12 → 13 | step 13 vs 1×1 |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| qsort(40) | 2×2 | 18,318 | **15,448** | −15.7% | 0.300 | **0.295** | 64% → 77% | 2.78× |
+| qsort(40) | 4×4 | 15,286 | **11,789** | −22.9% | 0.377 | **0.390** | 20% → 26% | 3.64× |
+| qsort(40) | 8×8 | 15,006 | **10,742** | −28.4% | 0.382 | **0.403** | 5.0% → 7.0% | 3.99× |
+| list(120) | 2×2 | 9,947 | **10,016** | +0.7% | 0.290 | **0.341** | 52% → 52% | 1.90× |
+| list(120) | 4×4 | 9,313 | **8,162** | −12.4% | 0.403 | **0.387** | 14% → 16% | 2.33× |
+| list(120) | 8×8 | 9,301 | **8,410** | −9.6% | 0.413 | **0.403** | 3.5% → 3.9% | 2.26× |
+| sum(1000) | 2×2 / 4×4 / 8×8 | 28,982 / 28,944 / 28,940 | **unchanged** | 0 | 0.022 | **0.022** | – | 1.00× |
+| sort(20) | 2×2 | 7,800 | **6,791** | −12.9% | 0.244 | **0.284** | 45% → 52% | 1.92× |
+| sort(20) | 4×4 | 7,292 | **5,910** | −19.0% | 0.226 | **0.308** | 12% → 15% | 2.21× |
+| higher(100) | 2×2 | 7,668 | **7,420** | −3.2% | 0.297 | **0.291** | 43% → 44% | 1.65× |
+| higher(100) | 4×4 | 8,027 | **7,605** | −5.3% | 0.396 | **0.320** | 10% → 11% | 1.61× |
+| fib(20) | 8×8 | 18,550 | **18,550** | 0 | 0.146 | 0.146 | 63% | – |
+| treesum(9) | 8×8 | 2,374 | **2,374** | 0 | 0.419 | 0.419 | 39% | – |
+| treesum_direct(14) | 8×8 | 15,057 | **15,057** | 0 | 0.224 | 0.224 | 63% | – |
+
+* **qsort(40) on 8×8: 10,742 cycles, 12% faster than step 10 (12,270 seed 1 / 12,393 mean) at 0.40
+  instead of 1.69 messages per interaction.** Every low-parallel program stays below 0.5 messages per
+  interaction and no slower than one cell on 2×2, 4×4 and 8×8.
+* Pareto choice for the producer threshold (8×8 means): fixed `spawn_kp` = 2: qsort 10,015 / 0.532
+  (over budget); fixed 4: 10,472 / 0.484 (seed 3 at 0.496, no margin); **governor 30: 10,742 / 0.403
+  (default)**; governor 40: 10,749 / 0.427; governor 60: 10,582 / 0.512; fixed 8: 12,807 / 0.419;
+  fixed 16 (step 12): 15,006 / 0.382. The governor costs up to 9% on qsort 4×4 against the fixed 4
+  (11,789 vs 10,765) and buys a constant ≈ 0.40 msgs/interaction on every mesh.
+* fib(20), treesum(9) and treesum_direct(14) have no producer definitions and run cycle for cycle as in
+  step 12 (every seed identical).
 
 ### Retry slot and global memory pressure (step 10)
 
@@ -543,6 +609,15 @@ What this says:
     random cases, 80 RTL fuzz cases, 20 multi-tenant cases, memory-pressure quick set). The full
     regression (fuzz 600 + big 200, security 420, mutants) runs locally on Verilator 5.052.
 
+11. **Spawn policy (steps 11–13) is heuristic.** The producer / strict split is a static call-graph
+    property: a strict recursion that would profit from spreading, or a producer whose consumer is
+    sequential anyway, is classified wrongly, and higher-order code (a fold whose operator is a
+    closure) is classed strict. The adaptive part is a per-cell message budget, not a per-definition
+    measurement: per-definition granularity counters were tried and rejected (README step 13). The
+    governor reacts after 32 interactions, so very short programs run at the reset level. treesum(9)
+    on 8×8 still varies ±12% with the arbitration seed (2,139–2,652), list(120) on 2×2 is 0.7% slower
+    than step 12 (within seed noise), and every policy number is for programs of this suite only.
+
 ## Next steps (suggested)
 
 1. Microarchitecture: shorten the read-ahead address chain in RTL (a pipelining / architecture question;
@@ -554,6 +629,9 @@ What this says:
    to off-fabric memory.
 4. Bigger language: signed numbers, strings, `fold`/`bend`, parameterised data types; a TACHYON-128 host
    interface (DMA of graph images, result readback).
+5. Spawn policy: ship the partner node with a SPAWN when it lives at the sender (the expanded root
+   would not have to migrate back), and a per-definition benefit signal measured at the *sender*
+   (time until the given work's result returns) to replace the static producer hint.
 
 ## Commits
 
@@ -582,4 +660,5 @@ What this says:
 * `46e4a1a` step 10: single non-LIFO retry slot with timeout + escalation, no blind round-robin SPAWN, global memory-pressure tests; mempress 43/43, mutants 42/42
 * `7642829` step 10 benchmarks incl. 8×8 (fib(20) 8×8 18,669; treesum_direct(14) 8×8 16,914); `OMEGA_SPLIT` for low-memory 8×8 builds
 * `25e94a9` README: scope statement (architecture and RTL only; tape-out / physical design permanently out of scope)
-* step 11+12: sender-side spawn threshold + fork/rec definition hints (`spawn_k` = 16, `spawn_k2` = 4), local-first var ~ var link orientation; 8×8 msgs/interaction qsort 0.385, list 0.404, sum 0.022; fib(20) 8×8 17,736, treesum_direct(14) 8×8 13,983; units 42/42, programs 279/279, fuzz 600/600 + big 200/200, security 420/420, mempress 43/43, mutants 45/45
+* `b75256a` step 11+12: sender-side spawn threshold + fork/rec definition hints (`spawn_k` = 16, `spawn_k2` = 4), local-first var ~ var link orientation; 8×8 msgs/interaction qsort 0.385, list 0.404, sum 0.022; fib(20) 8×8 17,736, treesum_direct(14) 8×8 13,983; units 42/42, programs 279/279, fuzz 600/600 + big 200/200, security 420/420, mempress 43/43, mutants 45/45
+* step 13: producer-recursion hint + per-cell message-budget governor (`gov_b` = 30); qsort(40) 8×8 10,742 cycles (mean of 4 seeds), 0.403 msgs/interaction; fib/treesum unchanged; units 42/42, programs 306/306, fuzz 600/600 + big 200/200, security 420/420, mempress 43/43, mutants 47/47

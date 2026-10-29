@@ -1,0 +1,12 @@
+{"prog": "qsort(40)", "mesh": "8x8", "gran": [2, 4, 0, 1], "cycles": [17787, 18031], "mean": 17909, "mpi": 0.546, "util": 0.099}
+{"prog": "qsort(40)", "mesh": "8x8", "gran": [2, 2, 0, 1], "cycles": [16324, 16020], "mean": 16172, "mpi": 0.655, "util": 0.113}
+{"prog": "qsort(40)", "mesh": "8x8", "gran": [2, 8, 0, 1], "cycles": [18683, 16103], "mean": 17393, "mpi": 0.485, "util": 0.1}
+{"prog": "qsort(40)", "mesh": "8x8", "gran": [2, 0, 0, 1], "cycles": [15775, 14965], "mean": 15370, "mpi": 0.985, "util": 0.131}
+{"prog": "list(120)", "mesh": "8x8", "gran": [2, 4, 0, 1], "cycles": [13638, 14391], "mean": 14014, "mpi": 0.595, "util": 0.058}
+{"prog": "list(120)", "mesh": "8x8", "gran": [2, 2, 0, 1], "cycles": [15679, 15186], "mean": 15432, "mpi": 0.586, "util": 0.053}
+{"prog": "list(120)", "mesh": "8x8", "gran": [2, 8, 0, 1], "cycles": [15586, 14472], "mean": 15029, "mpi": 0.501, "util": 0.053}
+{"prog": "list(120)", "mesh": "8x8", "gran": [2, 0, 0, 1], "cycles": [15545, 15542], "mean": 15544, "mpi": 0.679, "util": 0.054}
+{"prog": "sum(1000)", "mesh": "8x8", "gran": [2, 4, 0, 1], "cycles": [56221, 56221], "mean": 56221, "mpi": 0.048, "util": 0.02}
+{"prog": "sum(1000)", "mesh": "8x8", "gran": [2, 2, 0, 1], "cycles": [56221, 56221], "mean": 56221, "mpi": 0.048, "util": 0.02}
+{"prog": "sum(1000)", "mesh": "8x8", "gran": [2, 8, 0, 1], "cycles": [56221, 56221], "mean": 56221, "mpi": 0.048, "util": 0.02}
+{"prog": "sum(1000)", "mesh": "8x8", "gran": [2, 0, 0, 1], "cycles": [56221, 56221], "mean": 56221, "mpi": 0.048, "util": 0.02}

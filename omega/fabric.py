@@ -20,6 +20,12 @@ SPAWN_K = int(__import__('os').environ.get('OMEGA_SPAWN_K', '16'))
 SPAWN_HINT = int(__import__('os').environ.get('OMEGA_SPAWN_HINT', '1'))
 SPAWN_K2 = int(__import__('os').environ.get('OMEGA_SPAWN_K2', '4'))
 LINK_LOCAL = int(__import__('os').environ.get('OMEGA_LINK_LOCAL', '1'))
+# step 13 (SPEC 5.2): threshold for producer recursions (directory bit 58) and the per-cell message-budget
+# governor (budget in messages per 100 interactions; 0 = off, then spawn_kp is used as it is)
+SPAWN_KP = int(__import__('os').environ.get('OMEGA_SPAWN_KP', '4'))
+GOV_B = int(__import__('os').environ.get('OMEGA_GOV_B', '30'))
+GOV_E = 32                         # governor epoch: interactions
+GOV_K = (0, 2, 4, 8, 16)           # producer threshold per governor level (reset level 2)
 MSG_NAMES = ["LINK", "NODE", "SPAWN", "PULL"]
 T_LINK, T_EXPAND, T_SPAWN, T_FWD = 0, 1, 2, 3
 RTO = 32          # retry-slot timeout (cycles), as rtl/omega_cell.sv
@@ -105,7 +111,7 @@ class Image:
         self.rom = []
         self.dir = []
         self.romn, self.romr, self.dir3 = [], [], []
-        self.fork, self.rec = fork, rec = fork_defs(book, with_rec=True)
+        self.fork, self.rec, self.prod = fork, rec, prod = fork_defs(book, with_prod=True)
         for dd in book.defs:
             self.dir.append(len(self.rom))
             cnt = len(dd.nodes) | (dd.nvars << 8) | (len(dd.redexes) << 16)
@@ -113,7 +119,7 @@ class Image:
                 raise FabricError(f"definition @{dd.name} too large for one EXPAND "
                                   f"({len(dd.nodes)} nodes / {dd.nvars} vars, limit {XMAP})")
             self.rom.append((dd.root, cnt))
-            self.dir3.append(len(self.romn) | (len(self.romr) << 16) | (cnt << 32) | (int(len(self.dir3) in fork) << 56) | (int(len(self.dir3) in rec) << 57) | (dd.root << 64))
+            self.dir3.append(len(self.romn) | (len(self.romr) << 16) | (cnt << 32) | (int(len(self.dir3) in fork) << 56) | (int(len(self.dir3) in rec) << 57) | (int(len(self.dir3) in prod) << 58) | (dd.root << 64))
             self.romn += [(a, b) for (_, a, b) in dd.nodes]
             self.romr += list(dd.redexes)
             # cluster ROM words hold four entries: align every definition to a multiple of four
@@ -191,7 +197,7 @@ def readback_dump(book, nodes, vars_, root=mk(VAR, 0, addr(0, 0, 0))):
     return semantic.readback(gn, gv, root, book)
 
 
-def fork_defs(book, with_rec=False):
+def fork_defs(book, with_rec=False, with_prod=False):
     """Step 11 spawn hint (SPEC 5): the definitions worth handing to another cell.  A definition is a
     fork target when it belongs to a recursion SCC that some template calls at least twice (both
     branches of a divide-and-conquer recursion, e.g. fib(n-1) and fib(n-2), qs(lo) and qs(hi); the two
@@ -241,6 +247,19 @@ def fork_defs(book, with_rec=False):
             hits = [g for g in groups[v] if any(w < n and comp[w] == c for w in g)]
             if len(hits) >= 2 and c in rec:
                 fork.update(u for u in range(n) if comp[u] == c)     # the whole recursion SCC
+    # step 13: a linear recursion is a *producer* when a template of its SCC calls a non-recursive
+    # definition outside the SCC (a constructor such as Cons / Nil, or a lifted arm): it emits a data
+    # structure piece by piece, so its consumer can work on the head while the tail is still being made
+    # (pipeline parallelism), and the pieces stay spread over the cells that made them.  A strict
+    # recursion (sum, fact, a fold into an operator) only feeds its own pending operators: handing it
+    # to a neighbour moves the whole chain and adds a hop to the critical path.
+    prod = set()
+    for u in rec - fork:
+        scc = [v for v in range(n) if comp[v] == comp[u]]
+        if any(w < n and comp[w] != comp[u] and w not in rec for v in scc for w in calls[v]):
+            prod.add(u)
+    if with_prod:
+        return fork, rec, prod
     return (fork, rec) if with_rec else fork
 
 
@@ -275,6 +294,8 @@ class Cell:
                    "max_nodes": 0, "vhu": 0}
         # var-hop unit (RTL step 9): follows substitution chains in parallel with the engine
         self.vh_busy, self.vh_out = 0, None
+        # step 13 message-budget governor: messages sent / interactions done in the current epoch
+        self.ep_m, self.ep_i, self.lvl = 0, 0, 2
 
     # ---- helpers ----
     def local(self, p):
@@ -287,6 +308,7 @@ class Cell:
         assert self.can_send()
         self.inq["L"].append((kind, dst[0], dst[1]) + pl)
         self.fab.msgs[kind] += 1
+        self.ep_m = min(255, self.ep_m + 1)
 
     def send_or_retry(self, kind, dst, a, b):
         """LINK / SPAWN sends never block the engine: if the outbox is full the work goes back to the
@@ -335,6 +357,15 @@ class Cell:
     def count(self):
         self.st["interactions"] += 1
         self.fab.interactions += 1
+        if self.fab.gov_b:
+            self.ep_i += 1
+            if self.ep_i == GOV_E:
+                # epoch end: over the budget -> tighten the producer threshold one level, under half of
+                # it -> relax one level (RTL: same counters, 3-bit level)
+                b = self.fab.gov_b * GOV_E
+                if 100 * self.ep_m > b: self.lvl = min(4, self.lvl + 1)
+                elif 200 * self.ep_m < b: self.lvl = max(0, self.lvl - 1)
+                self.ep_m = self.ep_i = 0
 
     # ---- link (SPEC 4) ----
     def do_link(self, a, b):
@@ -448,6 +479,9 @@ class Cell:
             return q > fab.spawn_k
         if r in fab.img.fork:
             return True
+        if r in fab.img.prod:                 # step 13: producer recursion
+            k = GOV_K[self.lvl] if fab.gov_b else fab.spawn_kp
+            return k < 0 or q > k
         return q > (fab.spawn_k if r in fab.img.rec else fab.spawn_k2)
 
     def spawn(self, ref, x):
@@ -728,7 +762,7 @@ class Cell:
 
 class Fabric:
     def __init__(self, book, W, H, slots=1024, qdepth=1024, fifo_depth=4, seed=0,
-                 p_jitter=0.0, p_stall=0.0, p_msg=0.5, img=None, fi_nosend=False, cluster=(2, 2, 1), spawn_k=None, spawn_hint=None, link_local=None, spawn_k2=None):
+                 p_jitter=0.0, p_stall=0.0, p_msg=0.5, img=None, fi_nosend=False, cluster=(2, 2, 1), spawn_k=None, spawn_hint=None, link_local=None, spawn_k2=None, spawn_kp=None, gov_b=None):
         self.book, self.W, self.H = book, W, H
         # sender-side spawn threshold (step 11, SPEC 5): hand a REF expansion to a hungry neighbour only
         # while more than spawn_k tasks wait on the local task stack (-1 = always, the step-10 policy)
@@ -736,6 +770,8 @@ class Fabric:
         self.spawn_hint = SPAWN_HINT if spawn_hint is None else spawn_hint
         self.link_local = LINK_LOCAL if link_local is None else link_local
         self.spawn_k2 = SPAWN_K2 if spawn_k2 is None else spawn_k2
+        self.spawn_kp = SPAWN_KP if spawn_kp is None else spawn_kp
+        self.gov_b = GOV_B if gov_b is None else gov_b
         # cluster definition ROM (SPEC 5.6): CW x CH cells share one ROM with NP read ports.  An
         # EXPAND reads max(nodes, redexes) template entries, two per ROM word (one grant per pair); a cell whose
         # cluster's ports are all busy waits (the RTL interleaves cycle by cycle with a round-robin
