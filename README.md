@@ -72,7 +72,7 @@ def main = tsum(gen(N))
 
 ## Results
 
-### Verification (full regression on step 9: v4 engine — wide EXPAND, shorter commutation, var-hop unit; default 2×2 cells per ROM, one port)
+### Verification (full regression on step 10: v4 engine + retry slot / global memory pressure; default 2×2 cells per ROM, one port)
 
 | suite | result | what it checks |
 |---|---|---|
@@ -81,12 +81,37 @@ def main = tsum(gen(N))
 | RTL differential fuzz, small nets (`tests/fuzz_rtl.py 0 600`) | **600 / 600** | random books (all node kinds, 3 DUP labels, all 16 operators with both flip bits, SWI, REF DAGs) on 1×1, 2×2, 4×4, 3×2, 1×4 with random arbitration seed, link jitter (0–63%), engine stalls, message/task priority and random scatter of `@main` over the cells. Readback, interaction count and live node count must equal the semantic model's (165 diverging nets rejected) |
 | RTL differential fuzz, big nets (`--big`) | **200 / 200** | 3–8 definitions, 20–60 nodes each, deeper trees, more references; only nets with ≥ 30 interactions are kept (avg 375, max 16,239 interactions; 4,088 candidates rejected as diverging or trivial) |
 | owner-capability isolation (`tests/test_security.py --fuzz 300`) | **420 / 420** | 2- and 4-tenant program demos (fib ∥ qsort; treesum ∥ list ∥ sort ∥ higher-order) on 1×1/2×2/4×4/3×2, each tenant gets its known answer with zero traps; 10 attack programs (overwrite / capture the victim's result through a forged root-var pointer, out-of-bounds slot and cell, forged node pointers to the victim's result node, an attack hidden in a lazily expanded definition) and 3 cross-owner fault injections, each with the sender-side check on and off (`fi`); 300 random multi-tenant cases (2–4 random tenants, random owners, half with an attacker carrying random forged redexes). Semantic model, fabric model and RTL must agree on every honest tenant's result and node count, on the trap set and on the interaction count (SPEC §12) |
-| memory pressure (`tests/test_mempress.py`) | **36 / 36** | cell (0,0) pre-filled with foreign ballast so only 4–30 slots are free (30 cases), small-cell capacity cases, security fuzz case 265; semantic model, fabric model and RTL must agree |
-| mutation testing (`tests/mutants.py`) | **39 / 39 caught** | 15 functional mutants of the rule logic / protocol / quiescence + 1 performance mutant (no work distribution, caught by the speed-up bound) + 6 security mutants (each owner-capability check disabled, owner stamping missing, trap not blocking). Two mutants (eraser reaches only aux1; REF~DUP expands instead of copying) produce the *right* answer and are caught only by the node count / interaction count. That is why all three observables are compared. + 5 v3 engine mutants (read-ahead write bypass, write-queue drain, var owner-tag queue, allocation pop count, ROM read-ahead) + 2 memory-pressure mutants (caught by `tests/test_mempress.py`) + 3 cluster-ROM mutants (grant beyond the port count, EXPAND not waiting for its template word, stale buffered word) + 7 v4 mutants (second node write port not bypassed into the read-ahead, second EXPAND entry's var tag to the wrong slot, EXPAND skipping an entry, VHU without the same-slot stall, VHU hand-back never taken, VHU disabled = performance mutant caught by a fib(12) cycle bound, VHU read-ahead without bypass of write port 1) |
+| memory pressure (`tests/test_mempress.py`) | **43 / 43** | cell (0,0) pre-filled with foreign ballast so only 4–30 slots are free (30 cases), small-cell capacity cases (5), **global pressure (step 10, 5 cases): every cell except the far corner holds ballast (8 free node / 8 free var slots), so the room is up to 6 hops away** (fib(12) 3×3, treesum(6) 3×3, list(20) 3×2, qsort(15) 4×4, sort(10) 3×3), security fuzz case 265 — semantic model, fabric model and RTL must agree; **2 overfull cases** (the whole 2×2 fabric too small) must end in status 3 without a wrong answer |
+| mutation testing (`tests/mutants.py`) | **42 / 42 caught** | 15 functional mutants of the rule logic / protocol / quiescence + 1 performance mutant (no work distribution, caught by the speed-up bound) + 6 security mutants (each owner-capability check disabled, owner stamping missing, trap not blocking). Two mutants (eraser reaches only aux1; REF~DUP expands instead of copying) produce the *right* answer and are caught only by the node count / interaction count. That is why all three observables are compared. + 5 v3 engine mutants (read-ahead write bypass, write-queue drain, var owner-tag queue, allocation pop count, ROM read-ahead) + 2 memory-pressure mutants (caught by `tests/test_mempress.py`) + 3 cluster-ROM mutants (grant beyond the port count, EXPAND not waiting for its template word, stale buffered word) + 7 v4 mutants (second node write port not bypassed into the read-ahead, second EXPAND entry's var tag to the wrong slot, EXPAND skipping an entry, VHU without the same-slot stall, VHU hand-back never taken, VHU disabled = performance mutant caught by a fib(12) cycle bound, VHU read-ahead without bypass of write port 1) + 3 retry-slot mutants (39 parked retry never taken, 40 quiescence ignores the slot, 41 no escalation). Mutant 27 (roomy offload disabled) now survives on its own, because escalation also rescues every pressure case (roomy offload became a fast path); it is run together with 41 and caught |
 
 Strong confluence is the test oracle. Any schedule (arbitration, delays, stalls, task/message priority,
 initial placement) must produce exactly the same normal form, the same number of interactions and the
 same number of live nodes. The fuzzers vary all of these on every run.
+
+### Retry slot and global memory pressure (step 10)
+
+Before step 10 a cell short of slots pushed the failed rule (or SPAWN) back on its LIFO task stack and
+popped it again the next cycle, starving the very tasks that could free memory; a SPAWN without a roomy
+neighbour went round robin. A ballast case where the room is two or more hops away hung
+(`global list(20) 3×2`: step-9 RTL status 3 after 786 of 1,069 interactions; the fabric model also
+livelocked). Now (SPEC §5 "Retry slot and global pressure", mirrored in `omega/fabric.py`):
+
+* **One non-LIFO retry slot per cell** with a 32-cycle timeout: memory-pressure retries park there,
+  the engine keeps draining its stack and messages, and the parked entry is retried before the stack
+  when the timer expires. A parked entry keeps the cell non-idle and non-hungry.
+* **No blind round-robin SPAWN** while the slot can hold it: without room and without a roomy
+  neighbour a SPAWN parks.
+* **Escalation**: the 4th consecutive park of the same retry moves the work anyway — SPAWN round robin,
+  SWI node as NODE, commutation node as PULL to the next neighbour (roomy neighbours still win first).
+  Work diffuses through partly full cells toward room several hops away.
+* Result: all 5 global-pressure cases pass on semantic / fabric / RTL (step-9 RTL: 4 / 5).
+* Still a gap: a *globally* full fabric (overfull cases) ends in status 3 as before, and escalated
+  SPAWNs still bounce (treesum(9) on a 2×2 fabric with 24 free slots per cell: ~600k SPAWN messages in
+  300k cycles, same as step 9). No throttling or off-fabric spill yet.
+* No effect on the benchmarks: no cell runs out of memory there. Re-run on the step-10 RTL, fib(20),
+  treesum_direct(14), treesum(9) on 1×1, 2×2, 4×4 give exactly the v4 cycle counts (table below).
+  8×8 was not re-run in this step (its Verilator build exhausted the sandbox's 8 GB); its cells peak at
+  ≤ 91 nodes of 1,024, so the retry slot is never used there.
 
 ### v4 engine (step 9): 2.36 cycles per interaction
 
@@ -439,7 +464,13 @@ What this says:
    * task-stack overflow (`err = 1`) or a 1×1 cell that cannot place an expansion (`err = 2`) still
      halts the cell;
    * a *globally* full fabric still bounces work (status 3 / "no progress"); there is no spilling to
-     off-fabric memory and spawning is not throttled when every neighbour is poor.
+     off-fabric memory and spawning is not throttled. Step 10's retry slot parks a retry for 32
+     cycles and escalates after 4 parks (round robin, not toward the room: there is no gradient), so
+     room several hops away is found by diffusion, not routing; only one retry fits the slot, further
+     ones take the old path;
+   * mutant 27 (roomy offload disabled) survives on its own since step 10: escalation alone rescues
+     every pressure case in the suite, so the roomy offload is now only a fast path, and no current
+     benchmark shows its speed benefit.
 4. **Limits on sizes.**
    * One definition may have at most 255 nodes, 255 vars and 255 redexes (8-bit counts), and the ROM
      holds 4096 entries.
@@ -472,8 +503,9 @@ What this says:
    (OpenROAD on an x86-64 host) for routed area and Fmax. Shrink the node RAM / task queue.
 2. Re-synthesise the v4 cell (2W RAMs, VHU) and re-do the area × time comparison. Cut cycles per
    interaction below 2.36: dual-issue independent tasks, or overlap the rule cycle with the next pick.
-3. Global memory pressure: throttle spawning when every neighbour is poor, and spill to off-fabric
-   memory.
+3. Global memory pressure: a gradient (distance-to-room) side band instead of the 1-bit `roomy`, so
+   escalated work goes straight toward room; throttle SPAWN bouncing on a globally full fabric; spill
+   to off-fabric memory.
 4. Bigger language: signed numbers, strings, `fold`/`bend`, parameterised data types; a TACHYON-128 host
    interface (DMA of graph images, result readback).
 
@@ -500,4 +532,5 @@ What this says:
 * `1dfad55` step 6: nested / literal / default patterns, Hindley–Milner type checker
 * `97b3bec` step 7: cluster definition ROM (`rtl/omega_rom.sv`, 2×2 cells per ROM, pair words, round-robin arbiter), benchmarks per configuration
 * `03c8f9f` step 8: standard-cell flow (Yosys → Nangate45, fakeram45 macros, OpenSTA pre-layout), area / Fmax table
-* step 9: v4 engine (wide EXPAND, commutation 2 + 3, var-hop unit, free-var cache overflow fix); fib(20) 1×1 2.36 cycles/interaction; mutants 39/39
+* `012c4ff` step 9: v4 engine (wide EXPAND, commutation 2 + 3, var-hop unit, free-var cache overflow fix); fib(20) 1×1 2.36 cycles/interaction; mutants 39/39
+* step 10: single non-LIFO retry slot with timeout + escalation, no blind round-robin SPAWN, global memory-pressure tests; mempress 43/43, mutants 42/42

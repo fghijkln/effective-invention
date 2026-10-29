@@ -187,6 +187,19 @@ Correctness argument (also checked by fuzzing):
   * a commutation that needs 2 node + 4 var slots sends P as `PULL` to a roomy neighbour, which pulls Q
     after it (§4);
   * only when no neighbour is roomy does the task go back on the stack as a retry, as before.
+* **Retry slot and global pressure (step 10).** Since step 10 the retry of the last bullet, and a SPAWN
+  that has neither room nor a roomy neighbour, no longer go on the LIFO task stack (where they were
+  popped again at once and starved the tasks that free memory) nor round robin to any neighbour. Each
+  cell has **one non-LIFO retry slot** (`rs_v`, `rs_e`, a 32-cycle timer `rs_tm`, a park count
+  `rs_n`): the retry is parked there, the engine keeps working on its stack and messages, and the
+  parked entry is taken (before the stack) when its timer expires. A retry taken from the slot that has
+  to park again counts up `rs_n`; on the 4th consecutive park the task **escalates**: a SPAWN is
+  forwarded round robin (the old rule), a SWI node is sent as `NODE` and a commutation node as `PULL`
+  to the next neighbour round robin even though it is not roomy. Escalation moves work across cells
+  that are only partly full toward room several hops away (a roomy neighbour still always wins). The
+  slot is single: a second retry while it is occupied takes the old path (stack / round robin), so no
+  retry can be locked out of the slot forever. A parked entry keeps the cell non-idle and non-hungry
+  (§8). Mutants 39–41 (parked entry never taken, quiescence ignoring the slot, no escalation).
   None of these change the result or the interaction count (migration is not an interaction), only
   where a rule runs. `tests/test_mempress.py` pre-fills cell (0,0) with foreign "ballast" so that only
   4–30 slots are free there: without the mechanism the v3 RTL livelocks on 7 of 30 such cases.
@@ -321,7 +334,10 @@ The result is a canonical string, for example `#6765` or `((x0 x0) (x1 x1))`.
   * task-stack overflow: `err = 1`, the cell halts and the testbench reports status 2;
   * a 1×1 fabric unable to place an expansion: `err = 2`;
   * a fabric that is globally full can bounce SPAWNs forever. The Python model stops with "no progress
-    for 100000 cycles" and the RTL testbench with a cycle limit (status 3).
+    for 100000 cycles" and the RTL testbench with a cycle limit (status 3). Since step 10 parked
+    retries poll every 32 cycles instead of every cycle, but escalated SPAWNs (and SPAWNs that find the
+    retry slot occupied) still bounce; `tests/test_mempress.py` checks that a globally full fabric ends
+    in status 3 without a wrong answer.
 
   All are Known gaps (§11).
 
@@ -339,8 +355,9 @@ AND tree with a pipelined tree or a Dijkstra–Safra token ring. Both preserve t
 `seed` (LFSR seeds for router arbitration, engine source selection and stall injection), `jitter`
 (probability/256 that a link holds a flit for a cycle), `stall` (probability/256 that an idle engine
 skips a cycle) and `pmsg` (message vs. task priority) give the RTL a different interleaving on every
-run. Strong confluence makes any difference in the three observables a bug. `MUT` (256-bit parameter)
-injects the 22 mutations listed in `tests/mutants.py` (16–21: owner-capability checks).
+run. Strong confluence makes any difference in the three observables a bug. `MUT` (512-bit parameter)
+injects the 42 mutations listed in `tests/mutants.py` (16–21: owner-capability checks; 27, 28, 39–41:
+memory pressure and the retry slot, checked by `tests/test_mempress.py`).
 
 ## 10. Frontend (`omega/lang.py`)
 

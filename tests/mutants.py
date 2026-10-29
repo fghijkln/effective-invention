@@ -34,7 +34,7 @@ MUTANTS = {
     24: "v3 S_WQ: owner tags of fresh commutation vars not written",
     25: "v3 EXPAND allocation pops one node slot fewer than it maps (slot aliasing)",
     26: "v4 EXPAND: template word entry select wrong (entry i reads entry i xor 1)",
-    27: "memory pressure: roomy neighbours ignored (no PULL / NODE offload, OOM SPAWNs round robin)",
+    27: "memory pressure: roomy neighbours ignored (no PULL / NODE offload); run with bit 41 (no escalation) because since step 10 escalation alone also rescues every pressure case (alone: survives)",
     28: "memory pressure: hungry does not require roomy (a full cell still asks for work)",
     29: "cluster ROM: arbiter grants more requesters than it has read ports (they get another cell's data)",
     30: "cluster ROM: EXPAND does not wait for its template pair (proceeds on a missed grant)",
@@ -46,6 +46,9 @@ MUTANTS = {
     36: "VHU: hand-back link never taken by the main engine (redex lost / hang)",
     37: "VHU disabled (performance only: main engine follows every chain; caught by the cycle bound)",
     38: "VHU read-ahead: no bypass of the main engine's var write port 1 (stale var data)",
+    39: "retry slot: a parked retry is never taken again (lost work / hang)",
+    40: "retry slot: quiescence ignores a parked retry (premature termination)",
+    41: "retry slot: no escalation (a parked retry never falls back to round-robin SPAWN / NODE / PULL moves)",
 }
 PROGS = [("fib", 8), ("list", 6), ("sort", 6), ("higher", 5), ("fact", 5), ("treesum", 4), ("qsort", 5), ("sum", 20)]
 
@@ -74,9 +77,11 @@ def try_mutant(bit):
     mut = 1 << bit
     if 16 <= bit <= 21:
         return try_security(mut)
-    if bit in (27, 28):
+    if bit == 27:
+        mut |= 1 << 41      # escalation masks the missing roomy offload (it is a fast path since step 10)
+    if bit in (27, 28, 39, 40, 41):
         import test_mempress
-        n, fails, tag = test_mempress.run_cases(True, mut, verbose=False, quick=True)
+        n, fails, tag = test_mempress.run_cases(True, mut, verbose=False, quick=bit in (27, 28))
         return bool(fails), (f"{tag}: wrong result / timeout" if fails else f"survived {n} memory-pressure cases")
     if bit == 37:
         b = progs.book("fib", 12)

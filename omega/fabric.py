@@ -18,6 +18,7 @@ from . import semantic
 MSG_LINK, MSG_NODE, MSG_SPAWN, MSG_PULL = 0, 1, 2, 3
 MSG_NAMES = ["LINK", "NODE", "SPAWN", "PULL"]
 T_LINK, T_EXPAND, T_SPAWN, T_FWD = 0, 1, 2, 3
+RTO = 32          # retry-slot timeout (cycles), as rtl/omega_cell.sv
 DIRS = ["N", "E", "S", "W"]
 DXY = {"N": (0, -1), "E": (1, 0), "S": (0, 1), "W": (-1, 0)}
 OPP = {"N": "S", "S": "N", "E": "W", "W": "E"}
@@ -203,6 +204,8 @@ class Cell:
         self.eject = deque()
         self.busy = 0
         self.rr = 0
+        # single non-LIFO retry slot (step 10, SPEC 9.1): (kind, a, b), timeout, park count
+        self.rs, self.rs_tm, self.rs_n, self.cur_rs, self.cur_rsn = None, 0, 0, False, 0
         self.nbrs = [d for d in ("E", "S", "W", "N")
                      if 0 <= x + DXY[d][0] < fab.W and 0 <= y + DXY[d][1] < fab.H]
         self.spawn_targets = [None] + self.nbrs
@@ -343,7 +346,20 @@ class Cell:
         return self._roomy
 
     def hungry(self):
-        return self._roomy and not (self.busy or self.queue or self.eject or self.vh_busy or self.vh_out)
+        return self._roomy and not (self.busy or self.queue or self.eject or self.vh_busy or self.vh_out or self.rs)
+
+    def escalated(self):
+        """The current task is a retry parked 4 times in a row: fall back to round-robin moves."""
+        return bool(self.nbrs) and self.cur_rs and self.cur_rsn == 3
+
+    def park(self, kind, a, b):
+        """Memory-pressure retry: park in the single retry slot for RTO cycles (False if it is full)."""
+        if self.rs is not None:
+            return False
+        self.rs, self.rs_tm = (kind, a, b), RTO
+        self.rs_n = min(self.cur_rsn + 1, 3) if self.cur_rs else 0
+        self.st["park"] = self.st.get("park", 0) + 1
+        return True
 
     def roomy_nbr(self):
         """First roomy neighbour in rotating order (N E S W), or None."""
@@ -375,6 +391,9 @@ class Cell:
         if len(self.nfree) < nn or len(self.vfree) < nv:
             if self.nbrs:
                 t = self.roomy_nbr()          # out of memory: prefer a roomy neighbour
+                if t is None and not self.escalated() and self.park(T_SPAWN, refp, x):
+                    self.st["requeue"] += 1   # no roomy neighbour: park (forwarded after 4 parks)
+                    return 1
                 if t is None:
                     t = self.nbrs[self.rr % len(self.nbrs)]
                     self.rr += 1
@@ -428,12 +447,16 @@ class Cell:
                 return self.trap(TRAP_FORGED, a)
             if ta == SWI and tb == NUM and payload(b) != 0 and not self.nfree:
                 d = self.roomy_nbr() if self.can_send() else None
+                if d is None and self.escalated() and self.can_send():
+                    d = self.nbrs[self.rr % len(self.nbrs)]; self.rr += 1   # escalated retry: round robin
                 if d is not None:             # no slot: move the SWI node to a roomy neighbour
                     a1, a2 = self.free_node(a)
                     self.send(MSG_NODE, self.nbr_xy(d), a, a1, a2, b)
                     self.st["offload"] = self.st.get("offload", 0) + 1
                     return 1
-                self.queue.append((T_LINK, a, b)); self.st["requeue"] += 1
+                if not self.park(T_LINK, a, b):
+                    self.queue.append((T_LINK, a, b))
+                self.st["requeue"] += 1
                 return 0
             self.count()
             o = owner(a)
@@ -478,6 +501,8 @@ class Cell:
             anni = ta == tb and label(a) == label(b) and ta in (CON, DUP)
             if not anni and (len(self.nfree) < 2 or len(self.vfree) < 4):
                 d = self.roomy_nbr() if self.can_send() else None
+                if d is None and self.escalated() and self.can_send():
+                    d = self.nbrs[self.rr % len(self.nbrs)]; self.rr += 1   # escalated retry: round robin
                 if d is not None:
                     # no room for the commutation: PULL protocol, the roomy neighbour re-homes P and
                     # asks for Q (which then migrates with the ordinary NODE rule); poor -> rich
@@ -485,7 +510,9 @@ class Cell:
                     self.send(MSG_PULL, self.nbr_xy(d), a, a1, a2, b)
                     self.st["offload"] = self.st.get("offload", 0) + 1
                     return 1
-                self.queue.append((T_LINK, a, b)); self.st["requeue"] += 1
+                if not self.park(T_LINK, a, b):
+                    self.queue.append((T_LINK, a, b))
+                self.st["requeue"] += 1
                 return 0
             self.count()
             a1, a2 = self.free_node(a)
@@ -540,10 +567,13 @@ class Cell:
         if self.vh_out is not None and not self.vh_busy:
             a, b = self.vh_out
             self.vh_out = None
+            self.cur_rs = False
             self.st["tasks"] += 1
             self.busy = max(0, self.do_link(a, b))
             return
         src = None
+        if self.rs is not None and self.rs_tm > 0:
+            self.rs_tm -= 1
         msg_ok = bool(self.eject)
         self.update_roomy()
         if msg_ok and self.eject[0][0] in (MSG_NODE, MSG_PULL) and not self.nfree:
@@ -555,14 +585,21 @@ class Cell:
             src = "m"
         elif self.queue:
             src = "q"
-        else:
+        if src != "m" and self.rs is not None and self.rs_tm == 0:
+            src = "r"                          # the parked retry before the task stack (non-LIFO)
+        if src is None:
             return
         if self.fab.p_stall and rng.random() < self.fab.p_stall:
             self.busy = 1
             return
         self.st["tasks"] += 1
-        if src == "q":
-            k, a, b = self.queue.pop()   # LIFO task stack (depth-first, bounded memory)
+        self.cur_rs = src == "r"
+        if src in ("q", "r"):
+            if src == "r":
+                (k, a, b), self.rs = self.rs, None
+                self.cur_rsn = self.rs_n
+            else:
+                k, a, b = self.queue.pop()   # LIFO task stack (depth-first, bounded memory)
             vh = None
             if k == T_LINK and not self.vh_busy and self.vh_out is None:
                 vh = self.vhu_chain(a, b)          # hand the var chain to the VHU (no-op if not a local var link)
@@ -606,7 +643,7 @@ class Cell:
         self.busy = max(0, cost - 1)
 
     def idle(self):
-        return not (self.busy or self.vh_busy or self.vh_out or self.queue or self.eject or any(self.inq.values()))
+        return not (self.busy or self.vh_busy or self.vh_out or self.queue or self.eject or self.rs or any(self.inq.values()))
 
 
 class Fabric:

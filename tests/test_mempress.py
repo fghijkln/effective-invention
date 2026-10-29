@@ -27,16 +27,46 @@ CAPACITY = [("qsort", 24, 256, 2, 2), ("higher", 30, 256, 2, 2), ("sort", 30, 12
             ("qsort", 40, 256, 4, 4)]
 
 
-def ballast_img(book, W, H, slots, keep_n, keep_v):
+# global memory pressure (step 10): every cell except the far corner (W-1, H-1) is filled with ballast,
+# so the room is several hops from the program (no roomy neighbour on the way: a parked SPAWN must
+# fall back to forwarding after its retry-slot timeouts).  OVERFULL: the whole fabric is too small; the
+# run must not finish with a wrong answer (status 3 = out of memory / no progress is the accepted end).
+GLOBAL = [("fib", 12, 3, 3), ("treesum", 6, 3, 3), ("list", 20, 3, 2), ("qsort", 15, 4, 4), ("sort", 10, 3, 3)]
+GKEEP = (8, 8)
+OVERFULL = [("treesum", 9, 2, 2, 24), ("qsort", 30, 2, 2, 24)]
+
+
+def ballast_img(book, W, H, slots, keep_n, keep_v, cells=((0, 0),)):
     img = fabric.Image(book, W, H, slots, 1024)
-    c = (0, 0)
-    fn = [s for s in range(slots) if img.nodes[c][s] is None]
-    fv = [s for s in range(slots) if img.vars[c][s] is None]
-    for s in fn[keep_n:]:
-        img.nodes[c][s] = [mk(ERA), mk(ERA)]; img.nown[c][s] = 14
-    for s in fv[keep_v:]:
-        img.vars[c][s] = mk(NONE); img.vown[c][s] = 14
+    for c in cells:
+        fn = [s for s in range(slots) if img.nodes[c][s] is None]
+        fv = [s for s in range(slots) if img.vars[c][s] is None]
+        for s in fn[keep_n:]:
+            img.nodes[c][s] = [mk(ERA), mk(ERA)]; img.nown[c][s] = 14
+        for s in fv[keep_v:]:
+            img.vars[c][s] = mk(NONE); img.vown[c][s] = 14
     return img
+
+
+def run_overfull(use_rtl=True, mut=0, verbose=True):
+    """Globally full fabric: no wrong answer and no silent corruption (status 3 / err accepted)."""
+    n = fails = 0
+    for name, N, W, H, keep in OVERFULL:
+        book = progs.book(name, N)
+        want = progs.expected(name, N)
+        cells = [(x, y) for x in range(W) for y in range(H)]
+        n += 1
+        if use_rtl:
+            from omega import rtl
+            r = rtl.run(book, W, H, img=ballast_img(book, W, H, 1024, keep, keep, cells), seed=5, mut=mut,
+                        maxcycles=300_000, timeout=300)
+            bad = r["status"] == 0 and r["readback"] != want
+            park = sum(c.get("park", 0) for c in r["cells"].values())
+            if verbose:
+                print(f"overfull {name}({N}) {W}x{H} keep {keep}: status {r['status']} err {r.get('err')} "
+                      f"interactions {r['interactions']} msgs {r['msgs']} parks {park}" + ("  WRONG ANSWER" if bad else ""), flush=True)
+            fails += bad
+    return n, fails
 
 
 def cases(quick=False):
@@ -45,6 +75,9 @@ def cases(quick=False):
         for W, H in BSHAPES:
             for kn, kv in BKEEP:
                 out.append((f"ballast {name}({N}) {W}x{H} keep {kn}/{kv}", name, N, W, H, 1024, (kn, kv)))
+    for name, N, W, H in (GLOBAL[:2] if quick else GLOBAL):
+        cells = tuple((x, y) for x in range(W) for y in range(H) if (x, y) != (W - 1, H - 1))
+        out.append((f"global {name}({N}) {W}x{H} keep {GKEEP[0]}/{GKEEP[1]} in {len(cells)} cells", name, N, W, H, 1024, GKEEP + (cells,)))
     if not quick:
         for name, N, slots, W, H in CAPACITY:
             out.append((f"capacity {name}({N}) slots={slots} {W}x{H}", name, N, W, H, slots, None))
@@ -80,6 +113,9 @@ def run_cases(use_rtl=True, mut=0, verbose=True, quick=False, security=True):
             fails += 1
             if verbose: print(f"FAIL {tag}: " + "; ".join(errs), flush=True)
             if mut: return n, fails, tag
+    if use_rtl and not quick and mut == 0:
+        n2, f2 = run_overfull(use_rtl, mut, verbose)
+        n += n2; fails += f2
     if security and not quick:
         import test_security as ts
         book, tenants, W, H, kn, att = ts.fuzz_case(265)
