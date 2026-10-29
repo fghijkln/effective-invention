@@ -31,13 +31,13 @@ GOV_B = int(__import__('os').environ.get('OMEGA_GOV_B', '30'))
 #            the big, shallow subtrees go to the idle cells, the small deep ones stay).
 #  MSG_FIRST: the ejection port is served before the task stack whenever the outbox has room (pmsg = 256).
 BOT_GIVE = int(__import__('os').environ.get('OMEGA_BOT_GIVE', '0'))
-# step 14 (RTL, SPEC 5.3): s14c = 4-entry fork deque + oldest-fork give (bot_give 3, fdepth 4) and governor
-# nb5l1 (gov_nb 5, gov_l0 1).  S14 = 1 (default) makes these the defaults of every knob left at None;
-# OMEGA_S14=0 / Fabric(s14=0) gives step 13 behaviour (RTL: +s14=0).
-S14 = int(__import__('os').environ.get('OMEGA_S14', '1'))
-# s14 = 2: only fork tasks whose partner is a number go on the deque (RTL fork_dq = 2)
-S14_GOVNB = int(__import__('os').environ.get('OMEGA_S14_GOVNB', '5'))    # governor relax-with-hungry-neighbour bound (x/4 budget)
-S14_GOVL0 = int(__import__('os').environ.get('OMEGA_S14_GOVL0', '1'))    # governor reset level with s14
+# step 14 (RTL, SPEC 5.3): 4-entry fork deque + oldest-fork give (bot_give 3, fdepth 4) plus the governor
+# relax-with-hungry-neighbour knob.  S14 != 0 makes these the defaults of every knob left at None:
+#   S14 = 1: every fork definition goes on the deque (the explored s14c); S14 = 2 (default): only fork
+#   definitions that are not stream-fed (directory bit 59).  OMEGA_S14=0 / Fabric(s14=0) = step 13 (RTL +s14=0).
+S14 = int(__import__('os').environ.get('OMEGA_S14', '2'))
+S14_GOVNB = int(__import__('os').environ.get('OMEGA_S14_GOVNB', '0'))    # governor relax-with-hungry-neighbour bound (x/4 budget)
+S14_GOVL0 = int(__import__('os').environ.get('OMEGA_S14_GOVL0', '2'))    # governor reset level with s14
 GRAD = int(__import__('os').environ.get('OMEGA_GRAD', '0'))
 P_MSG = float(__import__('os').environ.get('OMEGA_P_MSG', '0.5'))     # default ejection-port priority
 GOV_E = 32                         # governor epoch: interactions

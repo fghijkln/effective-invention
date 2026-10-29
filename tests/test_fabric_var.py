@@ -9,7 +9,8 @@ from omega import progs, semantic, fabric
 SUITE = [("fib", 12), ("sum", 100), ("fact", 12), ("list", 25), ("treesum", 7), ("treesum_direct", 9),
          ("sort", 15), ("qsort", 15), ("higher", 9)]
 CFGS = {
-    "dflt": dict(),                   # default (step 14 = s14c)
+    "dflt": dict(),                   # default (step 14: fabric.S14 = mode 2, governor nb3 l2)
+    "s14m1": dict(s14=1),             # mode 1 (every fork definition on the deque)
     "base": dict(s14=0),
     "mf": dict(p_msg=1.0),
     "bot1": dict(bot_give=1), "bot2": dict(bot_give=2), "bot3": dict(bot_give=3), "bot4": dict(bot_give=4),
@@ -34,7 +35,8 @@ def main():
         b = progs.book(name, N)
         refs[name] = (b, semantic.result(b), progs.expected(name, N))
     for cname in want:
-        kw = dict(CFGS[cname]); kw.setdefault("s14", 0 if cname != "dflt" else 1)
+        kw = dict(CFGS[cname])
+        if cname != "dflt": kw.setdefault("s14", 0)
         for name, N in SUITE:
             b, ref, exp = refs[name]
             for (W, H) in ((1, 1), (2, 2), (3, 2), (4, 4), (8, 8)):

@@ -239,6 +239,30 @@ Correctness argument (also checked by fuzzing):
   a 32-bit copy of the interaction counter and two constant multiplies per cell; the decision stays in
   S_LINK. Fork and non-recursive definitions are untouched, so fib and both tree sums run exactly as in
   step 12.
+* **Fork deque and oldest-fork give (step 14).** A pure LIFO stack hands a hungry neighbour the *newest*
+  (small, deep) fork task; the big shallow subtrees sit at the bottom of a few busy cells and run
+  serially, which made the tail of fork programs on 8×8 long and seed-dependent (fabric study
+  `results/var/REPORT.md`). Each cell gets a 4-entry **fork deque** beside the task stack. A pushed task
+  is a *fork task* when it is a ready `REF ~ x` redex (`x` a NUM / OPR / CON / SWI of the same owner, no
+  var, REF, ERA or DUP) whose REF names a fork definition; it goes on the deque while the deque has room,
+  everything else (and a fork task finding the deque full) on the stack, in push order. Classification
+  needs no directory read: a per-cell flip-flop vector holds one hint bit per definition, written
+  together with the directory. Pick order: when a neighbour is hungry, the outbox has room and at
+  least two tasks wait, the **oldest** fork task (it then takes the ordinary step-11 path in S_LINK:
+  REF interaction counted, SPAWN to the hungry neighbour); otherwise the stack top; the **newest** fork
+  task only when the stack is empty. `hungry`, quiescence and the spawn thresholds count stack + deque.
+  Mode (`+s14`, mesh input `fork_dq`): 0 = off (step 13, cycle for cycle), 1 = every fork definition
+  (directory bit 56), **2 = default: fork definitions that are not stream-fed** (loader bit 59: the fork
+  SCC calls no producer recursion; qsort's partitions are lists that `lo` / `hi` emit piece by piece,
+  and handing its oldest task away moves the consumer away from its producers: +5% / +7% cycles on
+  4×4 / 8×8 in mode 1).
+* **Governor relax with a hungry neighbour (step 14, knobs).** `+govnb` = k (mesh input `gov_nb`, 0 = off):
+  at epoch end a cell with a hungry neighbour that sent at most k/4 × the budget relaxes one level (this
+  test comes before the over-budget test); `+govl0` = reset level (step 13: 2). The fabric study's nb5l1
+  (k = 5, reset level 1) regresses list / higher on the RTL (4×4: list(120) +4.8%, higher(100) +9.8% at
+  0.52 msgs/int; 8×8: list +9.5%, higher +5.5%), and the milder k = 3 is a wash (qsort 4×4 −1.7%, 8×8
+  +2.7%), so the relax is **off by default** (k = 0, reset level 2: the step-13 governor); the knob stays
+  for experiments (README step 14, known gap 12).
 * **Memory pressure (step 4).** Each cell also drives a 1-bit `roomy` wire: free node slots and free
   var slots both ≥ SLOTS/4 sets it, either < SLOTS/8 clears it (hysteresis, so the wire does not
   toggle on every allocation). `hungry` additionally requires `roomy`, so a full cell never asks for
