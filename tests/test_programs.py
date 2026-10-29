@@ -50,6 +50,16 @@ def main():
         n += 1
         if got != want:
             fails += 1; print(f"FAIL producer hint {name}: {sorted(got)} want {sorted(want)}")
+    # step 15 fork-deque hint (directory bit 59): fork recursions that are neither stream-fed (qsort) nor
+    # data-walking (treesum's tsum takes a tree apart; qs takes a list apart)
+    DQF = {"fib": {"fib", "fib__a1"}, "treesum": {"gen", "gen__a2"}, "treesum_direct": {"tsum", "tsum__a1"}, "qsort": set(),
+           "sum": set(), "fact": set(), "list": set(), "sort": set(), "higher": set()}
+    for name, want in DQF.items():
+        b = progs.book(name, 3)
+        got = {b.defs[i].name for i in fabric.fork_defs(b, with_prod=2)[3]}
+        n += 1
+        if got != want:
+            fails += 1; print(f"FAIL fork-deque hint {name}: {sorted(got)} want {sorted(want)}")
     for name, N in SUITE:
         b = progs.book(name, N)
         ref = semantic.result(b)
