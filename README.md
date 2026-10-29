@@ -180,18 +180,26 @@ RTL, Verilator, mean of arbitration seeds 1–4 (`results/s13_*.jsonl`, `bench/s
 | list(120) | 2×2 | 9,947 | **10,016** | +0.7% | 0.290 | **0.341** | 52% → 52% | 1.90× |
 | list(120) | 4×4 | 9,313 | **8,162** | −12.4% | 0.403 | **0.387** | 14% → 16% | 2.33× |
 | list(120) | 8×8 | 9,301 | **8,410** | −9.6% | 0.413 | **0.403** | 3.5% → 3.9% | 2.26× |
-| sum(1000) | 2×2 / 4×4 / 8×8 | 28,982 / 28,944 / 28,940 | **unchanged** | 0 | 0.022 | **0.022** | – | 1.00× |
+| sum(1000) | 2×2 / 4×4 | 28,982 / 28,944 | **28,982 / 28,944** | 0 | 0.022 | **0.022** | 24% / 6.1% | 1.00× |
+| sum(1000) | 8×8 | 28,940 | **28,940** | 0 | 0.022 | **0.022** | 1.5% | 1.00× |
 | sort(20) | 2×2 | 7,800 | **6,791** | −12.9% | 0.244 | **0.284** | 45% → 52% | 1.92× |
 | sort(20) | 4×4 | 7,292 | **5,910** | −19.0% | 0.226 | **0.308** | 12% → 15% | 2.21× |
+| sort(20) | 8×8 | 7,292 | **6,004** | −17.7% | 0.226 | **0.310** | 3.0% → 3.6% | 2.17× |
 | higher(100) | 2×2 | 7,668 | **7,420** | −3.2% | 0.297 | **0.291** | 43% → 44% | 1.65× |
 | higher(100) | 4×4 | 8,027 | **7,605** | −5.3% | 0.396 | **0.320** | 10% → 11% | 1.61× |
+| higher(100) | 8×8 | 8,132 | **7,780** | −4.3% | 0.418 | **0.347** | 2.6% | 1.58× |
+| fact(20) | 2×2 / 4×4 / 8×8 | 596 / 596 / 596 | **596 / 596 / 596** | 0 | 0.019 | **0.019** | – | 1.00× |
 | fib(20) | 8×8 | 18,550 | **18,550** | 0 | 0.146 | 0.146 | 63% | – |
 | treesum(9) | 8×8 | 2,374 | **2,374** | 0 | 0.419 | 0.419 | 39% | – |
 | treesum_direct(14) | 8×8 | 15,057 | **15,057** | 0 | 0.224 | 0.224 | 63% | – |
 
 * **qsort(40) on 8×8: 10,742 cycles, 12% faster than step 10 (12,270 seed 1 / 12,393 mean) at 0.40
   instead of 1.69 messages per interaction.** Every low-parallel program stays below 0.5 messages per
-  interaction and no slower than one cell on 2×2, 4×4 and 8×8.
+  interaction and no slower than one cell on 2×2, 4×4 and 8×8. All 8×8 rows are measured with the default
+  governor (`gov_b` = 30), seeds 1–4 (sum, sort, higher, fact on 8×8: `results/s13_8x8_gap.jsonl`; full table
+  `results/step13_table.md`). sum(1000) and fact(20) give the same cycle count as step 12 on every seed (strict
+  recursions, no producer REF); 1×1 is 29,018 / 598 cycles. Highest single-seed 8×8 msgs/interaction:
+  sort 0.319, higher 0.349.
 * Pareto choice for the producer threshold (8×8 means): fixed `spawn_kp` = 2: qsort 10,015 / 0.532
   (over budget); fixed 4: 10,472 / 0.484 (seed 3 at 0.496, no margin); **governor 30: 10,742 / 0.403
   (default)**; governor 40: 10,749 / 0.427; governor 60: 10,582 / 0.512; fixed 8: 12,807 / 0.419;
@@ -617,6 +625,9 @@ What this says:
     governor reacts after 32 interactions, so very short programs run at the reset level. treesum(9)
     on 8×8 still varies ±12% with the arbitration seed (2,139–2,652), list(120) on 2×2 is 0.7% slower
     than step 12 (within seed noise), and every policy number is for programs of this suite only.
+    Going from 4×4 to 8×8 does not help the low-parallel programs: sort(20) 5,910 → 6,004 (+1.6%) and
+    higher(100) 7,605 → 7,780 (+2.3%) cycles, higher's msgs/interaction 0.320 → 0.347 (mean of 4 seeds);
+    both stay faster than 1×1 (2.17× / 1.58×) and below 0.5 msgs/interaction.
 
 ## Next steps (suggested)
 

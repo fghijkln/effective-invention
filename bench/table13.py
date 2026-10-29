@@ -2,7 +2,7 @@
 import json, glob
 from collections import defaultdict
 g = defaultdict(list)
-for f in ["results/s13_8x8.jsonl", "results/s13_small.jsonl", "results/s13_8x8_par.jsonl"]:
+for f in ["results/s13_8x8.jsonl", "results/s13_small.jsonl", "results/s13_8x8_par.jsonl", "results/s13_8x8_gap.jsonl"]:
     for l in open(f):
         d = json.loads(l); g[(d["prog"], d["mesh"], tuple(d["cfg"]))].append(d)
 S12, S13, KP4 = (16, 4, 16, 0), (16, 4, 4, 30), (16, 4, 4, 0)
