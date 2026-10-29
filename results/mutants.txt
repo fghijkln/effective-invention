@@ -42,9 +42,9 @@ mutant 40 CAUGHT  retry slot: quiescence ignores a parked retry (premature termi
 mutant 41 CAUGHT  retry slot: no escalation (a parked retry never falls back to round-robin SPAWN / NODE / PULL moves) -- global fib(12) 3x3 keep 8/8 in 8 cells: wrong result / timeout
 mutant 42 CAUGHT  spawn policy: threshold ignored (every REF to a hungry neighbour, the step-10 policy; performance only: caught by the message bound) -- qsort(20) 4x4 1.21 msgs/interaction with the mutant (bound <= 0.6)
 mutant 43 CAUGHT  spawn policy: fork hint ignored (divide-and-conquer REFs held back by the threshold; performance only: caught by the speed-up bound) -- fib(12) 4x4 cycles 2510 with the mutant vs 1623 (bound: > 1.3x)
-mutant 44 CAUGHT  local-first link orientation disabled (a remote var ~ local var link is always sent away; performance only: caught by the LINK bound) -- treesum(7) 4x4 LINK messages 2079 with the mutant vs 1000 (bound: > 1.3x)
+mutant 44 CAUGHT  local-first link orientation disabled (a remote var ~ local var link is always sent away; performance only: caught by the LINK bound) -- treesum(7) 4x4 LINK messages 1769 with the mutant vs 777 (bound: > 1.3x)
 mutant 45 CAUGHT  step 13 producer hint ignored (producer recursions held back by spawn_k like strict ones; performance only: caught by the qsort speed bound) -- qsort(30) 4x4 cycles 11383 with the mutant vs 9118 (bound: > 1.15x)
 mutant 46 CAUGHT  step 13 governor never tightens (the level only relaxes; performance only: caught by the message bound with the governor on) -- qsort(30) 4x4 0.529 msgs/interaction with the mutant vs 0.398 (bound: > 1.15x)
-mutant 47 CAUGHT  step 14 oldest-fork give disabled (fork tasks leave the deque only when the stack is empty; performance only: caught by the fib(16) 4x4 cycle bound) -- fib(16) 4x4 cycles 8254 with the mutant vs 7530 (bound: > 1.05x)   [re-run alone after the treesum(7) bound (1,438 vs 1,378, 1.04x) let it survive]
+mutant 47 CAUGHT  step 14 oldest-fork give disabled (fork tasks leave the deque only when the stack is empty; performance only: caught by the fib(16) 4x4 cycle bound) -- fib(16) 4x4 cycles 8254 with the mutant vs 7530 (bound: > 1.05x)
 mutant 48 CAUGHT  step 14 fork deque: a fork task that finds the deque full is dropped (lost work) -- prog fib(8) on 2x2: got x0 / 698 interactions / 15 nodes, want #21 / 901 / 0
 mutants: 49/49 caught

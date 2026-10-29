@@ -1,0 +1,3 @@
+  s14b: done (1701/1701 cumulative) 293s
+  s14c: done (1782/1782 cumulative) 306s
+fabric var tests: 1782/1782 pass [dflt, s14m1, base, mf, bot1, bot2, bot3, bot4, bot3mf, gov_e16, gov_l0, gov_nb, gov_k6, gov_b50, g3, g3m3, g7nr, nb4l1, s14, main_c, s14b, s14c] 306s
