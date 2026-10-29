@@ -54,7 +54,9 @@ module omega_cell #(
   input  logic [7:0]  spawn_kp,            // step 13: threshold for producer recursions (directory bit 58; 255 = always)
   input  logic [7:0]  gov_b,               //   message-budget governor: messages per 100 interactions (0 = off: spawn_kp)
   input  logic        link_local,          // step 12: local-first orientation of var ~ var links
-  input  logic        fork_dq,             // step 14 (SPEC 5.3): fork deque + oldest-fork give + governor nb5l1 (0 = step 13)
+  input  logic        fork_dq,             // step 14 (SPEC 5.3): fork deque + oldest-fork give (0 = step 13)
+  input  logic [3:0]  gov_nb,              //   governor: with a hungry neighbour relax while sent <= gov_nb/4 x budget (0 = off)
+  input  logic [2:0]  gov_l0,              //   governor reset level (step 13: 2)
   input  logic [3:0]  in_v,
   input  flit_t [3:0] in_f,
   output logic [3:0]  in_rdy,
@@ -495,7 +497,7 @@ module omega_cell #(
       wq_n <= '0; vq_n <= '0; bufok <= 1'b0; rom_v <= 1'b0; rsp <= 1'b0; rsx <= 1'b0; rfw <= 1'b0; ej_taken <= 1'b0;
       roomy <= 1'b0; mrot <= 2'(X + Y + 1);
       rs_v <= 1'b0; rs_e <= '0; rs_tm <= '0; rs_n <= '0; cur_rs <= 1'b0; cur_rsn <= '0; st_park <= '0;
-      gv_lvl <= fork_dq ? 3'd1 : 3'd2; ep_i <= '0; ep_m <= '0; gv_pi <= '0;   // step 14: reset level 1
+      gv_lvl <= gov_l0; ep_i <= '0; ep_m <= '0; gv_pi <= '0;   // step 14: reset level 1
       fcnt <= '0; st_fgive <= '0;
       ncnt <= '0; nsp <= '0; npend <= 1'b0;
       vcnt <= '0; vsp <= '0; vpend <= 1'b0;
@@ -974,8 +976,8 @@ module omega_cell #(
         if (gov_b == 8'd0) begin
           ep_i <= '0; ep_m <= '0;
         end else if (gi == 6'd32) begin
-          if (fork_dq && (nbr_hungry & EXISTS) != 4'd0 && 32'd400 * 32'(gm) <= 32'd5 * 32'd32 * 32'(gov_b) ) begin
-            // step 14 (nb5l1): a hungry neighbour and at most 1.25x the budget: relax one level
+          if (gov_nb != 4'd0 && (nbr_hungry & EXISTS) != 4'd0 && 32'd400 * 32'(gm) <= 32'(gov_nb) * 32'd32 * 32'(gov_b)) begin
+            // step 14 (nb5l1 = gov_nb 5, gov_l0 1): a hungry neighbour and at most gov_nb/4 x the budget: relax one level
             if (gv_lvl != 3'd0) gv_lvl <= gv_lvl - 3'd1;
           end else if (32'd100 * 32'(gm) > 32'd32 * 32'(gov_b)) begin
             if (gv_lvl != 3'd4 && !MUT[46]) gv_lvl <= gv_lvl + 3'd1;

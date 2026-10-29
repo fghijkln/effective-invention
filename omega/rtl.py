@@ -76,7 +76,7 @@ def _readhex(path, n):
 
 
 def run(book, W, H, seed=1, jitter=0, stall=0, pmsg=128, slots=1024, qdepth=1024, romsz=4096,
-        mut=0, maxcycles=20_000_000, keep=None, img=None, timeout=600, fi=0, cluster=None, spawn=None, link_local=None, s14=None):
+        mut=0, maxcycles=20_000_000, keep=None, img=None, timeout=600, fi=0, cluster=None, spawn=None, link_local=None, s14=None, govnb=None, govl0=None):
     """spawn = (K, hint[, K2[, KP[, GOV]]]): step-11/13 spawn policy (default: fabric.SPAWN_K / SPAWN_HINT /
     SPAWN_K2 / SPAWN_KP / GOV_B, env OMEGA_SPAWN_K ...); K = -1 hands every REF to a hungry neighbour (the
     step-10 policy); KP = producer-recursion threshold, GOV = message budget (0 = governor off)."""
@@ -94,7 +94,8 @@ def run(book, W, H, seed=1, jitter=0, stall=0, pmsg=128, slots=1024, qdepth=1024
                             f"+pmsg={pmsg}", f"+maxcycles={maxcycles}", f"+fi={fi}",
                             f"+spawnk={255 if sk < 0 else min(sk, 254)}", f"+spawnhint={int(bool(sh))}", f"+linklocal={int(bool(ll))}",
                             f"+spawnk2={255 if sk2 < 0 else min(sk2, 254)}", f"+spawnkp={255 if skp < 0 else min(skp, 254)}",
-                            f"+govb={max(0, min(gov, 255))}", f"+s14={int(bool(fabric.S14 if s14 is None else s14))}"], capture_output=True, text=True, timeout=timeout)
+                            f"+govb={max(0, min(gov, 255))}", f"+s14={int(bool(fabric.S14 if s14 is None else s14))}"]
+                            + ([f"+govnb={govnb}"] if govnb is not None else []) + ([f"+govl0={govl0}"] if govl0 is not None else []), capture_output=True, text=True, timeout=timeout)
         res = {}
         for line in r.stdout.splitlines():
             k, _, v = line.partition(" ")

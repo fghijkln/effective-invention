@@ -10,12 +10,12 @@ SUITE = [("fib", 12), ("sum", 100), ("fact", 12), ("list", 25), ("treesum", 7), 
 SHAPES = [(1, 1), (2, 2), (4, 4)]
 
 
-def run_case(name, n, W, H, seed, jitter, stall, pmsg, scatter, spawn=None, link_local=None):
+def run_case(name, n, W, H, seed, jitter, stall, pmsg, scatter, spawn=None, link_local=None, s14=None):
     b = progs.book(name, n)
     ref = semantic.result(b)
     exp = progs.expected(name, n)
     img = fabric.Image(b, W, H, 1024, 1024, scatter=scatter)
-    r = rtl.run(b, W, H, img=img, seed=seed, jitter=jitter, stall=stall, pmsg=pmsg, spawn=spawn, link_local=link_local)
+    r = rtl.run(b, W, H, img=img, seed=seed, jitter=jitter, stall=stall, pmsg=pmsg, spawn=spawn, link_local=link_local, s14=s14)
     ok = ref["readback"] == exp and r["readback"] == exp and r["interactions"] == ref["interactions"] and r["node_count"] == ref["nodes"]
     return ok, r, ref
 
@@ -85,6 +85,7 @@ def main():
     rng = random.Random(2026)
     sprng = random.Random(11)
     sprng13 = random.Random(13)       # step 13 knobs: own stream (the earlier case sequence is unchanged)
+    sprng14 = random.Random(14)       # step 14 fork deque on / off (+s14), own stream
     for i in range(fuzz):
         name = rng.choice([s[0] for s in SUITE])
         N = {"fib": rng.randint(0, 11), "sum": rng.randint(0, 120), "fact": rng.randint(0, 13), "list": rng.randint(0, 25),
@@ -96,7 +97,7 @@ def main():
                               scatter=rng.randint(0, 10**6) if rng.random() < 0.5 else None,
                               spawn=(sprng.choice([-1, 0, 2, 8, 8, 32]), sprng.choice([0, 1, 1]), fabric.SPAWN_K2,
                                      sprng13.choice([-1, 0, 2, 4, 4, 16]), sprng13.choice([0, 0, 20, 50, 200])),
-                              link_local=sprng.choice([0, 1, 1]))
+                              link_local=sprng.choice([0, 1, 1]), s14=sprng14.choice([0, 1, 1]))
         n += 1
         if not ok:
             fails += 1; print(f"FAIL fuzz {name}({N}) {W}x{H}: {r['readback']} {r['interactions']}/{ref['interactions']}")
