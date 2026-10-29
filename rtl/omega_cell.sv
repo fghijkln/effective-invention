@@ -354,7 +354,7 @@ module omega_cell #(
     q_ok      = tq_av != 0;
     stall_now = (stall != 0) && (erng[7:0] < stall);
     rnd_msg   = erng[15:8] < pmsg;
-    idle      = (state == S_IDLE) && (tq_tot == 0) && (fcnt == 0 || MUT[48]) && !ej_v && (ob_cnt == 0) && (!rbusy || MUT[15]) && !vh_v && (!rs_v || MUT[40]);
+    idle      = (state == S_IDLE) && (tq_tot == 0) && (fcnt == 0) && !ej_v && (ob_cnt == 0) && (!rbusy || MUT[15]) && !vh_v && (!rs_v || MUT[40]);
     ready     = state != S_INIT;
     hungry    = (state == S_IDLE) && (tq_all == 0) && !ej_v && (roomy || MUT[28]) && !vh_v && !rs_v;
   end
@@ -951,6 +951,8 @@ module omega_cell #(
       for (int j = 0; j < 3; j++) if (j < 32'(tq_push)) begin
         if (fork_dq && fc_n < 3'(FD) && ftask(tq_pd[j], fbit[DB'(frefl(tq_pd[j]))] && spawn_hint)) begin
           fq_n[fc_n[1:0]] = tq_pd[j][127:0]; fc_n = fc_n + 3'd1;
+        end else if (fork_dq && MUT[48] && ftask(tq_pd[j], fbit[DB'(frefl(tq_pd[j]))] && spawn_hint)) begin
+          // mutant 48: a fork task finding the deque full is dropped
         end else begin
           fpd[fm[1:0]] = tq_pd[j]; fm = fm + 3'd1;
         end
