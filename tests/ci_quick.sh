@@ -5,6 +5,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.." && export PYTHONPATH=.:tests
 python3 tests/test_units.py --rtl
 python3 tests/test_programs.py --fuzz 0
+python3 tests/test_s14.py
 python3 tests/fuzz_rtl.py 0 80
 python3 tests/test_security.py --fuzz 20
 python3 tests/test_mempress.py --quick
