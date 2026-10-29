@@ -10,12 +10,12 @@ SUITE = [("fib", 12), ("sum", 100), ("fact", 12), ("list", 25), ("treesum", 7), 
 SHAPES = [(1, 1), (2, 2), (4, 4)]
 
 
-def run_case(name, n, W, H, seed, jitter, stall, pmsg, scatter):
+def run_case(name, n, W, H, seed, jitter, stall, pmsg, scatter, spawn=None, link_local=None):
     b = progs.book(name, n)
     ref = semantic.result(b)
     exp = progs.expected(name, n)
     img = fabric.Image(b, W, H, 1024, 1024, scatter=scatter)
-    r = rtl.run(b, W, H, img=img, seed=seed, jitter=jitter, stall=stall, pmsg=pmsg)
+    r = rtl.run(b, W, H, img=img, seed=seed, jitter=jitter, stall=stall, pmsg=pmsg, spawn=spawn, link_local=link_local)
     ok = ref["readback"] == exp and r["readback"] == exp and r["interactions"] == ref["interactions"] and r["node_count"] == ref["nodes"]
     return ok, r, ref
 
@@ -30,6 +30,15 @@ def main():
             n += 1
             if semantic.result(progs.book(name, N))["readback"] != progs.expected(name, N):
                 fails += 1; print(f"FAIL semantic {name}({N})")
+    # step 11 fork hint (loader analysis): exactly the divide-and-conquer recursions are fork targets
+    FORK = {"fib": {"fib", "fib__a1"}, "treesum": {"gen", "gen__a2", "tsum", "tsum__a3"}, "qsort": {"qs", "qs__a5"}, "treesum_direct": {"tsum", "tsum__a1"},
+            "sum": set(), "fact": set(), "list": set(), "sort": set(), "higher": set()}
+    for name, want in FORK.items():
+        b = progs.book(name, 3)
+        got = {b.defs[i].name for i in fabric.fork_defs(b)}
+        n += 1
+        if got != want:
+            fails += 1; print(f"FAIL fork hint {name}: {sorted(got)} want {sorted(want)}")
     for name, N in SUITE:
         b = progs.book(name, N)
         ref = semantic.result(b)
@@ -39,8 +48,10 @@ def main():
         n += 1
         for W, H in SHAPES:
             for k in range(2):
+                # schedule 0: default spawn policy and link orientation; schedule 1: the step-10 policy
+                # (every REF to a hungry neighbour, A = first var), so both decision paths stay covered
                 ok, r, ref = run_case(name, N, W, H, seed=k * 31 + W, jitter=[0, 60][k], stall=[0, 30][k],
-                                      pmsg=[128, 40][k], scatter=None)
+                                      pmsg=[128, 40][k], scatter=None, spawn=[None, (-1, 0)][k], link_local=[None, 0][k])
                 n += 1
                 if not ok:
                     fails += 1; print(f"FAIL rtl {name}({N}) {W}x{H} k={k}: {r['readback']} {r['interactions']}/{ref['interactions']}")
@@ -50,7 +61,17 @@ def main():
     n += 1
     if c1 / c4 < 3.0:
         fails += 1; print(f"FAIL perf bound: treesum_direct(9) speedup {c1/c4:.2f} < 3")
+    # step 11 message bound: low-parallel programs keep their messages per interaction low on 4x4 (the
+    # step-10 policy sends about 1.5-1.7 per interaction on these), and stay at least as fast as 1x1
+    for name, N, bound in (("qsort", 20, 0.6), ("list", 40, 0.6)):
+        b = progs.book(name, N)
+        r1 = rtl.run(b, 1, 1, slots=4096); r4 = rtl.run(b, 4, 4)
+        mpi = sum(r4["msgs"].values()) / r4["interactions"]
+        n += 1
+        if mpi > bound or r4["cycles"] > r1["cycles"]:
+            fails += 1; print(f"FAIL message bound: {name}({N}) 4x4 {mpi:.2f} msgs/interaction (bound {bound}), cycles {r4['cycles']} vs 1x1 {r1['cycles']}")
     rng = random.Random(2026)
+    sprng = random.Random(11)
     for i in range(fuzz):
         name = rng.choice([s[0] for s in SUITE])
         N = {"fib": rng.randint(0, 11), "sum": rng.randint(0, 120), "fact": rng.randint(0, 13), "list": rng.randint(0, 25),
@@ -59,7 +80,8 @@ def main():
         W, H = rng.choice([(1, 1), (2, 2), (4, 4), (3, 2), (1, 4)])
         ok, r, ref = run_case(name, N, W, H, seed=rng.randint(1, 10**9), jitter=rng.choice([0, 40, 120, 200]),
                               stall=rng.choice([0, 30, 90]), pmsg=rng.randint(0, 255),
-                              scatter=rng.randint(0, 10**6) if rng.random() < 0.5 else None)
+                              scatter=rng.randint(0, 10**6) if rng.random() < 0.5 else None,
+                              spawn=(sprng.choice([-1, 0, 2, 8, 8, 32]), sprng.choice([0, 1, 1])), link_local=sprng.choice([0, 1, 1]))
         n += 1
         if not ok:
             fails += 1; print(f"FAIL fuzz {name}({N}) {W}x{H}: {r['readback']} {r['interactions']}/{ref['interactions']}")

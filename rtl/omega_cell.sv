@@ -48,6 +48,10 @@ module omega_cell #(
   input  logic [31:0] seed,
   input  logic [7:0]  jitter, stall, pmsg,
   input  logic [7:0]  fi,                  // fault injection: bit 0 = sender skips the cross-owner check
+  input  logic [7:0]  spawn_k,             // step 11 spawn policy (configuration, SPEC 5): threshold K for linear recursions, 255 = always
+  input  logic        spawn_hint,          //   and use of the fork / recursion hints (directory bits 56 / 57)
+  input  logic [7:0]  spawn_k2,            //   threshold for non-recursive definitions (255 = always)
+  input  logic        link_local,          // step 12: local-first orientation of var ~ var links
   input  logic [3:0]  in_v,
   input  flit_t [3:0] in_f,
   output logic [3:0]  in_rdy,
@@ -285,12 +289,18 @@ module omega_cell #(
   function automatic logic nforged(input logic valid, input logic [63:0] p, input logic [131:0] w);
     nforged = !MUT[21] && (!valid || w[131:128] != pown(p));
   endfunction
-  // order a link: A = var side if any; P / Q = the pair ordered by (tag, label), bigger first
+  // order a link: A = var side if any; P / Q = the pair ordered by (tag, label), bigger first.
+  // Step 12, local-first orientation (SPEC 4): a var ~ var link may be resolved at either var's owner,
+  // so when x is a remote var and y a local in-bounds var, y becomes A and the exchange happens here
+  // instead of a LINK(x ~ y) message to x's cell.
+  function automatic logic lflip(input logic [63:0] x, input logic [63:0] y);
+    lflip = link_local && !MUT[44] && is_var(x) && is_var(y) && !oob(x) && !local_p(x) && !oob(y) && local_p(y);
+  endfunction
   function automatic logic [63:0] ordA(input logic [63:0] x, input logic [63:0] y);
-    ordA = (!is_var(x) && is_var(y)) ? y : x;
+    ordA = ((!is_var(x) && is_var(y)) || lflip(x, y)) ? y : x;
   endfunction
   function automatic logic [63:0] ordB(input logic [63:0] x, input logic [63:0] y);
-    ordB = (!is_var(x) && is_var(y)) ? x : y;
+    ordB = ((!is_var(x) && is_var(y)) || lflip(x, y)) ? x : y;
   endfunction
   function automatic logic qfirst(input logic [63:0] a, input logic [63:0] b);   // b is P
     qfirst = ptag(a) < ptag(b) || (ptag(a) == ptag(b) && plab(a) < plab(b));
@@ -319,6 +329,19 @@ module omega_cell #(
     ready     = state != S_INIT;
     hungry    = (state == S_IDLE) && (tq_tot == 0) && !ej_v && (roomy || MUT[28]) && !vh_v && !rs_v;
   end
+
+  // sender-side spawn decision (step 11, SPEC 5): the neighbour is hungry, the outbox has room, and
+  // with spawn_hint: a fork target (directory bit 56: a recursion SCC called twice from one template)
+  // always; a definition of a linear recursion (bit 57) while more than spawn_k tasks wait on the local
+  // stack; any other (non-recursive: constructors, arms) while more than spawn_k2 wait (255 = no
+  // threshold).  Without spawn_hint every REF uses spawn_k.  The directory word d_rd of the REF in dQ is read ahead, so the
+  // decision is known in S_LINK.
+  logic sp_give;
+  always_comb
+    sp_give = hv_found && can_send && !MUT[7] &&
+              (MUT[42] || (spawn_hint && d_rd[56] && !MUT[43]) ||
+               ((!spawn_hint || d_rd[57]) ? (spawn_k == 8'hFF || 32'(tq_tot) > 32'(spawn_k))
+                                          : (spawn_k2 == 8'hFF || 32'(tq_tot) > 32'(spawn_k2))));
 
   // translation of a template port during EXPAND (stamps the expanding owner, relocates via the maps)
   // (nmap / vmap entries are looked up by the caller: functions may not read module arrays in Yosys)
@@ -385,7 +408,7 @@ module omega_cell #(
     if (state == S_EXN) begin
       rom_req = c1 || c2;
       rom_q = c1 ? ni[7:2] : ni1[7:2];
-    end else if (state == S_LINK && ptag(dQ) == T_REF && (rsp || rsx || !(hv_found && can_send && !MUT[7]))) begin
+    end else if (state == S_LINK && ptag(dQ) == T_REF && (rsp || rsx || !sp_give)) begin
       rom_req = 1'b1; nb = d_rd[15:0]; rb2 = d_rd[31:16];       // (the buffer is cleared when the expansion starts)
     end
     rom_an = (nb >> 2) + 16'(rom_q); rom_ar = (rb2 >> 2) + 16'(rom_q);
@@ -718,7 +741,7 @@ module omega_cell #(
         logic [7:0] nn, nv, nr;
         nn = d_rd[39:32]; nv = d_rd[47:40]; nr = d_rd[55:48];
         hrot <= hrot + 2'd1;
-        if (!sp_local_only && hv_found && can_send && !MUT[7]) begin
+        if (!sp_local_only && sp_give) begin
           snd = 1'b1; sf = {M_SPAWN, dir_x(hv_dir), dir_y(hv_dir), 64'd0, 64'd0, sp_x_p, sp_ref_p};
           fin = 1'b1;
         end else if ((SB+2)'(nn) <= nf_tot && (SB+2)'(nv) <= vf_tot && (32'(tq_tot) + 32'(nr) + 1) < QDEPTH) begin

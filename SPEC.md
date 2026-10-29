@@ -99,6 +99,14 @@ link(a, b):
     if old == NONE: return                                  -- other end will find b
     free var a; a = old                                     -- both ends known: keep joining
 ```
+**Local-first orientation (step 12).** When both sides are vars, `link` is symmetric: the exchange may
+happen at either var's home cell. A cell therefore swaps the pair when `a` is a remote var and `b` a
+local, in-bounds var (`lflip` in `omega_cell.sv`, `Cell.flip` in the fabric model; configuration bit
+`link_local`, default on). The exchange then happens here, with no LINK message: `b` either takes `a`
+(and the message, if any, is sent later by whoever reaches `b` second) or `b` was already substituted
+and the loop continues with `old ~ a`. Atomicity is unchanged (every exchange is still at the var's own
+cell), and all owner checks are symmetric or run on whichever var becomes `a`. On 8×8 it removes
+25-55% of the LINK messages of the low-parallel programs and treesum (results/bench_msgs.md).
 For `redex(a, b)` the pair is first oriented so that `P` has the larger `(tag, label)` and `Q` the
 smaller. The rules are total, with exactly one rule per pair, so strong confluence holds: every
 schedule performs the same multiset of interactions and reaches the same normal form.
@@ -133,6 +141,18 @@ All inter-cell communication is a single wide flit
 | `NODE` | p0 = node pointer (tag, label), p1/p2 = its aux ports, p3 = partner pointer | a binary-binary redex whose nodes are in two cells: the local node **migrates** to its partner's cell | allocates a slot, writes the node there (*re-homing*) and runs `link(new, partner)`. Both nodes are now local |
 | `SPAWN` | p0 = REF id, p1 = partner port | a REF expansion given to a *hungry* neighbour (work distribution), or forwarded because the cell is out of slots | expands the definition locally and links its root with the partner (which may stay remote) |
 | `PULL` | as `NODE` (p0 = node P, p1/p2 = its aux ports, p3 = partner Q, a node in the sender) | a local commutation P ~ Q for which the cell has no free slots (memory pressure, §5): sent to a *roomy* neighbour | re-homes P (P'), then sends `LINK(Q ~ P')` to Q's cell (task kind `K_FWD` if the outbox is full). There the ordinary NODE rule migrates Q to P', so both nodes end up in the roomy cell, which applies the rule |
+
+**Remote-pointer path compression (step 12 study, not implemented).** A LINK that reaches a var
+already substituted by a var in a third cell is forwarded there. Compressing the path ("update the
+source pointer to the final owner") has nothing to update in a linear net: the pointer that caused
+the LINK was consumed by it, and the intermediate var is freed by the forward, so no copy of either
+remains. Only a chain of two or more forwards could be shortened at all, and `bench/link_forwards.py`
+measures that bound on 8×8 with the step-11/12 policy: 176 of 3,489 LINKs for qsort(40), 1 of 1,195
+for list(120), 208 of 3,880 for treesum(9) (≤ 5.4%). Local-first orientation (above) is the change that
+cuts forwarding itself (qsort forwards 1,483 → 839). Same-cycle merging of two LINKs to one
+destination into one flit was also measured: the outbox drains every cycle, so the fabric model found
+no LINK ever queued behind another LINK to the same cell (0 opportunities in qsort, list, treesum,
+fib on 8×8); not implemented.
 
 Correctness argument (also checked by fuzzing):
 1. A var has exactly two occurrences, and each occurrence is consumed by at most one `link`. All
@@ -176,6 +196,26 @@ Correctness argument (also checked by fuzzing):
   sent ~100× more messages and could exhaust a 2×2 fabric's memory, because eager breadth-first
   unfolding filled the cells. The pull-like policy keeps every cell depth-first until a neighbour asks
   for work.
+* **Sender-side spawn threshold and definition hints (step 11).** A hungry neighbour alone does not
+  get the REF any more. The loader marks two bits in every directory word (`fabric.fork_defs`):
+  bit 56 **fork** — the definition belongs to a recursion SCC that some template calls at least twice
+  (both halves of a divide-and-conquer recursion: fib, gen/tsum, qs; the two arms of a switch count
+  once); bit 57 **rec** — the definition belongs to any recursion SCC (list walks, filters, counters
+  as well). With `spawn_hint` set (default) the sender hands the REF to a hungry neighbour only if
+  * it is a fork target (always: coarse-grained work), or
+  * it is a linear-recursion definition and more than `spawn_k` tasks wait on the local task stack
+    (default 16), or
+  * it is non-recursive (constructor, arm, `main`) and more than `spawn_k2` tasks wait (default 4).
+  Without the hint every REF uses `spawn_k`; 255 means no threshold (spawn_k = 255, hint off is the
+  step-10 policy). All three are configuration inputs of the mesh (`+spawnk`, `+spawnhint`,
+  `+spawnk2`), so one build serves every setting. Otherwise a sequential chain hopped from cell to
+  cell dragging its wires behind it (each hop cost about 8 LINK + 3 NODE messages in qsort). The
+  decision is made in S_LINK from the read-ahead directory word and `tq_tot`, with no extra cycle.
+  Sweeps (`results/spawn_sweep.md`): a threshold alone was rejected (K = 2 slows fib(20) 4×4 by 36%,
+  K = 8 by 3.1×); spawn_k sets the trade-off for linear recursions (sum(1000) 8×8 is slower than one
+  cell below K ≈ 12), spawn_k2 the one for constructors (treesum(9) 8×8, mean of 4 seeds: 2,178
+  cycles with K2 = no threshold, 2,374 with 4, 2,646 with 2; qsort/list exceed 0.5 msgs/interaction
+  with no threshold).
 * **Memory pressure (step 4).** Each cell also drives a 1-bit `roomy` wire: free node slots and free
   var slots both ≥ SLOTS/4 sets it, either < SLOTS/8 clears it (hysteresis, so the wire does not
   toggle on every allocation). `hungry` additionally requires `roomy`, so a full cell never asks for

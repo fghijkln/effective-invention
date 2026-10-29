@@ -1,0 +1,12 @@
+{"prog": "treesum(9)", "mesh": "8x8", "K": 16, "hint": 1, "ll": 1, "K2": 4, "ok": true, "cycles": [2224, 2139, 2481, 2652], "mean": 2374, "mpi": 0.419}
+{"prog": "treesum(9)", "mesh": "8x8", "K": 16, "hint": 1, "ll": 1, "K2": 6, "ok": true, "cycles": [2892, 2251, 2525, 2613], "mean": 2570, "mpi": 0.448}
+{"prog": "treesum(9)", "mesh": "8x8", "K": 16, "hint": 1, "ll": 1, "K2": 3, "ok": true, "cycles": [2339, 2470, 2422, 2886], "mean": 2529, "mpi": 0.454}
+{"prog": "qsort(40)", "mesh": "8x8", "K": 16, "hint": 1, "ll": 1, "K2": 4, "ok": true, "cycles": [15270, 14669, 15105, 14979], "mean": 15006, "mpi": 0.382}
+{"prog": "qsort(40)", "mesh": "8x8", "K": 16, "hint": 1, "ll": 1, "K2": 6, "ok": true, "cycles": [15969, 16100, 15404, 15813], "mean": 15822, "mpi": 0.368}
+{"prog": "qsort(40)", "mesh": "8x8", "K": 16, "hint": 1, "ll": 1, "K2": 3, "ok": true, "cycles": [14197, 15064, 14582, 15847], "mean": 14922, "mpi": 0.392}
+{"prog": "list(120)", "mesh": "8x8", "K": 16, "hint": 1, "ll": 1, "K2": 4, "ok": true, "cycles": [9485, 9288, 9232, 9200], "mean": 9301, "mpi": 0.413}
+{"prog": "list(120)", "mesh": "8x8", "K": 16, "hint": 1, "ll": 1, "K2": 6, "ok": true, "cycles": [9784, 7929, 9388, 9260], "mean": 9090, "mpi": 0.38}
+{"prog": "list(120)", "mesh": "8x8", "K": 16, "hint": 1, "ll": 1, "K2": 3, "ok": true, "cycles": [9761, 9305, 9427, 9424], "mean": 9479, "mpi": 0.453}
+{"prog": "sum(1000)", "mesh": "8x8", "K": 16, "hint": 1, "ll": 1, "K2": 4, "ok": true, "cycles": [28943, 28930, 28940, 28949], "mean": 28940, "mpi": 0.022}
+{"prog": "sum(1000)", "mesh": "8x8", "K": 16, "hint": 1, "ll": 1, "K2": 6, "ok": true, "cycles": [28943, 28930, 28940, 28949], "mean": 28940, "mpi": 0.022}
+{"prog": "sum(1000)", "mesh": "8x8", "K": 16, "hint": 1, "ll": 1, "K2": 3, "ok": true, "cycles": [28943, 28930, 28940, 28949], "mean": 28940, "mpi": 0.022}

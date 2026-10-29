@@ -16,6 +16,10 @@ from .ports import *
 from . import semantic
 
 MSG_LINK, MSG_NODE, MSG_SPAWN, MSG_PULL = 0, 1, 2, 3
+SPAWN_K = int(__import__('os').environ.get('OMEGA_SPAWN_K', '16'))
+SPAWN_HINT = int(__import__('os').environ.get('OMEGA_SPAWN_HINT', '1'))
+SPAWN_K2 = int(__import__('os').environ.get('OMEGA_SPAWN_K2', '4'))
+LINK_LOCAL = int(__import__('os').environ.get('OMEGA_LINK_LOCAL', '1'))
 MSG_NAMES = ["LINK", "NODE", "SPAWN", "PULL"]
 T_LINK, T_EXPAND, T_SPAWN, T_FWD = 0, 1, 2, 3
 RTO = 32          # retry-slot timeout (cycles), as rtl/omega_cell.sv
@@ -101,6 +105,7 @@ class Image:
         self.rom = []
         self.dir = []
         self.romn, self.romr, self.dir3 = [], [], []
+        self.fork, self.rec = fork, rec = fork_defs(book, with_rec=True)
         for dd in book.defs:
             self.dir.append(len(self.rom))
             cnt = len(dd.nodes) | (dd.nvars << 8) | (len(dd.redexes) << 16)
@@ -108,7 +113,7 @@ class Image:
                 raise FabricError(f"definition @{dd.name} too large for one EXPAND "
                                   f"({len(dd.nodes)} nodes / {dd.nvars} vars, limit {XMAP})")
             self.rom.append((dd.root, cnt))
-            self.dir3.append(len(self.romn) | (len(self.romr) << 16) | (cnt << 32) | (dd.root << 64))
+            self.dir3.append(len(self.romn) | (len(self.romr) << 16) | (cnt << 32) | (int(len(self.dir3) in fork) << 56) | (int(len(self.dir3) in rec) << 57) | (dd.root << 64))
             self.romn += [(a, b) for (_, a, b) in dd.nodes]
             self.romr += list(dd.redexes)
             # cluster ROM words hold four entries: align every definition to a multiple of four
@@ -184,6 +189,59 @@ def readback_dump(book, nodes, vars_, root=mk(VAR, 0, addr(0, 0, 0))):
         e = vars_[(x, y)][addr_slot(a)]
         return mk(NONE) if e is None else e
     return semantic.readback(gn, gv, root, book)
+
+
+def fork_defs(book, with_rec=False):
+    """Step 11 spawn hint (SPEC 5): the definitions worth handing to another cell.  A definition is a
+    fork target when it belongs to a recursion SCC that some template calls at least twice (both
+    branches of a divide-and-conquer recursion, e.g. fib(n-1) and fib(n-2), qs(lo) and qs(hi); the two
+    arms of a switch count once); its REF expansions are the coarse-grained work.  REFs into a linear recursion (a list walk, a filter
+    chain, a counter) are expanded where they meet their partner, so a sequential chain does not hop
+    from cell to cell dragging remote wires behind it.  Returns a set of definition ids."""
+    n = len(book.defs)
+    calls, groups = [], []          # calls: every REF (call graph); groups: alternatives grouped
+    for d in book.defs:
+        # the two branches of a switch, ?((A B) r), are alternatives, not two calls: a SWI node's aux1
+        # (a CON pair) counts as one group
+        alt = set()
+        for (tp, a, b) in d.nodes:
+            if tag(tp) == SWI and tag(a) == CON and not (a & ABS_BIT):
+                alt.add(payload(a))
+        refs, grp = [], []
+        for j, (tp, a, b) in enumerate(d.nodes):
+            ps = [label(p) for p in (a, b) if tag(p) == REF and not (p & ABS_BIT)]
+            refs += ps
+            grp += [ps] if j in alt and ps else [[q] for q in ps]
+        for p in [d.root] + [q for r in d.redexes for q in r]:
+            if p is not None and tag(p) == REF and not (p & ABS_BIT):
+                refs.append(label(p)); grp.append([label(p)])
+        calls.append(refs); groups.append(grp)
+    # SCCs (Tarjan, iterative enough for small books)
+    idx, low, onst, st, comp, k = {}, {}, set(), [], [0] * n, [0]
+    def strong(v):
+        idx[v] = low[v] = k[0]; k[0] += 1; st.append(v); onst.add(v)
+        for w in set(calls[v]):
+            if w >= n: continue
+            if w not in idx:
+                strong(w); low[v] = min(low[v], low[w])
+            elif w in onst:
+                low[v] = min(low[v], idx[w])
+        if low[v] == idx[v]:
+            while True:
+                w = st.pop(); onst.discard(w); comp[w] = v
+                if w == v: break
+    import sys as _s
+    _s.setrecursionlimit(max(_s.getrecursionlimit(), 10000))
+    for v in range(n):
+        if v not in idx: strong(v)
+    rec = {u for u in range(n) if sum(comp[w] == comp[u] for w in range(n)) > 1 or u in calls[u]}
+    fork = set()
+    for v in range(n):
+        for c in set(comp[w] for w in calls[v] if w < n):
+            hits = [g for g in groups[v] if any(w < n and comp[w] == c for w in g)]
+            if len(hits) >= 2 and c in rec:
+                fork.update(u for u in range(n) if comp[u] == c)     # the whole recursion SCC
+    return (fork, rec) if with_rec else fork
 
 
 # ---------------------------------------------------------------------------------------------
@@ -285,6 +343,8 @@ class Cell:
             cost += 1
             if not is_var(a) and is_var(b):
                 a, b = b, a
+            if self.fab.link_local and self.flip(a, b):
+                a, b = b, a
             if self.cross(a, b, self.fab.fi_nosend and self.remote_target(a, b)):
                 return cost + self.trap(TRAP_CROSS, a if owner(a) < owner(b) else b)
             if not is_var(a):
@@ -315,6 +375,8 @@ class Cell:
         while True:
             if not is_var(a) and is_var(b):
                 a, b = b, a
+            if self.fab.link_local and self.flip(a, b):
+                a, b = b, a
             if (not is_var(a) or self.oob(a) or not self.local(a) or self.cross(a, b)
                     or self.vown[addr_slot(payload(a))] != owner(a)):
                 return hops, ((a, b) if hops else None)
@@ -328,6 +390,12 @@ class Cell:
             self.vown[s] = OWNER_FREE
             self.vfree.append(s)
             a = old
+
+    def flip(self, a, b):
+        """Step 12 local-first link orientation (SPEC 4): a link between two vars may be resolved at
+        either var's owner (link is symmetric).  When A is a remote var and B a local, in-bounds var,
+        exchange at B here instead of sending LINK(A ~ B) to A's cell."""
+        return is_var(a) and is_var(b) and not self.oob(a) and not self.local(a) and not self.oob(b) and self.local(b)
 
     def remote_target(self, a, b):
         """Would this link/redex leave the cell (used only by the fault-injection knob)?"""
@@ -371,6 +439,17 @@ class Cell:
                 return d
         return None
 
+    def give(self, r):
+        """Step 11 sender-side decision (SPEC 5): fork targets always (with the hint); a definition of a
+        linear recursion only while more than spawn_k tasks wait here; a non-recursive one (constructor,
+        arm) while more than spawn_k2 wait.  K = -1: no threshold.  Without the hint every REF uses spawn_k."""
+        q, fab = len(self.queue), self.fab
+        if not fab.spawn_hint:
+            return q > fab.spawn_k
+        if r in fab.img.fork:
+            return True
+        return q > (fab.spawn_k if r in fab.img.rec else fab.spawn_k2)
+
     def spawn(self, ref, x):
         """Demand-driven work distribution: hand the expansion to a hungry neighbour (one that
         advertises an empty task stack on its side-band wire), otherwise expand locally."""
@@ -378,7 +457,8 @@ class Cell:
         order = ["N", "E", "S", "W"]
         for k in range(4):
             d = order[(self.hrot - 1 + k) % 4]
-            if d in self.nbrs and self.fab.cells[self.nbr_xy(d)].hungry() and self.can_send():
+            if (d in self.nbrs and self.give(label(ref))
+                    and self.fab.cells[self.nbr_xy(d)].hungry() and self.can_send()):
                 self.send(MSG_SPAWN, self.nbr_xy(d), ref, x)
                 return 1
         return self.expand(ref, x)
@@ -648,8 +728,14 @@ class Cell:
 
 class Fabric:
     def __init__(self, book, W, H, slots=1024, qdepth=1024, fifo_depth=4, seed=0,
-                 p_jitter=0.0, p_stall=0.0, p_msg=0.5, img=None, fi_nosend=False, cluster=(2, 2, 1)):
+                 p_jitter=0.0, p_stall=0.0, p_msg=0.5, img=None, fi_nosend=False, cluster=(2, 2, 1), spawn_k=None, spawn_hint=None, link_local=None, spawn_k2=None):
         self.book, self.W, self.H = book, W, H
+        # sender-side spawn threshold (step 11, SPEC 5): hand a REF expansion to a hungry neighbour only
+        # while more than spawn_k tasks wait on the local task stack (-1 = always, the step-10 policy)
+        self.spawn_k = SPAWN_K if spawn_k is None else spawn_k
+        self.spawn_hint = SPAWN_HINT if spawn_hint is None else spawn_hint
+        self.link_local = LINK_LOCAL if link_local is None else link_local
+        self.spawn_k2 = SPAWN_K2 if spawn_k2 is None else spawn_k2
         # cluster definition ROM (SPEC 5.6): CW x CH cells share one ROM with NP read ports.  An
         # EXPAND reads max(nodes, redexes) template entries, two per ROM word (one grant per pair); a cell whose
         # cluster's ports are all busy waits (the RTL interleaves cycle by cycle with a round-robin

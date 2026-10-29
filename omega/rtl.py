@@ -76,7 +76,11 @@ def _readhex(path, n):
 
 
 def run(book, W, H, seed=1, jitter=0, stall=0, pmsg=128, slots=1024, qdepth=1024, romsz=4096,
-        mut=0, maxcycles=20_000_000, keep=None, img=None, timeout=600, fi=0, cluster=None):
+        mut=0, maxcycles=20_000_000, keep=None, img=None, timeout=600, fi=0, cluster=None, spawn=None, link_local=None):
+    """spawn = (K, hint[, K2]): step-11 spawn policy (default: fabric.SPAWN_K / SPAWN_HINT, env OMEGA_SPAWN_K /
+    OMEGA_SPAWN_HINT); K = -1 hands every REF to a hungry neighbour (the step-10 policy)."""
+    sk, sh, sk2 = (tuple(spawn) + (fabric.SPAWN_K2,))[:3] if spawn else (fabric.SPAWN_K, fabric.SPAWN_HINT, fabric.SPAWN_K2)
+    ll = fabric.LINK_LOCAL if link_local is None else link_local     # step 12 (OMEGA_LINK_LOCAL)
     exe = build(W, H, slots, qdepth, romsz, mut, cluster=cluster)
     img = img or fabric.Image(book, W, H, slots, qdepth)
     if len(img.romn) > romsz or len(img.romr) > RDXSZ or len(img.dir) > 256:
@@ -85,7 +89,9 @@ def run(book, W, H, seed=1, jitter=0, stall=0, pmsg=128, slots=1024, qdepth=1024
     try:
         img.write_hex(tmp)
         r = subprocess.run([exe, f"+img={tmp}", f"+seed={seed}", f"+jitter={jitter}", f"+stall={stall}",
-                            f"+pmsg={pmsg}", f"+maxcycles={maxcycles}", f"+fi={fi}"], capture_output=True, text=True, timeout=timeout)
+                            f"+pmsg={pmsg}", f"+maxcycles={maxcycles}", f"+fi={fi}",
+                            f"+spawnk={255 if sk < 0 else min(sk, 254)}", f"+spawnhint={int(bool(sh))}", f"+linklocal={int(bool(ll))}",
+                            f"+spawnk2={255 if sk2 < 0 else min(sk2, 254)}"], capture_output=True, text=True, timeout=timeout)
         res = {}
         for line in r.stdout.splitlines():
             k, _, v = line.partition(" ")

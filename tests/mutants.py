@@ -49,6 +49,9 @@ MUTANTS = {
     39: "retry slot: a parked retry is never taken again (lost work / hang)",
     40: "retry slot: quiescence ignores a parked retry (premature termination)",
     41: "retry slot: no escalation (a parked retry never falls back to round-robin SPAWN / NODE / PULL moves)",
+    42: "spawn policy: threshold ignored (every REF to a hungry neighbour, the step-10 policy; performance only: caught by the message bound)",
+    43: "spawn policy: fork hint ignored (divide-and-conquer REFs held back by the threshold; performance only: caught by the speed-up bound)",
+    44: "local-first link orientation disabled (a remote var ~ local var link is always sent away; performance only: caught by the LINK bound)",
 }
 PROGS = [("fib", 8), ("list", 6), ("sort", 6), ("higher", 5), ("fact", 5), ("treesum", 4), ("qsort", 5), ("sum", 20)]
 
@@ -88,6 +91,21 @@ def try_mutant(bit):
         c0 = rtl.run(b, 1, 1)["cycles"]
         c1 = rtl.run(b, 1, 1, mut=mut)["cycles"]
         return (c1 > 1.1 * c0), f"fib(12) 1x1 cycles {c1} with the mutant vs {c0} (bound: > 1.1x)"
+    if bit == 42:
+        b = progs.book("qsort", 20)
+        r = rtl.run(b, 4, 4, mut=mut)
+        mpi = sum(r["msgs"].values()) / r["interactions"]
+        return (mpi > 0.6), f"qsort(20) 4x4 {mpi:.2f} msgs/interaction with the mutant (bound <= 0.6)"
+    if bit == 43:
+        b = progs.book("fib", 12)
+        c0 = rtl.run(b, 4, 4)["cycles"]
+        c1 = rtl.run(b, 4, 4, mut=mut)["cycles"]
+        return (c1 > 1.3 * c0), f"fib(12) 4x4 cycles {c1} with the mutant vs {c0} (bound: > 1.3x)"
+    if bit == 44:
+        b = progs.book("treesum", 7)
+        l0 = rtl.run(b, 4, 4)["msgs"]["msg_link"]
+        l1 = rtl.run(b, 4, 4, mut=mut)["msgs"]["msg_link"]
+        return (l1 > 1.3 * l0), f"treesum(7) 4x4 LINK messages {l1} with the mutant vs {l0} (bound: > 1.3x)"
     if bit == 7:
         b = progs.book("treesum_direct", 8)
         c1 = rtl.run(b, 1, 1, mut=mut)["cycles"]

@@ -54,17 +54,18 @@ def check(name, book, tenants, W, H, use_rtl=True, seed=1, jitter=0, stall=0, pm
             fails.append(f"{tag} traps {traps} want {ref['traps']}")
         if inter != ref["interactions"] and not fi:   # under fault injection a skipped sender check may count one REF expansion
             fails.append(f"{tag} interactions {inter} want {ref['interactions']}")
+    ll = int(seed % 3 != 0)       # step 12: link orientation varies with the seed (both paths checked)
     if mut == 0:
         img = fabric.Image(book, W, H, 1024, 1024, scatter=scatter, tenants=tenants)
         f = fabric.Fabric(book, W, H, seed=seed, p_jitter=jitter / 256, p_stall=stall / 256, img=img,
-                          fi_nosend=bool(fi & 1)).run()
+                          fi_nosend=bool(fi & 1), link_local=ll).run()
         cmp(f"fabric {W}x{H}", f.tenant_results(), f.traps(), f.interactions)
     r = None
     if use_rtl:
         from omega import rtl
         img = fabric.Image(book, W, H, 1024, 1024, scatter=scatter, tenants=tenants)
         r = rtl.run(book, W, H, img=img, seed=seed, jitter=jitter, stall=stall, pmsg=pmsg, fi=fi, mut=mut,
-                    maxcycles=2_000_000, timeout=120)
+                    maxcycles=2_000_000, timeout=120, link_local=ll)
         if r["status"] != 0:
             fails.append(f"rtl {W}x{H} status {r['status']}")
         else:

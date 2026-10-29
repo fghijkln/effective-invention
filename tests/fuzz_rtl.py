@@ -30,6 +30,10 @@ def case(i, mut=0, big=False):
     knobs = dict(seed=rng.randint(1, 2**31), jitter=rng.choice([0, 0, 30, 80, 160]), stall=rng.choice([0, 20, 60]),
                  pmsg=rng.randint(0, 255))
     img = fabric.Image(b, W, H, 1024, 1024, scatter=rng.randint(0, 10**9) if rng.random() < 0.7 else None)
+    # step 11 spawn policy, drawn from its own stream (the step-10 knob sequence is unchanged)
+    sp = random.Random(i * 104729 + 7)
+    knobs["spawn"] = (sp.choice([-1, 0, 1, 3, 8, 8, 32]), sp.choice([0, 1, 1]))
+    knobs["link_local"] = sp.choice([0, 1, 1])        # step 12 local-first link orientation
     r = rtl.run(b, W, H, img=img, mut=mut, maxcycles=2_000_000, **knobs)
     ok = (r["readback"] == ref["readback"] and r["interactions"] == ref["interactions"]
           and r["node_count"] == ref["nodes"] and r["status"] == 0)

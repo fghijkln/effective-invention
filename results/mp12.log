@@ -1,0 +1,3 @@
+overfull treesum(9) 2x2 keep 24: status 3 err 0 interactions 259 msgs {'msg_link': 26, 'msg_node': 30, 'msg_spawn': 599428} parks 35278
+overfull qsort(30) 2x2 keep 24: status 3 err 0 interactions 279 msgs {'msg_link': 63, 'msg_node': 43, 'msg_spawn': 24972} parks 33274
+memory-pressure tests: 43/43 pass [semantic + fabric + RTL] 222s
