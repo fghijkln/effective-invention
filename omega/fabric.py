@@ -38,6 +38,7 @@ BOT_GIVE = int(__import__('os').environ.get('OMEGA_BOT_GIVE', '0'))
 S14 = int(__import__('os').environ.get('OMEGA_S14', '2'))
 S14_GOVNB = int(__import__('os').environ.get('OMEGA_S14_GOVNB', '0'))    # governor relax-with-hungry-neighbour bound (x/4 budget)
 S14_GOVL0 = int(__import__('os').environ.get('OMEGA_S14_GOVL0', '2'))    # governor reset level with s14
+DQF_DATA = int(__import__('os').environ.get('OMEGA_DQF_DATA', '0'))  # step 15: 1 = step 14's bit 59 (data-walking forks too)
 GRAD = int(__import__('os').environ.get('OMEGA_GRAD', '0'))
 P_MSG = float(__import__('os').environ.get('OMEGA_P_MSG', '0.5'))     # default ejection-port priority
 GOV_E = 32                         # governor epoch: interactions
@@ -213,7 +214,7 @@ def readback_dump(book, nodes, vars_, root=mk(VAR, 0, addr(0, 0, 0))):
     return semantic.readback(gn, gv, root, book)
 
 
-def fork_defs(book, with_rec=False, with_prod=False):
+def fork_defs(book, with_rec=False, with_prod=False, dqf_data=None):
     """Step 11 spawn hint (SPEC 5): the definitions worth handing to another cell.  A definition is a
     fork target when it belongs to a recursion SCC that some template calls at least twice (both
     branches of a divide-and-conquer recursion, e.g. fib(n-1) and fib(n-2), qs(lo) and qs(hi); the two
@@ -283,8 +284,27 @@ def fork_defs(book, with_rec=False, with_prod=False):
         scc = [v for v in range(n) if comp[v] == comp[u]]
         if any(w < n and comp[w] != comp[u] and w in prod for v in scc for w in calls[v]):
             fstream.add(u)
+    # step 15: a fork recursion is *data-walking* when one of its templates takes its first argument apart
+    # as a Scott value (the argument var meets a CON node in a template redex: tsum over gen's tree, qs over
+    # a list), as opposed to a numeric fork (switch / operator on the argument: fib, gen, the direct tsum).
+    # Handing such a task to another cell separates the consumer from the structure it walks: every match
+    # step then crosses the mesh (treesum(9) 8x8 +0.1 msgs/interaction under step 14).  Directory bit 59
+    # leaves them out too (OMEGA_DQF_DATA=1 / dqf_data=1 restores step 14's bit 59).
+    fdata = set()
+    if not (DQF_DATA if dqf_data is None else dqf_data):
+        for u in fork:
+            d = book.defs[u]
+            if d.root is None or tag(d.root) != CON or (d.root & ABS_BIT):
+                continue
+            arg = d.nodes[payload(d.root)][1]
+            if tag(arg) != VAR or (arg & ABS_BIT):
+                continue
+            for a, b in d.redexes:
+                for x, y in ((a, b), (b, a)):
+                    if x == arg and tag(y) == CON and not (y & ABS_BIT):
+                        fdata.update(v for v in range(n) if comp[v] == comp[u])
     if with_prod == 2:
-        return fork, rec, prod, fork - fstream
+        return fork, rec, prod, fork - fstream - fdata
     if with_prod:
         return fork, rec, prod
     return (fork, rec) if with_rec else fork
