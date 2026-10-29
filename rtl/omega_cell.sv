@@ -58,6 +58,7 @@ module omega_cell #(
                                            //   task, 2 = tasks of fork definitions that are not stream-fed: directory bit 59)
   input  logic [3:0]  gov_nb,              //   governor: with a hungry neighbour relax while sent <= gov_nb/4 x budget (0 = off)
   input  logic [2:0]  gov_l0,              //   governor reset level (step 13: 2)
+  input  logic [5:0]  rto_m1,              //   step 18: retry-slot timeout - 1 (cycles; step 10-17: 31)
   input  logic [3:0]  in_v,
   input  flit_t [3:0] in_f,
   output logic [3:0]  in_rdy,
@@ -934,7 +935,7 @@ module omega_cell #(
         if (st_traps == 0) begin tr_reason <= tpr; tr_owner <= pown(tpp); tr_addr <= pval(tpp); end
       end
       if (park && pn == 2'd1 && !rs_v) begin
-        rs_v <= 1'b1; rs_e <= pq[0]; rs_tm <= 6'(RTO - 1); st_park <= st_park + 1;
+        rs_v <= 1'b1; rs_e <= pq[0]; rs_tm <= rto_m1; st_park <= st_park + 1;
         rs_n <= cur_rs ? ((cur_rsn == 2'd3) ? 2'd3 : cur_rsn + 2'd1) : 2'd0;
         pn = 2'd0;
       end
