@@ -18,6 +18,7 @@ module omega_mesh #(
   input  logic [7:0]  spawn_k2,
   input  logic [7:0]  spawn_kp,            // step 13 producer threshold / message-budget governor (SPEC 5.2)
   input  logic [7:0]  gov_b,
+  input  logic        fork_dq,             // step 14 fork deque + oldest-fork give + governor nb5l1 (SPEC 5.3; 0 = step 13)
   input  logic        link_local,          // step 12 local-first link orientation (configuration, SPEC 4)
   input  logic        dump,
   output logic        all_ready,
@@ -73,7 +74,7 @@ module omega_mesh #(
     for (genvar y = 0; y < H; y++) begin : gy
       omega_cell #(.X(x), .Y(y), .W(W), .H(H), .SLOTS(SLOTS), .QDEPTH(QDEPTH), .ROMSZ(ROMSZ),
                    .DIRSZ(DIRSZ), .DEPTH(DEPTH), .RDXSZ(RDXSZ), .MUT(MUT)) u_cell (
-        .clk, .rst, .seed, .jitter, .stall, .pmsg, .fi, .spawn_k, .spawn_hint, .spawn_k2, .spawn_kp, .gov_b, .link_local,
+        .clk, .rst, .seed, .jitter, .stall, .pmsg, .fi, .spawn_k, .spawn_hint, .spawn_k2, .spawn_kp, .gov_b, .fork_dq, .link_local,
         .in_v(iv[x][y]), .in_f(inf[x][y]), .in_rdy(irdy[x][y]),
         .out_v(ov[x][y]), .out_f(of[x][y]), .out_rdy(ordy[x][y]),
         .idle(cidle[x][y]), .hungry(chung[x][y]), .nbr_hungry(nhung[x][y]), .roomy(croom[x][y]), .nbr_roomy(nroom[x][y]), .ready(crdy[x][y]), .err(cerr[x][y]), .dump,

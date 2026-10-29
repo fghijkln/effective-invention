@@ -54,6 +54,7 @@ module omega_cell #(
   input  logic [7:0]  spawn_kp,            // step 13: threshold for producer recursions (directory bit 58; 255 = always)
   input  logic [7:0]  gov_b,               //   message-budget governor: messages per 100 interactions (0 = off: spawn_kp)
   input  logic        link_local,          // step 12: local-first orientation of var ~ var links
+  input  logic        fork_dq,             // step 14 (SPEC 5.3): fork deque + oldest-fork give + governor nb5l1 (0 = step 13)
   input  logic [3:0]  in_v,
   input  flit_t [3:0] in_f,
   output logic [3:0]  in_rdy,
@@ -114,6 +115,13 @@ module omega_cell #(
   logic [NK-1:0][SB-1:0] nc;  logic [3:0] ncnt;  logic [SB:0] nsp;  logic npend;
   logic [VK-1:0][SB-1:0] vc;  logic [3:0] vcnt;  logic [SB:0] vsp;  logic vpend;
   logic [QK-1:0][129:0]  qc;  logic [3:0] qcnt;  logic [QB:0] qsp;  logic qpend;
+  // step 14 fork deque (SPEC 5.3): up to FD ready fork-REF redexes {b, a} (kind K_LINK) beside the LIFO
+  // stack; fq[0] = oldest.  fbit = directory bit 56 (fork hint) per definition, flip-flops written with
+  // the directory, so a pushed task is classified without a directory read.
+  localparam int FD = 4;
+  logic [FD-1:0][127:0] fq;  logic [2:0] fcnt;
+  logic [DIRSZ-1:0] fbit;
+  logic [31:0] st_fgive;
   // ---------------- storage ----------------
   logic [SLOTS-1:0] nalloc;             // valid bit per node slot (flip-flops; readback + free check)
   logic [SLOTS-1:0] valloc;             // initial var allocation (image only, used while building the free stack)
@@ -132,6 +140,7 @@ module omega_cell #(
     $readmemh($sformatf("%s/var_%0d_%0d.hex", imgdir, X, Y), var_mem);
     $readmemh($sformatf("%s/queue_%0d_%0d.hex", imgdir, X, Y), tqm);
     $readmemh($sformatf("%s/dir.hex", imgdir), dirm);
+    for (int i = 0; i < DIRSZ; i++) fbit[i] = dirm[i][56];
   end
 `else
   initial qinit[0] = '0;
@@ -142,7 +151,7 @@ module omega_cell #(
   logic [129:0]   tq_top;
   logic [3:0]     nf_av, nf_room, vf_av, vf_room, tq_av, tq_room;
   logic [SB+1:0]  nf_tot, vf_tot;
-  logic [QB+1:0]  tq_tot;
+  logic [QB+1:0]  tq_tot, tq_all;      // tq_all: stack + fork deque (step 14)
   always_comb begin
     for (int i = 0; i < 8; i++) nf_top[i] = (32'(ncnt) > i) ? nc[32'(ncnt) - 1 - i] : '0;
     for (int i = 0; i < 8; i++) vf_top[i] = (32'(vcnt) > i) ? vc[32'(vcnt) - 1 - i] : '0;
@@ -152,6 +161,7 @@ module omega_cell #(
     nf_tot = (SB+2)'(ncnt) + (SB+2)'(nsp) + (SB+2)'(npend);
     vf_tot = (SB+2)'(vcnt) + (SB+2)'(vsp) + (SB+2)'(vpend);
     tq_tot = (QB+2)'(qcnt) + (QB+2)'(qsp) + (QB+2)'(qpend);
+    tq_all = tq_tot + (QB+2)'(fcnt);
   end
 
   flit_t [DEPTH-1:0] ob;                // outbox (router local input)
@@ -308,6 +318,21 @@ module omega_cell #(
     qfirst = ptag(a) < ptag(b) || (ptag(a) == ptag(b) && plab(a) < plab(b));
   endfunction
 
+  // step 14: a task is a fork task when it is a ready REF ~ x redex whose REF names a fork target (directory
+  // bit 56) and x is a NUM / OPR / CON / SWI (not a var, REF, ERA or DUP) of the same owner: the redexes
+  // the step-11 policy always hands to a hungry neighbour.  frefl = label of its REF side.
+  function automatic logic [15:0] frefl(input logic [129:0] e);
+    frefl = (ptag(e[127:64]) == T_REF && ptag(e[63:0]) != T_REF) ? plab(e[127:64]) : plab(e[63:0]);
+  endfunction
+  function automatic logic ftask(input logic [129:0] e, input logic fb);
+    logic [63:0] r, x;
+    if (ptag(e[127:64]) == T_REF && ptag(e[63:0]) != T_REF) begin r = e[127:64]; x = e[63:0]; end
+    else begin r = e[63:0]; x = e[127:64]; end
+    ftask = e[129:128] == K_LINK && fb && ptag(r) == T_REF && !is_var(e[63:0]) && !is_var(e[127:64]) &&
+            !xown(e[63:0], e[127:64]) && ptag(x) != T_REF && ptag(x) != T_ERA && ptag(x) != T_DUP &&
+            ptag(x) != T_NONE && ptag(x) != T_VAR;
+  endfunction
+
   // ---------------- link decode (combinational, from ra/rb) ----------------
   logic [63:0] A, B, dP, dQ;
   logic        dvar, dlP, dlQ;
@@ -327,9 +352,9 @@ module omega_cell #(
     q_ok      = tq_av != 0;
     stall_now = (stall != 0) && (erng[7:0] < stall);
     rnd_msg   = erng[15:8] < pmsg;
-    idle      = (state == S_IDLE) && (tq_tot == 0) && !ej_v && (ob_cnt == 0) && (!rbusy || MUT[15]) && !vh_v && (!rs_v || MUT[40]);
+    idle      = (state == S_IDLE) && (tq_tot == 0) && (fcnt == 0 || MUT[48]) && !ej_v && (ob_cnt == 0) && (!rbusy || MUT[15]) && !vh_v && (!rs_v || MUT[40]);
     ready     = state != S_INIT;
-    hungry    = (state == S_IDLE) && (tq_tot == 0) && !ej_v && (roomy || MUT[28]) && !vh_v && !rs_v;
+    hungry    = (state == S_IDLE) && (tq_all == 0) && !ej_v && (roomy || MUT[28]) && !vh_v && !rs_v;
   end
 
   // sender-side spawn decision (step 11, SPEC 5): the neighbour is hungry, the outbox has room, and
@@ -355,9 +380,9 @@ module omega_cell #(
     sp_give = hv_found && can_send && !MUT[7] &&
               (MUT[42] || (spawn_hint && d_rd[56] && !MUT[43]) ||
                ((!spawn_hint || d_rd[57])
-                  ? ((spawn_hint && d_rd[58] && !MUT[45]) ? (kp_eff == 8'hFF || 32'(tq_tot) > 32'(kp_eff))
-                                                         : (spawn_k == 8'hFF || 32'(tq_tot) > 32'(spawn_k)))
-                  : (spawn_k2 == 8'hFF || 32'(tq_tot) > 32'(spawn_k2))));
+                  ? ((spawn_hint && d_rd[58] && !MUT[45]) ? (kp_eff == 8'hFF || 32'(tq_all) > 32'(kp_eff))
+                                                         : (spawn_k == 8'hFF || 32'(tq_all) > 32'(spawn_k)))
+                  : (spawn_k2 == 8'hFF || 32'(tq_all) > 32'(spawn_k2))));
   end
 
   // translation of a template port during EXPAND (stamps the expanding owner, relocates via the maps)
@@ -453,6 +478,7 @@ module omega_cell #(
   logic alloc, al_start; logic [7:0] al_nn, al_nv, al_in, al_iv;
   logic [3:0] al_kn, al_kv;
   logic sp_go; logic [63:0] sp_ref_p, sp_x_p; logic sp_local_only; logic park; logic esc;
+  logic fpop_old, fpop_new; logic [FD-1:0][127:0] fq_n; logic [2:0] fc_n; logic [2:0] fm; logic [2:0][129:0] fpd;
 
   always_ff @(posedge clk) begin
     if (rst) begin
@@ -469,7 +495,8 @@ module omega_cell #(
       wq_n <= '0; vq_n <= '0; bufok <= 1'b0; rom_v <= 1'b0; rsp <= 1'b0; rsx <= 1'b0; rfw <= 1'b0; ej_taken <= 1'b0;
       roomy <= 1'b0; mrot <= 2'(X + Y + 1);
       rs_v <= 1'b0; rs_e <= '0; rs_tm <= '0; rs_n <= '0; cur_rs <= 1'b0; cur_rsn <= '0; st_park <= '0;
-      gv_lvl <= 3'd2; ep_i <= '0; ep_m <= '0; gv_pi <= '0;
+      gv_lvl <= fork_dq ? 3'd1 : 3'd2; ep_i <= '0; ep_m <= '0; gv_pi <= '0;   // step 14: reset level 1
+      fcnt <= '0; st_fgive <= '0;
       ncnt <= '0; nsp <= '0; npend <= 1'b0;
       vcnt <= '0; vsp <= '0; vpend <= 1'b0;
       qcnt <= '0; qsp <= (QB+1)'(qinit[0]); qpend <= 1'b0;
@@ -486,6 +513,7 @@ module omega_cell #(
       v_we2 = 1'b0; v_wa2 = '0; v_wd2 = '0;
       alloc = 1'b0; al_start = 1'b0;
       hand = 1'b0; nvh_a = vh_a; nvh_b = vh_b; nvh_v = vh_v; vh_go = 1'b0; al_nn = '0; al_nv = '0; al_in = '0; al_iv = '0; al_kn = '0; al_kv = '0;
+      fpop_old = 1'b0; fpop_new = 1'b0;
       sp_go = 1'b0; sp_ref_p = '0; sp_x_p = '0; sp_local_only = 1'b0; park = 1'b0; esc = (NT > 1) && cur_rs && cur_rsn == 2'd3 && !MUT[41];
       if (rs_v && rs_tm != 6'd0) rs_tm <= rs_tm - 6'd1;
       erng <= xorshift(erng);
@@ -840,9 +868,14 @@ module omega_cell #(
 
       // ---- the step finished: pick the next task or message in the same cycle (no IDLE cycle) ----
       if (fin && nst != S_HALT) begin
-        logic msg_ok, pick_msg;
+        logic msg_ok, pick_msg, fgive, fnew;
+        // step 14: while a neighbour is hungry and at least two tasks wait, the OLDEST fork task is taken
+        // (and handed over by the step-11 spawn path in S_LINK); otherwise the stack top; the newest fork
+        // task only when the stack is empty
+        fgive = fork_dq && fcnt != 0 && hv_found && can_send && 32'(tq_all) >= 2 && !MUT[47];
+        fnew = fork_dq && fcnt != 0 && tq_tot == 0;
         msg_ok = ej_v && !ej_taken && !((ej_f.kind == M_NODE || ej_f.kind == M_PULL) && (nf_av == 0 || n_we || nf_pop != 0));
-        pick_msg = msg_ok && (!q_ok || !can_send || rnd_msg);
+        pick_msg = msg_ok && (!(q_ok || fgive || fnew) || !can_send || rnd_msg);
         nst = S_IDLE; nrsp = 1'b0; nrsx = 1'b0; nrfw = 1'b0;
         cur_rs <= 1'b0;
         if (stall_now) begin
@@ -877,11 +910,17 @@ module omega_cell #(
           st_tasks <= st_tasks + 1;
           nra = rs_e[63:0]; nrb = rs_e[127:64]; nrsp = (rs_e[129:128] == K_SPAWN); nrfw = (rs_e[129:128] == K_FWD); nst = S_LINK;
           rs_v <= 1'b0; cur_rs <= 1'b1; cur_rsn <= rs_n;
+        end else if (fgive) begin
+          st_tasks <= st_tasks + 1; st_fgive <= st_fgive + 1;
+          nra = fq[0][63:0]; nrb = fq[0][127:64]; fpop_old = 1'b1; nst = S_LINK;
         end else if (q_ok) begin
           logic [129:0] e;
           st_tasks <= st_tasks + 1;
           e = tq_top; tq_pop = 3'd1;
           nra = e[63:0]; nrb = e[127:64]; nrsp = (e[129:128] == K_SPAWN); nrfw = (e[129:128] == K_FWD); nst = S_LINK;
+        end else if (fnew) begin
+          st_tasks <= st_tasks + 1;
+          nra = fq[fcnt - 3'd1][63:0]; nrb = fq[fcnt - 3'd1][127:64]; fpop_new = 1'b1; nst = S_LINK;
         end
       end
 
@@ -899,8 +938,23 @@ module omega_cell #(
       tq_push = 3'(pn); tq_pd = pq;
       if (pn != 0) begin
         if (32'(tq_tot) + 32'(pn) > QDEPTH) begin err <= 4'd1; nst = S_HALT; tq_push = '0; end
-        else if (32'(tq_tot) + 32'(pn) > st_maxq) st_maxq <= 32'(tq_tot) + 32'(pn);
+        else if (32'(tq_all) + 32'(pn) > st_maxq) st_maxq <= 32'(tq_all) + 32'(pn);
       end
+      // ---- step 14: fork-deque pop (picked above) and push routing: a fork task goes to the deque while it
+      // has room, every other task (and a fork task finding it full) to the LIFO stack, in push order ----
+      fq_n = fq; fc_n = fcnt;
+      if (fpop_old) begin for (int i = 0; i < FD - 1; i++) fq_n[i] = fq_n[i + 1]; fc_n = fc_n - 3'd1; end
+      else if (fpop_new) fc_n = fc_n - 3'd1;
+      fm = '0; fpd = '0;
+      for (int j = 0; j < 3; j++) if (j < 32'(tq_push)) begin
+        if (fork_dq && fc_n < 3'(FD) && ftask(tq_pd[j], fbit[DB'(frefl(tq_pd[j]))] && spawn_hint)) begin
+          fq_n[fc_n[1:0]] = tq_pd[j][127:0]; fc_n = fc_n + 3'd1;
+        end else begin
+          fpd[fm[1:0]] = tq_pd[j]; fm = fm + 3'd1;
+        end
+      end
+      tq_push = fm; tq_pd = fpd;
+      fq <= fq_n; fcnt <= fc_n;
       begin
         logic pop;
         pop = l_pop && ob_cnt != 0;
@@ -920,7 +974,10 @@ module omega_cell #(
         if (gov_b == 8'd0) begin
           ep_i <= '0; ep_m <= '0;
         end else if (gi == 6'd32) begin
-          if (32'd100 * 32'(gm) > 32'd32 * 32'(gov_b)) begin
+          if (fork_dq && (nbr_hungry & EXISTS) != 4'd0 && 32'd400 * 32'(gm) <= 32'd5 * 32'd32 * 32'(gov_b) ) begin
+            // step 14 (nb5l1): a hungry neighbour and at most 1.25x the budget: relax one level
+            if (gv_lvl != 3'd0) gv_lvl <= gv_lvl - 3'd1;
+          end else if (32'd100 * 32'(gm) > 32'd32 * 32'(gov_b)) begin
             if (gv_lvl != 3'd4 && !MUT[46]) gv_lvl <= gv_lvl + 3'd1;
           end else if (32'd200 * 32'(gm) < 32'd32 * 32'(gov_b)) begin
             if (gv_lvl != 3'd0) gv_lvl <= gv_lvl - 3'd1;
@@ -957,7 +1014,7 @@ module omega_cell #(
       d_rd   <= dirm[la_d];
       rom_v  <= rom_req && rom_gnt; rvp <= rom_q;
     end
-    if (cfg_we && cfg_sel == 2'd2) dirm[DB'(cfg_a)] <= cfg_d;
+    if (cfg_we && cfg_sel == 2'd2) begin dirm[DB'(cfg_a)] <= cfg_d; fbit[DB'(cfg_a)] <= cfg_d[56]; end
   end
 
 `ifndef SYNTHESIS
@@ -975,8 +1032,8 @@ module omega_cell #(
       $writememh($sformatf("%s/out_node_%0d_%0d.hex", outdir, X, Y), node_mem);
       $writememh($sformatf("%s/out_var_%0d_%0d.hex", outdir, X, Y), var_mem);
       fd = $fopen($sformatf("%s/out_stats_%0d_%0d.txt", outdir, X, Y), "w");
-      $fwrite(fd, "cycles %0d\ninteractions %0d\nbusy %0d\ntasks %0d\nlinks %0d\nretry %0d\nmsg_link %0d\nmsg_node %0d\nmsg_spawn %0d\nmaxq %0d\nfree_nodes %0d\nfree_vars %0d\nerr %0d\npeak_nodes %0d\npeak_vars %0d\nvhu %0d\npark %0d\ntraps %0d\ntrap_reason %0d\ntrap_owner %0d\ntrap_addr %0d\ntrap_mask %0d\n",
-              cyc, st_inter, st_busy, st_tasks, st_links, st_retry, st_msg0, st_msg1, st_msg2, st_maxq, nf_tot, vf_tot, err, SLOTS - st_minfn, SLOTS - st_minfv, st_vhu, st_park, st_traps, tr_reason, tr_owner, tr_addr, tr_mask);
+      $fwrite(fd, "cycles %0d\ninteractions %0d\nbusy %0d\ntasks %0d\nlinks %0d\nretry %0d\nmsg_link %0d\nmsg_node %0d\nmsg_spawn %0d\nmaxq %0d\nfree_nodes %0d\nfree_vars %0d\nerr %0d\npeak_nodes %0d\npeak_vars %0d\nvhu %0d\npark %0d\ntraps %0d\ntrap_reason %0d\ntrap_owner %0d\ntrap_addr %0d\ntrap_mask %0d\nfgive %0d\n",
+              cyc, st_inter, st_busy, st_tasks, st_links, st_retry, st_msg0, st_msg1, st_msg2, st_maxq, nf_tot, vf_tot, err, SLOTS - st_minfn, SLOTS - st_minfv, st_vhu, st_park, st_traps, tr_reason, tr_owner, tr_addr, tr_mask, st_fgive);
       $fclose(fd);
     end
   end
