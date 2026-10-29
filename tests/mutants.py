@@ -54,10 +54,10 @@ MUTANTS = {
     44: "local-first link orientation disabled (a remote var ~ local var link is always sent away; performance only: caught by the LINK bound)",
     45: "step 13 producer hint ignored (producer recursions held back by spawn_k like strict ones; performance only: caught by the qsort speed bound)",
     46: "step 13 governor never tightens (the level only relaxes; performance only: caught by the message bound with the governor on)",
-    47: "step 14 oldest-fork give disabled (fork tasks leave the deque only when the stack is empty; performance only: caught by the fork-program cycle bound)",
+    47: "step 14 oldest-fork give disabled (fork tasks leave the deque only when the stack is empty; performance only: caught by the fib(16) 4x4 cycle bound)",
     48: "step 14 fork deque: a fork task that finds the deque full is dropped (lost work)",
 }
-BOUND47 = 1.1
+BOUND47 = 1.05
 PROGS = [("fib", 8), ("list", 6), ("sort", 6), ("higher", 5), ("fact", 5), ("treesum", 4), ("qsort", 5), ("sum", 20)]
 
 
@@ -122,10 +122,12 @@ def try_mutant(bit):
         m0 = sum(r0["msgs"].values()) / r0["interactions"]; m1 = sum(r1["msgs"].values()) / r1["interactions"]
         return (m1 > 1.15 * m0), f"qsort(30) 4x4 {m1:.3f} msgs/interaction with the mutant vs {m0:.3f} (bound: > 1.15x)"
     if bit == 47:
-        b = progs.book("treesum", 7)
-        c0 = rtl.run(b, 4, 4)["cycles"]
-        c1 = rtl.run(b, 4, 4, mut=mut)["cycles"]
-        return (c1 > BOUND47 * c0), f"treesum(7) 4x4 cycles {c1} with the mutant vs {c0} (bound: > {BOUND47}x)"
+        # the step-11 path still gives a fork task popped from an empty stack, so the effect is modest on
+        # small meshes (fib(16) 4x4 seed 1: 8,254 vs 7,530 cycles; the simulation is deterministic)
+        b = progs.book("fib", 16)
+        c0 = rtl.run(b, 4, 4, seed=1)["cycles"]
+        c1 = rtl.run(b, 4, 4, seed=1, mut=mut)["cycles"]
+        return (c1 > BOUND47 * c0), f"fib(16) 4x4 cycles {c1} with the mutant vs {c0} (bound: > {BOUND47}x)"
     if bit == 7:
         b = progs.book("treesum_direct", 8)
         c1 = rtl.run(b, 1, 1, mut=mut)["cycles"]

@@ -1,0 +1,5 @@
+  dflt: done (81/81 cumulative) 15s
+  s14m1: done (162/162 cumulative) 29s
+  base: done (243/243 cumulative) 41s
+  s14c: done (324/324 cumulative) 55s
+fabric var tests: 324/324 pass [dflt, s14m1, base, s14c] 55s
