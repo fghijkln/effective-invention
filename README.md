@@ -135,6 +135,31 @@ step 12 the cost was qsort: on meshes it was 16–27% slower than with step 10's
 because its filter chains (lo/hi/app) stayed where they started; step 13 (next section) fixes that. treesum(9)
 on 8×8 varies ±20% with the arbitration seed; over seeds 1–4 the mean is 2,374 vs 2,470 for step 10.
 
+### Two fabric probes, both rejected (step 16)
+
+Screened on the fabric model only (arbitration seeds 1–4, step-15 defaults, `bench/probe15.py`); neither
+reached the RTL. Raw output: `results/s16/`.
+
+* **Dynamic locality test for the fork deque (next step 5).** Idea: let a data-walking fork task (treesum's
+  `tsum`) onto the deque, but give it only when the structure it walks has already left the cell. At push
+  time the test never fires: in all 796 `tsum` pushes of treesum(9) 8×8 seed 1, field 0 of the `CON`
+  argument is a *local, still unbound* var (the tree arrives later from `gen`), so a push-time test equals
+  step 15's static bit. Moving the test to give time (task on the deque, give only if the var is bound to a
+  remote node, or also when unbound) is worse than step 15 everywhere it changes anything: treesum(9) 8×8
+  4,120 → 5,410 / 4,282 cycles (0.421 → 0.466 / 0.449 msgs/int), 4×4 7,972 → 9,279 / 8,828; letting the
+  stream-fed qsort forks in as well: qsort(40) 4×4 21,534 → 22,819 cycles, 8×8 20,599 → 21,471. Kept: the
+  static bit 59 of step 15.
+* **SPAWN carries the partner node (next step 6).** When a REF ~ node redex is handed to a neighbour and the
+  node lives at the sender, send the node itself (an ordinary NODE message whose link partner is the REF;
+  the receiver re-forms the redex and expands it locally, never re-giving it) instead of SPAWN(ref, node
+  pointer). Nearly every spawned partner is a `CON` holding the return wire as a local var, so shipping it
+  turns the expansion's result wire into a remote one. Mixed result, mean of 4 seeds (cycles, step 15 →
+  shipped): treesum(9) 8×8 4,120 → 3,696 (−10%, 0.421 → 0.384 msgs/int), sort(20) 4×4 12,152 → 11,060 (−9%),
+  higher(100) 4×4 −2%; but qsort(40) 4×4 / 8×8 +6% / +7%, list(120) 4×4 / 8×8 +10% / +16% (0.52 → 0.57
+  msgs/int), fib(16) 8×8 +13%. Restricting it to partners with no local-var aux port never fires (every
+  partner has one). No static class separates the winners from the losers (fib and treesum's `gen` are both
+  numeric forks with a `CON(n, ret)` partner), so it was not taken to RTL (`results/s16/probe16b_ship.patch`).
+
 ### Data-walking forks stay off the fork deque (step 15)
 
 Step 14 raised treesum(9) on 8×8 from 0.431 to 0.526 messages per interaction (target < 0.5). Per-kind RTL
@@ -789,11 +814,13 @@ What this says:
    interface (DMA of graph images, result readback).
 5. Fork deque: narrower entries (`{REF label, owner, x}`, 76 b) and one hint vector; a dynamic locality
    test (give a data-walking task when its argument has already left the cell) instead of step 15's static
-   bit; a governor signal that
+   bit (step 16 probe: tried at push and at give time on the fabric model, worse than the static bit, because the walked
+   structure has not arrived when the task is pushed); a governor signal that
    separates "neighbour idle because the program is sequential" from "neighbour starving", so the relax
    helps qsort without hurting list / higher.
-6. Spawn policy: ship the partner node with a SPAWN when it lives at the sender (the expanded root
-   would not have to migrate back), and a per-definition benefit signal measured at the *sender*
+6. Spawn policy: shipping the partner node with a SPAWN (step 16 probe) helps treesum / sort and hurts
+   qsort / list / fib on the fabric model; a selector for it would need a dynamic signal (e.g. whether the
+   return wire's consumer is busy), and a per-definition benefit signal measured at the *sender*
    (time until the given work's result returns) to replace the static producer hint.
 
 ## Commits
@@ -828,3 +855,4 @@ What this says:
 * `ac2acd5` step 13 gap: 8×8 sum / sort / higher / fact at the default governor
 * step 14: per-cell 4-entry fork deque + oldest-fork give (default: fork definitions that are not stream-fed, directory bit 59; `+s14=0` = step 13), governor relax knobs `+govnb` / `+govl0` (default off); 8 seeds: fib(20) 8×8 −10.7%, treesum_direct(14) 8×8 −15.8% (range −53%), treesum(9) 4×4 / 8×8 −6.4% / −5.8%, every other program cycle for cycle as step 13; units 42/42, programs 306/306, step-14 cross-check 90/90, fabric knobs 324/324, fuzz 600/600 + big 200/200, security 420/420, mempress 43/43, mutants 49/49
 * step 15: directory bit 59 (fork deque) leaves out data-walking fork recursions (loader only, no RTL change; `OMEGA_DQF_DATA=1` = step 14); 8 seeds: treesum(9) 8×8 2,255 → 2,126 cycles (−5.7%), 0.526 → 0.466 msgs/interaction; every other program cycle for cycle as step 14; units 42/42, programs 315/315, step-14 cross-check 90/90, fabric knobs 1,782/1,782, fuzz 600/600 + big 200/200, security 420/420, mempress 43/43, mutants 49/49
+* step 16: two fabric-model probes rejected (dynamic fork-deque locality test; SPAWN carrying the partner node), README section and `results/s16/`; no model / RTL change

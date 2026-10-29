@@ -1,0 +1,33 @@
+== treesum:9 8x8 dyn=1
+s14=2 {} excl=set(): cycles 5,410 (sd 688)  msgs/int 0.466  kinds {'LINK': 4349, 'NODE': 2818, 'SPAWN': 1422, 'PULL': 0}  gives/run {(6, 'CON'): 194.5, (2, 'CON'): 550.0, (3, 'CON'): 8.0}
+== treesum:9 8x8 dyn=2
+s14=2 {} excl=set(): cycles 5,410 (sd 688)  msgs/int 0.466  kinds {'LINK': 4349, 'NODE': 2818, 'SPAWN': 1422, 'PULL': 0}  gives/run {(6, 'CON'): 194.5, (2, 'CON'): 550.0, (3, 'CON'): 8.0}
+== treesum:9 8x8 dyn=3
+s14=2 {} excl=set(): cycles 4,282 (sd 380)  msgs/int 0.449  kinds {'LINK': 4196, 'NODE': 2660, 'SPAWN': 1414, 'PULL': 0}  gives/run {(6, 'CON'): 205.5, (2, 'CON'): 549.8, (3, 'CON'): 369.2}
+== treesum:9 8x8 dyn=4
+s14=2 {} excl=set(): cycles 4,282 (sd 380)  msgs/int 0.449  kinds {'LINK': 4196, 'NODE': 2660, 'SPAWN': 1414, 'PULL': 0}  gives/run {(6, 'CON'): 205.5, (2, 'CON'): 549.8, (3, 'CON'): 369.2}
+== treesum:9 4x4 dyn=1
+s14=2 {} excl=set(): cycles 9,279 (sd 491)  msgs/int 0.206  kinds {'LINK': 1904, 'NODE': 1321, 'SPAWN': 575, 'PULL': 0}  gives/run {(6, 'CON'): 63.2, (2, 'CON'): 193.8, (3, 'CON'): 3.2}
+== treesum:9 4x4 dyn=2
+s14=2 {} excl=set(): cycles 9,279 (sd 491)  msgs/int 0.206  kinds {'LINK': 1904, 'NODE': 1321, 'SPAWN': 575, 'PULL': 0}  gives/run {(6, 'CON'): 63.2, (2, 'CON'): 193.8, (3, 'CON'): 3.2}
+== treesum:9 4x4 dyn=3
+s14=2 {} excl=set(): cycles 8,828 (sd 351)  msgs/int 0.148  kinds {'LINK': 1361, 'NODE': 949, 'SPAWN': 418, 'PULL': 0}  gives/run {(6, 'CON'): 58.0, (2, 'CON'): 156.2, (3, 'CON'): 89.5}
+== treesum:9 4x4 dyn=4
+s14=2 {} excl=set(): cycles 8,828 (sd 351)  msgs/int 0.148  kinds {'LINK': 1361, 'NODE': 949, 'SPAWN': 418, 'PULL': 0}  gives/run {(6, 'CON'): 58.0, (2, 'CON'): 156.2, (3, 'CON'): 89.5}
+== qsort:40 8x8 dyn=1
+s14=2 {} excl=set(): cycles 20,599 (sd 837)  msgs/int 0.448  kinds {'LINK': 3784, 'NODE': 2088, 'SPAWN': 331, 'PULL': 0}  gives/run {}
+== qsort:40 8x8 dyn=2
+s14=2 {} excl=set(): cycles 20,826 (sd 1,226)  msgs/int 0.449  kinds {'LINK': 3766, 'NODE': 2094, 'SPAWN': 354, 'PULL': 0}  gives/run {}
+== qsort:40 8x8 dyn=3
+s14=2 {} excl=set(): cycles 20,599 (sd 837)  msgs/int 0.448  kinds {'LINK': 3784, 'NODE': 2088, 'SPAWN': 331, 'PULL': 0}  gives/run {}
+== qsort:40 8x8 dyn=4
+s14=2 {} excl=set(): cycles 21,471 (sd 1,360)  msgs/int 0.424  kinds {'LINK': 3592, 'NODE': 1986, 'SPAWN': 303, 'PULL': 0}  gives/run {(6, 'CON'): 77.0}
+== qsort:40 4x4 dyn=1
+s14=2 {} excl=set(): cycles 21,534 (sd 3,297)  msgs/int 0.423  kinds {'LINK': 3576, 'NODE': 1976, 'SPAWN': 314, 'PULL': 0}  gives/run {}
+== qsort:40 4x4 dyn=2
+s14=2 {} excl=set(): cycles 20,127 (sd 1,373)  msgs/int 0.426  kinds {'LINK': 3595, 'NODE': 1996, 'SPAWN': 310, 'PULL': 0}  gives/run {}
+== qsort:40 4x4 dyn=3
+s14=2 {} excl=set(): cycles 21,534 (sd 3,297)  msgs/int 0.423  kinds {'LINK': 3576, 'NODE': 1976, 'SPAWN': 314, 'PULL': 0}  gives/run {}
+== qsort:40 4x4 dyn=4
+s14=2 {} excl=set(): cycles 22,819 (sd 338)  msgs/int 0.410  kinds {'LINK': 3462, 'NODE': 1928, 'SPAWN': 293, 'PULL': 0}  gives/run {(6, 'CON'): 74.2}
+DONE

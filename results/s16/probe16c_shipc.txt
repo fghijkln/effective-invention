@@ -1,0 +1,25 @@
+== treesum:9 4x4 ship=1 shipc=1
+s14=2 {} excl=set(): cycles 7,972 (sd 133)  msgs/int 0.104  kinds {'LINK': 910, 'NODE': 714, 'SPAWN': 296, 'PULL': 0}  gives/run {(6, 'CON'): 57.2, (2, 'CON'): 183.5}
+== treesum:9 8x8 ship=1 shipc=1
+s14=2 {} excl=set(): cycles 4,120 (sd 321)  msgs/int 0.421  kinds {'LINK': 3792, 'NODE': 2674, 'SPAWN': 1289, 'PULL': 0}  gives/run {(6, 'CON'): 242.0, (2, 'CON'): 648.8}
+== sort:20 4x4 ship=1 shipc=1
+s14=2 {} excl=set(): cycles 12,152 (sd 793)  msgs/int 0.322  kinds {'LINK': 792, 'NODE': 488, 'SPAWN': 52, 'PULL': 0}  gives/run {}
+== sort:20 8x8 ship=1 shipc=1
+s14=2 {} excl=set(): cycles 11,535 (sd 337)  msgs/int 0.324  kinds {'LINK': 800, 'NODE': 492, 'SPAWN': 46, 'PULL': 0}  gives/run {}
+== qsort:40 4x4 ship=1 shipc=1
+s14=2 {} excl=set(): cycles 21,534 (sd 3,297)  msgs/int 0.423  kinds {'LINK': 3576, 'NODE': 1976, 'SPAWN': 314, 'PULL': 0}  gives/run {}
+== qsort:40 8x8 ship=1 shipc=1
+s14=2 {} excl=set(): cycles 20,599 (sd 837)  msgs/int 0.448  kinds {'LINK': 3784, 'NODE': 2088, 'SPAWN': 331, 'PULL': 0}  gives/run {}
+== list:120 4x4 ship=1 shipc=1
+s14=2 {} excl=set(): cycles 16,852 (sd 914)  msgs/int 0.524  kinds {'LINK': 2028, 'NODE': 1114, 'SPAWN': 144, 'PULL': 0}  gives/run {}
+== list:120 8x8 ship=1 shipc=1
+s14=2 {} excl=set(): cycles 16,206 (sd 1,024)  msgs/int 0.511  kinds {'LINK': 1958, 'NODE': 1104, 'SPAWN': 142, 'PULL': 0}  gives/run {}
+== fib:16 4x4 ship=1 shipc=1
+s14=2 {} excl=set(): cycles 16,684 (sd 164)  msgs/int 0.040  kinds {'LINK': 1015, 'NODE': 358, 'SPAWN': 358, 'PULL': 0}  gives/run {(0, 'CON'): 308.0}
+== fib:16 8x8 ship=1 shipc=1
+s14=2 {} excl=set(): cycles 6,507 (sd 340)  msgs/int 0.191  kinds {'LINK': 4789, 'NODE': 1724, 'SPAWN': 1724, 'PULL': 0}  gives/run {(0, 'CON'): 1354.2}
+== higher:100 4x4 ship=1 shipc=1
+s14=2 {} excl=set(): cycles 13,411 (sd 692)  msgs/int 0.632  kinds {'LINK': 1534, 'NODE': 790, 'SPAWN': 103, 'PULL': 0}  gives/run {}
+== higher:100 8x8 ship=1 shipc=1
+s14=2 {} excl=set(): cycles 13,214 (sd 1,204)  msgs/int 0.631  kinds {'LINK': 1530, 'NODE': 792, 'SPAWN': 101, 'PULL': 0}  gives/run {}
+DONE

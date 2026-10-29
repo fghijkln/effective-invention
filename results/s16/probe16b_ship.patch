@@ -1,0 +1,70 @@
+diff --git a/omega/fabric.py b/omega/fabric.py
+index ef49234..f7f48aa 100644
+--- a/omega/fabric.py
++++ b/omega/fabric.py
+@@ -38,7 +38,13 @@ BOT_GIVE = int(__import__('os').environ.get('OMEGA_BOT_GIVE', '0'))
+ S14 = int(__import__('os').environ.get('OMEGA_S14', '2'))
+ S14_GOVNB = int(__import__('os').environ.get('OMEGA_S14_GOVNB', '0'))    # governor relax-with-hungry-neighbour bound (x/4 budget)
+ S14_GOVL0 = int(__import__('os').environ.get('OMEGA_S14_GOVL0', '2'))    # governor reset level with s14
+-DQF_DATA = int(__import__('os').environ.get('OMEGA_DQF_DATA', '0'))  # step 15: 1 = step 14's bit 59 (data-walking forks too)
++DQF_DATA = int(__import__('os').environ.get('OMEGA_DQF_DATA', '0'))
++# step 16 probe: SPAWN carries the partner node.  When a REF ~ node redex is handed to a neighbour and the node
++# lives at the sender, send the node itself (an ordinary NODE message whose link partner is the REF) instead of
++# SPAWN(ref, node pointer): the receiver re-forms the redex locally and expands it there, so the expansion's root
++# never has to reach back to the sender.  1 = demand spawns, 2 = also the step-14 oldest-fork give.  0 = step 15.
++SHIP = int(__import__('os').environ.get('OMEGA_SHIP', '0'))
++SHIPC = int(__import__('os').environ.get('OMEGA_SHIPC', '0'))   # 1: ship only when no aux port is a local var  # step 15: 1 = step 14's bit 59 (data-walking forks too)
+ GRAD = int(__import__('os').environ.get('OMEGA_GRAD', '0'))
+ P_MSG = float(__import__('os').environ.get('OMEGA_P_MSG', '0.5'))     # default ejection-port priority
+ GOV_E = 32                         # governor epoch: interactions
+@@ -640,10 +646,26 @@ class Cell:
+             d = order[(self.hrot - 1 + k) % 4]
+             if (d in self.nbrs and self.give(label(ref))
+                     and self.fab.cells[self.nbr_xy(d)].hungry() and self.can_send()):
+-                self.send(MSG_SPAWN, self.nbr_xy(d), ref, x)
++                self.ship(self.nbr_xy(d), ref, x, 1)
+                 return 1
+         return self.expand(ref, x)
+ 
++    def ship(self, to, ref, x, lvl):
++        """Hand REF ~ x to cell `to`: SPAWN, or (step 16 probe, SHIP >= lvl) the local partner node itself."""
++        if SHIP >= lvl and is_node(x) and self.local(x) and not self.forged_node(x) and (
++                not SHIPC or not any(is_var(p) and self.local(p) for p in self.nodes[addr_slot(payload(x))])):
++            a1, a2 = self.free_node(x)
++            self.send(MSG_NODE, to, x, a1, a2, ref)
++            self.st["ship"] = self.st.get("ship", 0) + 1
++        else:
++            self.send(MSG_SPAWN, to, ref, x)
++
++    def uncount(self):
++        self.st["interactions"] -= 1
++        self.fab.interactions -= 1
++        if self.fab.gov_b and self.ep_i > 0:
++            self.ep_i -= 1
++
+     def expand(self, refp, x, forwarded=False):
+         """refp: the REF port (its owner stamps everything the expansion creates)."""
+         ref, o = label(refp), owner(refp)
+@@ -866,7 +888,10 @@ class Cell:
+                     k0 = self.queue[bf[0]]; del self.queue[bf[0]]
+                 if k0[0] == T_LINK:
+                     self.count()
+-                self.send(MSG_SPAWN, self.nbr_xy(d), bf[1], bf[2])
++                if k0[0] == T_LINK:
++                    self.ship(self.nbr_xy(d), bf[1], bf[2], 2)
++                else:
++                    self.send(MSG_SPAWN, self.nbr_xy(d), bf[1], bf[2])
+                 self.grot += 1
+                 self.st["tasks"] += 1
+                 self.st["botgive"] = self.st.get("botgive", 0) + 1
+@@ -916,7 +941,9 @@ class Cell:
+                 else:
+                     s = self.nfree.pop()
+                     self.nodes[s] = [m[4], m[5]]; self.nown[s] = owner(m[3])
+-                    if kind == MSG_PULL:
++                    if kind == MSG_NODE and SHIP and tag(m[6]) == REF:
++                        cost = 1 + self.expand(m[6], with_payload(m[3], self.here(s)))   # step 16 probe: shipped redex
++                    elif kind == MSG_PULL:
+                         cost = 1 + self.forward(m[6], with_payload(m[3], self.here(s)))
+                     else:
+                         cost = 1 + self.do_link(with_payload(m[3], self.here(s)), m[6])
