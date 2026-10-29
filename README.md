@@ -1,5 +1,11 @@
 # TACHYON-Ω — a Spatial Interaction-Net Fabric
 
+> **Scope statement / 项目范围声明**
+>
+> TACHYON-Ω is an architecture and RTL project. Tape-out, physical design, place-and-route, timing closure, power, process nodes and silicon cost are **out of scope — permanently**. The area and Fmax figures in this repo are rough pre-layout estimates kept for internal reference only; they are not claims and not an invitation to debate. Reviews, issues or comments that judge this project on fabrication or physical-design grounds will be closed without discussion.
+>
+> 本项目只关注体系结构与 RTL。流片、物理设计、布局布线、时序收敛、功耗、工艺节点与硅成本**永久不在范围内**。仓库中的面积与 Fmax 数字仅为布局前粗略估算，仅供内部参考，不构成任何主张，也不接受讨论。任何以流片或物理设计为由对本项目做出的评价、issue 或评论，一律不予回应、直接关闭。
+
 A processor prototype with **no CPU, no separate memory, no program counter, no shared address space
 and no instruction stream**. A program is a graph (an interaction net). The machine is a W×H mesh of
 *active memory cells*. Each cell stores part of the graph and rewrites, right where it is stored, the
@@ -399,8 +405,8 @@ read-only) onto the **Nangate45 (FreePDK45) Open Cell Library**, typical corner,
 Yosys 0.70 (`dfflibmap` + `abc -D 2000`), every memory kept as a black-box macro whose area is
 bits × the mean density of the OpenROAD **fakeram45** macros (0.533 µm²/bit, +50% per extra port), a
 fanout repair pass (`synth/buffer_nets.py`, buffer trees above 16 sinks, buffers counted in the area)
-and **OpenSTA** pre-layout timing with the library's wire-load model. OpenROAD (place and route) is not
-installable on this aarch64 host, so these are pre-layout estimates (see Known gaps).
+and **OpenSTA** pre-layout timing with the library's wire-load model. Place and route is out of scope
+(see the scope statement at the top), so these are rough pre-layout estimates for internal reference only.
 Reports: `synth/out/<design>/{stat.txt, sta.txt, summary.json}`; table: `bench/area_table.py` →
 `results/area_fmax.md`.
 
@@ -449,8 +455,8 @@ What this says:
    The ROM is shared, so tenants see each other's definitions (they cannot forge an owner, but code is
    not confidential). Forged pointers to slots the attacker itself owns are not trapped (no isolation
    issue, but the attacker can corrupt its own graph).
-2. **Area and Fmax are pre-layout estimates (no OpenROAD).** OpenROAD has no linux-aarch64 package
-   and a source build of it and its dependencies was out of scope, so `synth/flow.py` stops after
+2. **Area and Fmax are rough pre-layout estimates.** Physical design (OpenROAD, place and route, timing
+   closure) is out of scope permanently (scope statement at the top), so `synth/flow.py` stops after
    synthesis + OpenSTA: no floorplan, placement, clock tree or routing, wire delay from the Nangate45
    wire-load model only (real routed timing on a 0.66 mm² cell will be worse), the fanout repair is a
    simple buffer-tree pass instead of `repair_design`/resizing, and `abc` maps for delay without
@@ -499,8 +505,8 @@ What this says:
 
 ## Next steps (suggested)
 
-1. Timing: pipeline the read-ahead address (the 35 MHz critical path), then place and route the cell
-   (OpenROAD on an x86-64 host) for routed area and Fmax. Shrink the node RAM / task queue.
+1. Microarchitecture: shorten the read-ahead address chain in RTL (a pipelining / architecture question;
+   place and route, routed area and timing closure are out of scope). Shrink the node RAM / task queue.
 2. Re-synthesise the v4 cell (2W RAMs, VHU) and re-do the area × time comparison. Cut cycles per
    interaction below 2.36: dual-issue independent tasks, or overlap the rule cycle with the next pick.
 3. Global memory pressure: a gradient (distance-to-room) side band instead of the 1-bit `roomy`, so
