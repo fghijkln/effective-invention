@@ -13,7 +13,7 @@ def main():
     n = fails = 0; t = time.time()
     for name, N in CASES:
         b = progs.book(name, N); ref = semantic.result(b); exp = progs.expected(name, N)
-        fork = name in ("fib", "treesum", "treesum_direct")
+        fork = name in ("fib", "treesum", "treesum_direct", "qsort")
         for (W, H) in ((2, 2), (4, 4), (3, 2)):
             for mode in (0, 1, 2):
                 for nb in ((0, 2), (5, 1)) if mode else ((0, 2),):
@@ -21,7 +21,7 @@ def main():
                     f = fabric.Fabric(b, W, H, seed=seed, s14=mode, gov_nb=nb[0], gov_l0=nb[1], p_jitter=0.05).run()
                     r = rtl.run(b, W, H, seed=seed, jitter=20, s14=mode, govnb=nb[0], govl0=nb[1])
                     fg = sum(c.st.get("botgive", 0) for c in f.cells.values())
-                    want_give = fork and mode != 0 and W * H >= 4
+                    want_give = fork and W * H >= 4 and (mode == 1 or (mode == 2 and name != "qsort"))
                     ok = (f.readback() == exp and f.interactions == ref["interactions"] and r["status"] == 0
                           and r["readback"] == ref["readback"] and r["interactions"] == ref["interactions"]
                           and r["node_count"] == ref["nodes"]

@@ -97,7 +97,7 @@ def main():
                               scatter=rng.randint(0, 10**6) if rng.random() < 0.5 else None,
                               spawn=(sprng.choice([-1, 0, 2, 8, 8, 32]), sprng.choice([0, 1, 1]), fabric.SPAWN_K2,
                                      sprng13.choice([-1, 0, 2, 4, 4, 16]), sprng13.choice([0, 0, 20, 50, 200])),
-                              link_local=sprng.choice([0, 1, 1]), s14=sprng14.choice([0, 1, 1]))
+                              link_local=sprng.choice([0, 1, 1]), s14=sprng14.choice([0, 1, 2, 2]))
         n += 1
         if not ok:
             fails += 1; print(f"FAIL fuzz {name}({N}) {W}x{H}: {r['readback']} {r['interactions']}/{ref['interactions']}")

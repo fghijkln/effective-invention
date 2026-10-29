@@ -37,7 +37,7 @@ def case(i, mut=0, big=False):
     # step 13 producer threshold and message-budget governor (own stream again)
     s13 = random.Random(i * 15485863 + 13)
     knobs["spawn"] += (fabric.SPAWN_K2, s13.choice([-1, 0, 2, 4, 4, 16]), s13.choice([0, 0, 10, 50, 200]))
-    knobs["s14"] = random.Random(i * 32452843 + 14).choice([0, 1, 1])   # step 14 fork deque on / off
+    knobs["s14"] = random.Random(i * 32452843 + 14).choice([0, 1, 2, 2])   # step 14 fork-deque mode
     r = rtl.run(b, W, H, img=img, mut=mut, maxcycles=2_000_000, **knobs)
     ok = (r["readback"] == ref["readback"] and r["interactions"] == ref["interactions"]
           and r["node_count"] == ref["nodes"] and r["status"] == 0)
