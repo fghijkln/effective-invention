@@ -24,6 +24,19 @@ LINK_LOCAL = int(__import__('os').environ.get('OMEGA_LINK_LOCAL', '1'))
 # governor (budget in messages per 100 interactions; 0 = off, then spawn_kp is used as it is)
 SPAWN_KP = int(__import__('os').environ.get('OMEGA_SPAWN_KP', '4'))
 GOV_B = int(__import__('os').environ.get('OMEGA_GOV_B', '30'))
+# step 14 (exploration, branch explore-variance; off = step 13 behaviour):
+#  BOT_GIVE: bottom-of-stack give.  While a neighbour is hungry, a cell whose task stack holds >= 2 tasks
+#            and whose *oldest* task is a ready fork-REF redex (REF of a fork target ~ NUM / non-DUP node)
+#            hands that one over with SPAWN instead of popping its top (a deque instead of a pure stack:
+#            the big, shallow subtrees go to the idle cells, the small deep ones stay).
+#  MSG_FIRST: the ejection port is served before the task stack whenever the outbox has room (pmsg = 256).
+BOT_GIVE = int(__import__('os').environ.get('OMEGA_BOT_GIVE', '0'))
+# step 14 (RTL, SPEC 5.3): s14c = 4-entry fork deque + oldest-fork give (bot_give 3, fdepth 4) and governor
+# nb5l1 (gov_nb 5, gov_l0 1).  S14 = 1 (default) makes these the defaults of every knob left at None;
+# OMEGA_S14=0 / Fabric(s14=0) gives step 13 behaviour (RTL: +s14=0).
+S14 = int(__import__('os').environ.get('OMEGA_S14', '1'))
+GRAD = int(__import__('os').environ.get('OMEGA_GRAD', '0'))
+P_MSG = float(__import__('os').environ.get('OMEGA_P_MSG', '0.5'))     # default ejection-port priority
 GOV_E = 32                         # governor epoch: interactions
 GOV_K = (0, 2, 4, 8, 16)           # producer threshold per governor level (reset level 2)
 MSG_NAMES = ["LINK", "NODE", "SPAWN", "PULL"]
@@ -266,6 +279,39 @@ def fork_defs(book, with_rec=False, with_prod=False):
 # ---------------------------------------------------------------------------------------------
 # Cycle model
 # ---------------------------------------------------------------------------------------------
+FDEPTH = 16       # step 14 mode 3: fork-deque depth
+
+
+class TaskStack:
+    """Step 14 mode 3: the LIFO task stack plus a small separate deque f of ready fork-REF redexes.
+    The engine pops the main stack first and the newest fork task when the main stack is empty; a hungry
+    neighbour is given the *oldest* fork task.  A fork task finding f full goes on the main stack."""
+
+    def __init__(self, cell, init):
+        self.cell, self.m, self.f = cell, deque(init), deque()
+
+    def append(self, t):
+        if len(self.f) < self.cell.fab.fdepth and self.cell.fork_task(t):
+            self.f.append(t)
+        else:
+            self.m.append(t)
+
+    def pop(self):
+        return self.m.pop() if self.m else self.f.pop()
+
+    def __len__(self):
+        return len(self.m) + len(self.f)
+
+    def __bool__(self):
+        return bool(self.m) or bool(self.f)
+
+    def __getitem__(self, i):
+        return self.m[i]
+
+    def __iter__(self):
+        return iter(list(self.m) + list(self.f))
+
+
 class Cell:
     def __init__(self, fab, x, y, img):
         self.fab, self.x, self.y = fab, x, y
@@ -276,7 +322,7 @@ class Cell:
         self.traps = []
         self.nfree = [s for s in range(img.slots - 1, -1, -1) if self.nodes[s] is None]
         self.vfree = [s for s in range(img.slots - 1, -1, -1) if self.vars[s] is None]
-        self.queue = deque(img.queue[(x, y)])
+        self.queue = TaskStack(self, img.queue[(x, y)]) if fab.bot_give in (3, 4) else deque(img.queue[(x, y)])
         self.inq = {d: deque() for d in DIRS + ["L"]}     # router input FIFOs (L = local outbox)
         self.eject = deque()
         self.busy = 0
@@ -295,7 +341,10 @@ class Cell:
         # var-hop unit (RTL step 9): follows substitution chains in parallel with the engine
         self.vh_busy, self.vh_out = 0, None
         # step 13 message-budget governor: messages sent / interactions done in the current epoch
-        self.ep_m, self.ep_i, self.lvl = 0, 0, 2
+        self.ep_m, self.ep_i, self.lvl = 0, 0, fab.gov_l0
+        self.hd = 0                   # step 14 hunger distance (registered)
+        self.hrot = x + y
+        self.grot = x + y
 
     # ---- helpers ----
     def local(self, p):
@@ -359,11 +408,16 @@ class Cell:
         self.fab.interactions += 1
         if self.fab.gov_b:
             self.ep_i += 1
-            if self.ep_i == GOV_E:
+            if self.ep_i == self.fab.gov_e:
                 # epoch end: over the budget -> tighten the producer threshold one level, under half of
                 # it -> relax one level (RTL: same counters, 3-bit level)
-                b = self.fab.gov_b * GOV_E
-                if 100 * self.ep_m > b: self.lvl = min(4, self.lvl + 1)
+                b = self.fab.gov_b * self.fab.gov_e
+                top = len(self.fab.gov_k) - 1
+                nb = self.fab.gov_nb and any(self.fab.cells[self.nbr_xy(d)].hungry() for d in self.nbrs)
+                # gov_nb = 1: relax while under 2x budget (as gov_nb = 8); gov_nb = k > 1: under k/4 x budget
+                nbk = 8 if self.fab.gov_nb == 1 else self.fab.gov_nb
+                if nb and 400 * self.ep_m <= nbk * b: self.lvl = max(0, self.lvl - 1)
+                elif 100 * self.ep_m > b: self.lvl = min(top, self.lvl + 1)
                 elif 200 * self.ep_m < b: self.lvl = max(0, self.lvl - 1)
                 self.ep_m = self.ep_i = 0
 
@@ -480,9 +534,66 @@ class Cell:
         if r in fab.img.fork:
             return True
         if r in fab.img.prod:                 # step 13: producer recursion
-            k = GOV_K[self.lvl] if fab.gov_b else fab.spawn_kp
+            k = fab.gov_k[self.lvl] if fab.gov_b else fab.spawn_kp
             return k < 0 or q > k
         return q > (fab.spawn_k if r in fab.img.rec else fab.spawn_k2)
+
+    def fork_task(self, t):
+        """Step 14: (ref, x) if task t is a ready fork-REF redex (or a parked fork SPAWN), else None."""
+        k, a, b = t
+        if k == T_SPAWN:
+            return (a, b) if label(a) in self.fab.img.fork else None
+        if k != T_LINK or is_var(a) or is_var(b) or self.cross(a, b):
+            return None
+        if tag(b) == REF and tag(a) != REF:
+            a, b = b, a
+        if tag(a) != REF or label(a) not in self.fab.img.fork or tag(b) in (REF, ERA, DUP, NONE, VAR):
+            return None
+        return a, b
+
+    def bottom_fork(self):
+        """Step 14 bottom give: the oldest giveable fork task -> (index or 'f', ref, x), or None.
+        mode 1: only the bottom entry of the stack; mode 2 (idealised): the oldest fork task anywhere in
+        the stack; mode 3: the bottom of the separate fork deque (TaskStack.f)."""
+        q, mode = self.queue, self.fab.bot_give
+        if len(q) < 2:
+            return None
+        if mode == 4:                 # ablation: fork deque without the give
+            return None
+        if mode == 3:
+            if q.f:
+                r = self.fork_task(q.f[0])
+                return ("f",) + r if r else None
+            return None
+        for i in range(len(q) - 1 if mode == 2 else 1):
+            r = self.fork_task(q[i])
+            if r:
+                return (i,) + r
+        return None
+
+    def hungry_nbr(self):
+        # own rotation pointer (grot), advanced only when a give happens, so programs without fork work
+        # stay cycle-identical to step 13 (the spawn rotation hrot is left alone)
+        order = ["N", "E", "S", "W"]
+        for k in range(4):
+            d = order[(self.grot + k) % 4]
+            if d in self.nbrs and self.fab.cells[self.nbr_xy(d)].hungry():
+                return d
+        return self.downhill(order)
+
+    def downhill(self, order=("N", "E", "S", "W")):
+        """Step 14 gradient: the neighbour with the smallest hunger distance below our own (None if off)."""
+        G = self.fab.grad
+        if not G:
+            return None
+        best, bd = None, min(self.hd, G)
+        for k in range(4):
+            d = order[(self.grot + k) % 4]
+            if d in self.nbrs:
+                h = self.fab.cells[self.nbr_xy(d)].hd
+                if h < bd:
+                    best, bd = d, h
+        return best
 
     def spawn(self, ref, x):
         """Demand-driven work distribution: hand the expansion to a hungry neighbour (one that
@@ -706,6 +817,25 @@ class Cell:
         if self.fab.p_stall and rng.random() < self.fab.p_stall:
             self.busy = 1
             return
+        if src == "q" and self.fab.bot_give and self.can_send():
+            d = self.hungry_nbr()
+            if d is not None and self.fab.grad and self.fab.dmin > 1 and not self.fab.cells[self.nbr_xy(d)].hungry() \
+                    and len(self.queue.f) < self.fab.dmin:
+                d = None
+            bf = self.bottom_fork() if d is not None else None
+            if bf is not None:
+                if bf[0] == "f":
+                    k0 = self.queue.f.popleft()
+                else:
+                    k0 = self.queue[bf[0]]; del self.queue[bf[0]]
+                if k0[0] == T_LINK:
+                    self.count()
+                self.send(MSG_SPAWN, self.nbr_xy(d), bf[1], bf[2])
+                self.grot += 1
+                self.st["tasks"] += 1
+                self.st["botgive"] = self.st.get("botgive", 0) + 1
+                self.busy = 2                  # as a popped REF redex that is given: task + link + spawn
+                return
         self.st["tasks"] += 1
         self.cur_rs = src == "r"
         if src in ("q", "r"):
@@ -737,6 +867,11 @@ class Cell:
             elif kind == MSG_SPAWN:
                 if self.cross(m[3], m[4]):
                     cost = 1 + self.trap(TRAP_CROSS, min(m[3], m[4], key=owner))
+                elif (self.fab.grad and self.fab.relay and self.fab.bot_give == 3 and self.queue and label(m[3]) in self.fab.img.fork
+                      and len(self.queue.f) < self.fab.fdepth and len(self.queue.f) + 1 >= self.fab.dmin and self.downhill() is not None):
+                    self.queue.f.append((T_SPAWN, m[3], m[4]))     # relay: park on the fork deque
+                    self.st["relay"] = self.st.get("relay", 0) + 1
+                    cost = 1
                 else:
                     cost = 1 + self.expand(m[3], m[4])
             else:
@@ -762,8 +897,17 @@ class Cell:
 
 class Fabric:
     def __init__(self, book, W, H, slots=1024, qdepth=1024, fifo_depth=4, seed=0,
-                 p_jitter=0.0, p_stall=0.0, p_msg=0.5, img=None, fi_nosend=False, cluster=(2, 2, 1), spawn_k=None, spawn_hint=None, link_local=None, spawn_k2=None, spawn_kp=None, gov_b=None):
+                 p_jitter=0.0, p_stall=0.0, p_msg=None, img=None, fi_nosend=False, cluster=(2, 2, 1), spawn_k=None, spawn_hint=None, link_local=None, spawn_k2=None, spawn_kp=None, gov_b=None, bot_give=None,
+                 gov_e=None, gov_k=None, gov_l0=None, gov_nb=None, fdepth=None, grad=None, relay=1, dmin=1, main_at=None, s14=None):
         self.book, self.W, self.H = book, W, H
+        self.s14 = S14 if s14 is None else s14
+        if self.s14:
+            bot_give = 3 if bot_give is None and BOT_GIVE == 0 else bot_give
+            fdepth = 4 if fdepth is None else fdepth
+            gov_nb = 5 if gov_nb is None else gov_nb
+            gov_l0 = 1 if gov_l0 is None else gov_l0
+        fdepth = FDEPTH if fdepth is None else fdepth
+        gov_nb = 0 if gov_nb is None else gov_nb
         # sender-side spawn threshold (step 11, SPEC 5): hand a REF expansion to a hungry neighbour only
         # while more than spawn_k tasks wait on the local task stack (-1 = always, the step-10 policy)
         self.spawn_k = SPAWN_K if spawn_k is None else spawn_k
@@ -772,6 +916,23 @@ class Fabric:
         self.spawn_k2 = SPAWN_K2 if spawn_k2 is None else spawn_k2
         self.spawn_kp = SPAWN_KP if spawn_kp is None else spawn_kp
         self.gov_b = GOV_B if gov_b is None else gov_b
+        self.bot_give = BOT_GIVE if bot_give is None else bot_give
+        self.fdepth = fdepth
+        # step 14 hunger gradient (0 = off): every cell drives a saturating hunger distance hd (0 = hungry,
+        # else 1 + min over neighbours of last cycle's hd, capped at grad).  With bot_give a cell holding a
+        # waiting fork task gives the oldest one to a hungry neighbour or, failing that, to a neighbour with a
+        # smaller hd (downhill); a non-idle cell receiving a fork SPAWN while it has a downhill neighbour
+        # parks it on its fork deque instead of expanding it, so fork work flows across idle regions.
+        self.grad = GRAD if grad is None else grad
+        self.relay = relay
+        self.dmin = dmin             # downhill give / relay only while the fork deque holds >= dmin tasks
+        # governor shape knobs (step 14 exploration): epoch length, threshold ladder, reset level, and
+        # neighbour-hunger mode (gov_nb: 1 = a cell with a hungry neighbour at epoch end relaxes instead of
+        # tightening when over budget by less than 2x)
+        self.gov_e = GOV_E if gov_e is None else gov_e
+        self.gov_k = tuple(GOV_K if gov_k is None else gov_k)
+        self.gov_l0 = 2 if gov_l0 is None else gov_l0
+        self.gov_nb = gov_nb
         # cluster definition ROM (SPEC 5.6): CW x CH cells share one ROM with NP read ports.  An
         # EXPAND reads max(nodes, redexes) template entries, two per ROM word (one grant per pair); a cell whose
         # cluster's ports are all busy waits (the RTL interleaves cycle by cycle with a round-robin
@@ -782,8 +943,15 @@ class Fabric:
         self.fi_nosend = fi_nosend
         self.fifo_depth, self.qdepth = fifo_depth, qdepth
         self.rng = random.Random(seed)
-        self.p_jitter, self.p_stall, self.p_msg = p_jitter, p_stall, p_msg
-        self.img = img or Image(book, W, H, slots, qdepth)
+        self.p_jitter, self.p_stall, self.p_msg = p_jitter, p_stall, (P_MSG if p_msg is None else p_msg)
+        # step 14 deterministic seeding: main_at="c" loads @main (and its initial redexes) at the centre cell
+        # instead of (0,0); the root var stays at (0,0)
+        mc = None
+        if main_at == "c" and img is None:
+            cl = [(x, y) for y in range(H) for x in range(W)]
+            i = cl.index((W // 2, H // 2)) if W * H > 1 else 0
+            mc = cl[i:] + cl[:i]
+        self.img = img or Image(book, W, H, slots, qdepth, main_cells=mc)
         self.slots = self.img.slots
         self.cells = {(x, y): Cell(self, x, y, self.img) for x in range(W) for y in range(H)}
         self.interactions = 0
@@ -840,6 +1008,12 @@ class Fabric:
         self.rng.shuffle(cells)
         for c in cells:
             c.engine(self.rng)
+        if self.grad:
+            G = self.grad
+            nh = {k: (0 if c.hungry() else min(G, 1 + min(self.cells[c.nbr_xy(d)].hd for d in c.nbrs)) if c.nbrs else G)
+                  for k, c in self.cells.items()}
+            for k, c in self.cells.items():
+                c.hd = nh[k]
         self.cycles += 1
 
     def run(self, max_cycles=10**8):
