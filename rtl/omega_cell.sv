@@ -54,7 +54,8 @@ module omega_cell #(
   input  logic [7:0]  spawn_kp,            // step 13: threshold for producer recursions (directory bit 58; 255 = always)
   input  logic [7:0]  gov_b,               //   message-budget governor: messages per 100 interactions (0 = off: spawn_kp)
   input  logic        link_local,          // step 12: local-first orientation of var ~ var links
-  input  logic        fork_dq,             // step 14 (SPEC 5.3): fork deque + oldest-fork give (0 = step 13)
+  input  logic [1:0]  fork_dq,             // step 14 (SPEC 5.3): fork deque + oldest-fork give (0 = step 13; 1 = every fork
+                                           //   task, 2 = tasks of fork definitions that are not stream-fed: directory bit 59)
   input  logic [3:0]  gov_nb,              //   governor: with a hungry neighbour relax while sent <= gov_nb/4 x budget (0 = off)
   input  logic [2:0]  gov_l0,              //   governor reset level (step 13: 2)
   input  logic [3:0]  in_v,
@@ -122,7 +123,7 @@ module omega_cell #(
   // the directory, so a pushed task is classified without a directory read.
   localparam int FD = 4;
   logic [FD-1:0][127:0] fq;  logic [2:0] fcnt;
-  logic [DIRSZ-1:0] fbit;
+  logic [DIRSZ-1:0] fbit, fbit2;        // directory bit 56 (fork) / bit 59 (fork, not stream-fed)
   logic [31:0] st_fgive;
   // ---------------- storage ----------------
   logic [SLOTS-1:0] nalloc;             // valid bit per node slot (flip-flops; readback + free check)
@@ -142,7 +143,7 @@ module omega_cell #(
     $readmemh($sformatf("%s/var_%0d_%0d.hex", imgdir, X, Y), var_mem);
     $readmemh($sformatf("%s/queue_%0d_%0d.hex", imgdir, X, Y), tqm);
     $readmemh($sformatf("%s/dir.hex", imgdir), dirm);
-    for (int i = 0; i < DIRSZ; i++) fbit[i] = dirm[i][56];
+    for (int i = 0; i < DIRSZ; i++) begin fbit[i] = dirm[i][56]; fbit2[i] = dirm[i][59]; end
   end
 `else
   initial qinit[0] = '0;
@@ -874,8 +875,8 @@ module omega_cell #(
         // step 14: while a neighbour is hungry and at least two tasks wait, the OLDEST fork task is taken
         // (and handed over by the step-11 spawn path in S_LINK); otherwise the stack top; the newest fork
         // task only when the stack is empty
-        fgive = fork_dq && fcnt != 0 && hv_found && can_send && 32'(tq_all) >= 2 && !MUT[47];
-        fnew = fork_dq && fcnt != 0 && tq_tot == 0;
+        fgive = fork_dq != 2'd0 && fcnt != 0 && hv_found && can_send && 32'(tq_all) >= 2 && !MUT[47];
+        fnew = fork_dq != 2'd0 && fcnt != 0 && tq_tot == 0;
         msg_ok = ej_v && !ej_taken && !((ej_f.kind == M_NODE || ej_f.kind == M_PULL) && (nf_av == 0 || n_we || nf_pop != 0));
         pick_msg = msg_ok && (!(q_ok || fgive || fnew) || !can_send || rnd_msg);
         nst = S_IDLE; nrsp = 1'b0; nrsx = 1'b0; nrfw = 1'b0;
@@ -949,9 +950,9 @@ module omega_cell #(
       else if (fpop_new) fc_n = fc_n - 3'd1;
       fm = '0; fpd = '0;
       for (int j = 0; j < 3; j++) if (j < 32'(tq_push)) begin
-        if (fork_dq && fc_n < 3'(FD) && ftask(tq_pd[j], fbit[DB'(frefl(tq_pd[j]))] && spawn_hint)) begin
+        if (fork_dq != 2'd0 && fc_n < 3'(FD) && ftask(tq_pd[j], (fork_dq == 2'd2 ? fbit2[DB'(frefl(tq_pd[j]))] : fbit[DB'(frefl(tq_pd[j]))]) && spawn_hint)) begin
           fq_n[fc_n[1:0]] = tq_pd[j][127:0]; fc_n = fc_n + 3'd1;
-        end else if (fork_dq && MUT[48] && ftask(tq_pd[j], fbit[DB'(frefl(tq_pd[j]))] && spawn_hint)) begin
+        end else if (fork_dq != 2'd0 && MUT[48] && ftask(tq_pd[j], (fork_dq == 2'd2 ? fbit2[DB'(frefl(tq_pd[j]))] : fbit[DB'(frefl(tq_pd[j]))]) && spawn_hint)) begin
           // mutant 48: a fork task finding the deque full is dropped
         end else begin
           fpd[fm[1:0]] = tq_pd[j]; fm = fm + 3'd1;
@@ -1018,7 +1019,7 @@ module omega_cell #(
       d_rd   <= dirm[la_d];
       rom_v  <= rom_req && rom_gnt; rvp <= rom_q;
     end
-    if (cfg_we && cfg_sel == 2'd2) begin dirm[DB'(cfg_a)] <= cfg_d; fbit[DB'(cfg_a)] <= cfg_d[56]; end
+    if (cfg_we && cfg_sel == 2'd2) begin dirm[DB'(cfg_a)] <= cfg_d; fbit[DB'(cfg_a)] <= cfg_d[56]; fbit2[DB'(cfg_a)] <= cfg_d[59]; end
   end
 
 `ifndef SYNTHESIS

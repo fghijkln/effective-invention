@@ -18,7 +18,7 @@ module omega_mesh #(
   input  logic [7:0]  spawn_k2,
   input  logic [7:0]  spawn_kp,            // step 13 producer threshold / message-budget governor (SPEC 5.2)
   input  logic [7:0]  gov_b,
-  input  logic        fork_dq,             // step 14 fork deque + oldest-fork give (SPEC 5.3; 0 = step 13)
+  input  logic [1:0]  fork_dq,             // step 14 fork deque + oldest-fork give (SPEC 5.3; 0 = step 13)
   input  logic [3:0]  gov_nb,              // step 14 governor: relax with a hungry neighbour (0 = off)
   input  logic [2:0]  gov_l0,              //   governor reset level
   input  logic        link_local,          // step 12 local-first link orientation (configuration, SPEC 4)

@@ -83,6 +83,9 @@ def run(book, W, H, seed=1, jitter=0, stall=0, pmsg=128, slots=1024, qdepth=1024
     dflt = (fabric.SPAWN_K, fabric.SPAWN_HINT, fabric.SPAWN_K2, fabric.SPAWN_KP, fabric.GOV_B)
     sk, sh, sk2, skp, gov = (tuple(spawn) + dflt[len(spawn):])[:5] if spawn else dflt
     ll = fabric.LINK_LOCAL if link_local is None else link_local     # step 12 (OMEGA_LINK_LOCAL)
+    s14 = fabric.S14 if s14 is None else int(s14)                     # step 14 fork deque mode (OMEGA_S14)
+    govnb = (fabric.S14_GOVNB if s14 else 0) if govnb is None else govnb
+    govl0 = (fabric.S14_GOVL0 if s14 else 2) if govl0 is None else govl0
     exe = build(W, H, slots, qdepth, romsz, mut, cluster=cluster)
     img = img or fabric.Image(book, W, H, slots, qdepth)
     if len(img.romn) > romsz or len(img.romr) > RDXSZ or len(img.dir) > 256:
@@ -94,8 +97,7 @@ def run(book, W, H, seed=1, jitter=0, stall=0, pmsg=128, slots=1024, qdepth=1024
                             f"+pmsg={pmsg}", f"+maxcycles={maxcycles}", f"+fi={fi}",
                             f"+spawnk={255 if sk < 0 else min(sk, 254)}", f"+spawnhint={int(bool(sh))}", f"+linklocal={int(bool(ll))}",
                             f"+spawnk2={255 if sk2 < 0 else min(sk2, 254)}", f"+spawnkp={255 if skp < 0 else min(skp, 254)}",
-                            f"+govb={max(0, min(gov, 255))}", f"+s14={int(bool(fabric.S14 if s14 is None else s14))}"]
-                            + ([f"+govnb={govnb}"] if govnb is not None else []) + ([f"+govl0={govl0}"] if govl0 is not None else []), capture_output=True, text=True, timeout=timeout)
+                            f"+govb={max(0, min(gov, 255))}", f"+s14={s14}", f"+govnb={govnb}", f"+govl0={govl0}"], capture_output=True, text=True, timeout=timeout)
         res = {}
         for line in r.stdout.splitlines():
             k, _, v = line.partition(" ")

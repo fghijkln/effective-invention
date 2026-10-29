@@ -35,6 +35,9 @@ BOT_GIVE = int(__import__('os').environ.get('OMEGA_BOT_GIVE', '0'))
 # nb5l1 (gov_nb 5, gov_l0 1).  S14 = 1 (default) makes these the defaults of every knob left at None;
 # OMEGA_S14=0 / Fabric(s14=0) gives step 13 behaviour (RTL: +s14=0).
 S14 = int(__import__('os').environ.get('OMEGA_S14', '1'))
+# s14 = 2: only fork tasks whose partner is a number go on the deque (RTL fork_dq = 2)
+S14_GOVNB = int(__import__('os').environ.get('OMEGA_S14_GOVNB', '5'))    # governor relax-with-hungry-neighbour bound (x/4 budget)
+S14_GOVL0 = int(__import__('os').environ.get('OMEGA_S14_GOVL0', '1'))    # governor reset level with s14
 GRAD = int(__import__('os').environ.get('OMEGA_GRAD', '0'))
 P_MSG = float(__import__('os').environ.get('OMEGA_P_MSG', '0.5'))     # default ejection-port priority
 GOV_E = 32                         # governor epoch: interactions
@@ -124,7 +127,7 @@ class Image:
         self.rom = []
         self.dir = []
         self.romn, self.romr, self.dir3 = [], [], []
-        self.fork, self.rec, self.prod = fork, rec, prod = fork_defs(book, with_prod=True)
+        self.fork, self.rec, self.prod, self.dqf = fork, rec, prod, dqf = fork_defs(book, with_prod=2)
         for dd in book.defs:
             self.dir.append(len(self.rom))
             cnt = len(dd.nodes) | (dd.nvars << 8) | (len(dd.redexes) << 16)
@@ -132,7 +135,7 @@ class Image:
                 raise FabricError(f"definition @{dd.name} too large for one EXPAND "
                                   f"({len(dd.nodes)} nodes / {dd.nvars} vars, limit {XMAP})")
             self.rom.append((dd.root, cnt))
-            self.dir3.append(len(self.romn) | (len(self.romr) << 16) | (cnt << 32) | (int(len(self.dir3) in fork) << 56) | (int(len(self.dir3) in rec) << 57) | (int(len(self.dir3) in prod) << 58) | (dd.root << 64))
+            self.dir3.append(len(self.romn) | (len(self.romr) << 16) | (cnt << 32) | (int(len(self.dir3) in fork) << 56) | (int(len(self.dir3) in rec) << 57) | (int(len(self.dir3) in prod) << 58) | (int(len(self.dir3) in dqf) << 59) | (dd.root << 64))
             self.romn += [(a, b) for (_, a, b) in dd.nodes]
             self.romr += list(dd.redexes)
             # cluster ROM words hold four entries: align every definition to a multiple of four
@@ -271,6 +274,17 @@ def fork_defs(book, with_rec=False, with_prod=False):
         scc = [v for v in range(n) if comp[v] == comp[u]]
         if any(w < n and comp[w] != comp[u] and w not in rec for v in scc for w in calls[v]):
             prod.add(u)
+    # step 14: a fork recursion is *stream-fed* when its SCC calls a producer recursion outside the SCC
+    # (qsort's partitions are lists that lo / hi emit piece by piece): handing its oldest task to another
+    # cell moves the consumer away from its producers, so the fork deque (s14 = 2) only takes the other
+    # fork definitions (directory bit 59: fib, gen, tsum, ...)
+    fstream = set()
+    for u in fork:
+        scc = [v for v in range(n) if comp[v] == comp[u]]
+        if any(w < n and comp[w] != comp[u] and w in prod for v in scc for w in calls[v]):
+            fstream.add(u)
+    if with_prod == 2:
+        return fork, rec, prod, fork - fstream
     if with_prod:
         return fork, rec, prod
     return (fork, rec) if with_rec else fork
@@ -548,6 +562,8 @@ class Cell:
         if tag(b) == REF and tag(a) != REF:
             a, b = b, a
         if tag(a) != REF or label(a) not in self.fab.img.fork or tag(b) in (REF, ERA, DUP, NONE, VAR):
+            return None
+        if self.fab.s14 == 2 and label(a) not in self.fab.img.dqf:   # s14 = 2: not stream-fed forks (bit 59)
             return None
         return a, b
 
@@ -904,8 +920,8 @@ class Fabric:
         if self.s14:
             bot_give = 3 if bot_give is None and BOT_GIVE == 0 else bot_give
             fdepth = 4 if fdepth is None else fdepth
-            gov_nb = 5 if gov_nb is None else gov_nb
-            gov_l0 = 1 if gov_l0 is None else gov_l0
+            gov_nb = S14_GOVNB if gov_nb is None else gov_nb
+            gov_l0 = S14_GOVL0 if gov_l0 is None else gov_l0
         fdepth = FDEPTH if fdepth is None else fdepth
         gov_nb = 0 if gov_nb is None else gov_nb
         # sender-side spawn threshold (step 11, SPEC 5): hand a REF expansion to a hungry neighbour only
