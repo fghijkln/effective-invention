@@ -1,0 +1,25 @@
+RGRAD=0 fib(12) 3x3: cycles 36,346 (sd 4)  msgs 32  hops 38
+RGRAD=0 treesum(6) 3x3: cycles 12,996 (sd 240)  msgs 330  hops 474
+RGRAD=0 list(20) 3x2: cycles 6,690 (sd 133)  msgs 321  hops 504
+RGRAD=0 qsort(15) 4x4: cycles 25,163 (sd 43)  msgs 29  hops 118
+RGRAD=0 sort(10) 3x3: cycles 8,327 (sd 3)  msgs 27  hops 78
+RGRAD=0 fib(12) 6x6: cycles 31,088 (sd 960)  msgs 1,944  hops 2,727
+RGRAD=0 qsort(15) 6x6: cycles 25,735 (sd 54)  msgs 33  hops 198
+RGRAD=0 treesum(7) 8x8: cycles 18,046 (sd 1,100)  msgs 7,288  hops 11,950
+RGRAD=8 fib(12) 3x3: cycles 36,346 (sd 4)  msgs 32  hops 38
+RGRAD=8 treesum(6) 3x3: cycles 13,578 (sd 160)  msgs 114  hops 143
+RGRAD=8 list(20) 3x2: cycles 6,431 (sd 659)  msgs 318  hops 508
+RGRAD=8 qsort(15) 4x4: cycles 25,163 (sd 43)  msgs 29  hops 118
+RGRAD=8 sort(10) 3x3: cycles 8,327 (sd 3)  msgs 27  hops 78
+RGRAD=8 fib(12) 6x6: cycles 35,629 (sd 32)  msgs 195  hops 296
+RGRAD=8 qsort(15) 6x6: cycles 25,735 (sd 54)  msgs 33  hops 198
+RGRAD=8 treesum(7) 8x8: cycles 20,199 (sd 411)  msgs 2,755  hops 6,000
+RGRAD=15 fib(12) 3x3: cycles 36,346 (sd 4)  msgs 32  hops 38
+RGRAD=15 treesum(6) 3x3: cycles 13,578 (sd 160)  msgs 114  hops 143
+RGRAD=15 list(20) 3x2: cycles 6,431 (sd 659)  msgs 318  hops 508
+RGRAD=15 qsort(15) 4x4: cycles 25,163 (sd 43)  msgs 29  hops 118
+RGRAD=15 sort(10) 3x3: cycles 8,327 (sd 3)  msgs 27  hops 78
+RGRAD=15 fib(12) 6x6: cycles 35,629 (sd 32)  msgs 195  hops 296
+RGRAD=15 qsort(15) 6x6: cycles 25,735 (sd 54)  msgs 33  hops 198
+RGRAD=15 treesum(7) 8x8: cycles 24,306 (sd 844)  msgs 1,240  hops 2,931
+DONE

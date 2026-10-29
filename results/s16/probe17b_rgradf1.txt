@@ -1,0 +1,23 @@
+RGRAD=8 fib(12) 3x3: cycles 36,076 (sd 1)  msgs 32  hops 38
+RGRAD=8 treesum(6) 3x3: cycles 13,400 (sd 18)  msgs 76  hops 92
+RGRAD=8 list(20) 3x2: cycles 7,179 (sd 618)  msgs 257  hops 392
+RGRAD=8 qsort(15) 4x4: cycles 24,543 (sd 47)  msgs 29  hops 118
+RGRAD=8 sort(10) 3x3: cycles 7,900 (sd 21)  msgs 27  hops 78
+RGRAD=8 fib(12) 6x6: cycles 35,614 (sd 62)  msgs 163  hops 266
+RGRAD=8 qsort(15) 6x6: cycles 24,992 (sd 8)  msgs 33  hops 198
+Traceback (most recent call last):
+  File "/workspace/work/omega/bench/rgrad17.py", line 14, in <module>
+    f = fabric.Fabric(book, W, H, seed=s, p_jitter=0.1, img=tm.ballast_img(book, W, H, 1024, *tm.GKEEP, cells)).run()
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/work/omega/bench/../omega/fabric.py", line 1100, in run
+    raise FabricError("no progress for 100000 cycles (out of memory / livelock)")
+omega.fabric.FabricError: no progress for 100000 cycles (out of memory / livelock)
+RGRAD=15 fib(12) 3x3: cycles 36,076 (sd 1)  msgs 32  hops 38
+RGRAD=15 treesum(6) 3x3: cycles 13,400 (sd 18)  msgs 76  hops 92
+RGRAD=15 list(20) 3x2: cycles 7,179 (sd 618)  msgs 257  hops 392
+RGRAD=15 qsort(15) 4x4: cycles 24,543 (sd 47)  msgs 29  hops 118
+RGRAD=15 sort(10) 3x3: cycles 7,900 (sd 21)  msgs 27  hops 78
+RGRAD=15 fib(12) 6x6: cycles 35,390 (sd 60)  msgs 154  hops 263
+RGRAD=15 qsort(15) 6x6: cycles 24,564 (sd 48)  msgs 33  hops 198
+RGRAD=15 treesum(7) 8x8: cycles 24,282 (sd 197)  msgs 933  hops 1,756
+DONE

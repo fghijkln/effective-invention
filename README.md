@@ -135,6 +135,28 @@ step 12 the cost was qsort: on meshes it was 16–27% slower than with step 10's
 because its filter chains (lo/hi/app) stayed where they started; step 13 (next section) fixes that. treesum(9)
 on 8×8 varies ±20% with the arbitration seed; over seeds 1–4 the mean is 2,374 vs 2,470 for step 10.
 
+### Room-distance gradient under global memory pressure: probe rejected (step 17)
+
+Next step 3 on the fabric model (`results/s16/rgrad17.py`, patch `results/s16/probe17_rgrad.patch`; the five
+global-pressure cases of `tests/test_mempress.py` plus fib(12) 6×6, qsort(15) 6×6, treesum(7) 8×8, every cell
+but the far corner left with 8 free node / 8 free var slots, seeds 1–4, jitter 0.1). Each cell registers a
+room distance `rd` (0 when roomy, else 1 + the neighbours' minimum, capped at G), the analogue of step 14's
+hunger distance.
+
+* **Escalated retries go downhill instead of round robin** (G = 8): far fewer messages where work moves at all
+  (treesum(7) 8×8 7,288 → 2,755, fib(12) 6×6 1,944 → 195, treesum(6) 3×3 330 → 114), but *slower*: treesum(7)
+  8×8 18,046 → 20,199 cycles (+12%, G = 15: +35%), fib(12) 6×6 31,088 → 35,629 (+15%), treesum(6) 3×3 +4.5%;
+  list(20) 3×2 −3.9%; the rest unchanged. Round robin spreads work over the ballast cells, which still have a
+  few free slots each, and that parallelism is worth more than reaching the one roomy corner quickly.
+* **No parking when a downhill neighbour exists** (expansions only, or also the SWI / commutation offloads):
+  sort(10) 3×3 −5%, qsort(15) 4×4 / 6×6 −2.5% / −2.9%, but list(20) 3×2 +7%, fib(12) 6×6 +15%, and the fabric
+  **livelocks** (no progress for 100,000 cycles) on treesum(7) 8×8 (expansions only, G = 8) and list(20) 3×2
+  (all three sites): work that is sent downhill without waiting bounces between cells whose rd changes
+  under it. Kept: step 10's park-and-escalate.
+
+Most of a global-pressure run is spent parked (fib(12) 3×3 needs 36,346 cycles with only 32 messages): the
+work fits in the ballast cells' few free slots and waits for slots to be freed, rather than moving to the room.
+
 ### Two fabric probes, both rejected (step 16)
 
 Screened on the fabric model only (arbitration seeds 1–4, step-15 defaults, `bench/probe15.py`); neither
@@ -807,8 +829,9 @@ What this says:
    place and route, routed area and timing closure are out of scope). Shrink the node RAM / task queue.
 2. Re-synthesise the v4 cell (2W RAMs, VHU) and re-do the area × time comparison. Cut cycles per
    interaction below 2.36: dual-issue independent tasks, or overlap the rule cycle with the next pick.
-3. Global memory pressure: a gradient (distance-to-room) side band instead of the 1-bit `roomy`, so
-   escalated work goes straight toward room; throttle SPAWN bouncing on a globally full fabric; spill
+3. Global memory pressure: a gradient (distance-to-room) side band was probed in step 17 (fewer messages,
+   but slower, and livelock when parking is skipped); a useful version would have to keep the round-robin
+   spread and add a progress guarantee; throttle SPAWN bouncing on a globally full fabric; spill
    to off-fabric memory.
 4. Bigger language: signed numbers, strings, `fold`/`bend`, parameterised data types; a TACHYON-128 host
    interface (DMA of graph images, result readback).
@@ -856,3 +879,4 @@ What this says:
 * step 14: per-cell 4-entry fork deque + oldest-fork give (default: fork definitions that are not stream-fed, directory bit 59; `+s14=0` = step 13), governor relax knobs `+govnb` / `+govl0` (default off); 8 seeds: fib(20) 8×8 −10.7%, treesum_direct(14) 8×8 −15.8% (range −53%), treesum(9) 4×4 / 8×8 −6.4% / −5.8%, every other program cycle for cycle as step 13; units 42/42, programs 306/306, step-14 cross-check 90/90, fabric knobs 324/324, fuzz 600/600 + big 200/200, security 420/420, mempress 43/43, mutants 49/49
 * step 15: directory bit 59 (fork deque) leaves out data-walking fork recursions (loader only, no RTL change; `OMEGA_DQF_DATA=1` = step 14); 8 seeds: treesum(9) 8×8 2,255 → 2,126 cycles (−5.7%), 0.526 → 0.466 msgs/interaction; every other program cycle for cycle as step 14; units 42/42, programs 315/315, step-14 cross-check 90/90, fabric knobs 1,782/1,782, fuzz 600/600 + big 200/200, security 420/420, mempress 43/43, mutants 49/49
 * step 16: two fabric-model probes rejected (dynamic fork-deque locality test; SPAWN carrying the partner node), README section and `results/s16/`; no model / RTL change
+* step 17: room-distance gradient for global memory pressure, fabric probe rejected (fewer messages, up to +15% cycles, livelock without parking); README section, `results/s16/`

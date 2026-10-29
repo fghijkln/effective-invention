@@ -1,0 +1,109 @@
+diff --git a/omega/fabric.py b/omega/fabric.py
+index ef49234..a26e13b 100644
+--- a/omega/fabric.py
++++ b/omega/fabric.py
+@@ -38,7 +38,12 @@ BOT_GIVE = int(__import__('os').environ.get('OMEGA_BOT_GIVE', '0'))
+ S14 = int(__import__('os').environ.get('OMEGA_S14', '2'))
+ S14_GOVNB = int(__import__('os').environ.get('OMEGA_S14_GOVNB', '0'))    # governor relax-with-hungry-neighbour bound (x/4 budget)
+ S14_GOVL0 = int(__import__('os').environ.get('OMEGA_S14_GOVL0', '2'))    # governor reset level with s14
+-DQF_DATA = int(__import__('os').environ.get('OMEGA_DQF_DATA', '0'))  # step 15: 1 = step 14's bit 59 (data-walking forks too)
++DQF_DATA = int(__import__('os').environ.get('OMEGA_DQF_DATA', '0'))
++# step 17 probe: room gradient.  RGRAD = G > 0: every cell registers rd = 0 when roomy, else 1 + min over its
++# neighbours' rd (capped at G); an escalated retry moves to the neighbour with the smallest rd below its own
++# instead of round robin (ties / none: round robin as before).  0 = step 15.
++RGRAD = int(__import__('os').environ.get('OMEGA_RGRAD', '0'))
++RGRADF = int(__import__('os').environ.get('OMEGA_RGRADF', '0'))   # 1: an expansion with no room goes downhill at once (no parking)  # step 15: 1 = step 14's bit 59 (data-walking forks too)
+ GRAD = int(__import__('os').environ.get('OMEGA_GRAD', '0'))
+ P_MSG = float(__import__('os').environ.get('OMEGA_P_MSG', '0.5'))     # default ejection-port priority
+ GOV_E = 32                         # governor epoch: interactions
+@@ -377,6 +382,7 @@ class Cell:
+         # step 13 message-budget governor: messages sent / interactions done in the current epoch
+         self.ep_m, self.ep_i, self.lvl = 0, 0, fab.gov_l0
+         self.hd = 0                   # step 14 hunger distance (registered)
++        self.rd = 0                   # step 17 probe: room distance (registered)
+         self.hrot = x + y
+         self.grot = x + y
+ 
+@@ -548,6 +554,31 @@ class Cell:
+         self.st["park"] = self.st.get("park", 0) + 1
+         return True
+ 
++    def down_room(self):
++        """Step 17 probe: the neighbour with the smallest room distance below our own, or None."""
++        best, bd = None, min(self.rd, RGRAD - 1)
++        for k in range(len(self.nbrs)):
++            d = self.nbrs[(self.rr + k) % len(self.nbrs)]
++            r = self.fab.cells[self.nbr_xy(d)].rd
++            if r < bd:
++                best, bd = d, r
++        if best is not None:
++            self.rr += 1
++        return best
++
++    def esc_nbr(self):
++        """Escalated move target: round robin (step 10), or downhill on the room gradient (step 17 probe)."""
++        if RGRAD:
++            best, bd = None, self.rd
++            for k in range(len(self.nbrs)):
++                d = self.nbrs[(self.rr + k) % len(self.nbrs)]
++                r = self.fab.cells[self.nbr_xy(d)].rd
++                if r < bd:
++                    best, bd = d, r
++            if best is not None:
++                return best
++        return self.nbrs[self.rr % len(self.nbrs)]
++
+     def roomy_nbr(self):
+         """First roomy neighbour in rotating order (N E S W), or None."""
+         self.mrot = getattr(self, "mrot", self.x + self.y) + 1
+@@ -652,11 +683,13 @@ class Cell:
+         if len(self.nfree) < nn or len(self.vfree) < nv:
+             if self.nbrs:
+                 t = self.roomy_nbr()          # out of memory: prefer a roomy neighbour
++                if t is None and RGRADF:
++                    t = self.down_room()
+                 if t is None and not self.escalated() and self.park(T_SPAWN, refp, x):
+                     self.st["requeue"] += 1   # no roomy neighbour: park (forwarded after 4 parks)
+                     return 1
+                 if t is None:
+-                    t = self.nbrs[self.rr % len(self.nbrs)]
++                    t = self.esc_nbr()
+                     self.rr += 1
+                 self.send_or_retry(MSG_SPAWN, self.nbr_xy(t), refp, x)
+                 self.st["requeue"] += 1
+@@ -708,8 +741,10 @@ class Cell:
+                 return self.trap(TRAP_FORGED, a)
+             if ta == SWI and tb == NUM and payload(b) != 0 and not self.nfree:
+                 d = self.roomy_nbr() if self.can_send() else None
++                if d is None and RGRADF >= 2 and self.can_send():
++                    d = self.down_room()
+                 if d is None and self.escalated() and self.can_send():
+-                    d = self.nbrs[self.rr % len(self.nbrs)]; self.rr += 1   # escalated retry: round robin
++                    d = self.esc_nbr(); self.rr += 1   # escalated retry: round robin
+                 if d is not None:             # no slot: move the SWI node to a roomy neighbour
+                     a1, a2 = self.free_node(a)
+                     self.send(MSG_NODE, self.nbr_xy(d), a, a1, a2, b)
+@@ -762,8 +797,10 @@ class Cell:
+             anni = ta == tb and label(a) == label(b) and ta in (CON, DUP)
+             if not anni and (len(self.nfree) < 2 or len(self.vfree) < 4):
+                 d = self.roomy_nbr() if self.can_send() else None
++                if d is None and RGRADF >= 2 and self.can_send():
++                    d = self.down_room()
+                 if d is None and self.escalated() and self.can_send():
+-                    d = self.nbrs[self.rr % len(self.nbrs)]; self.rr += 1   # escalated retry: round robin
++                    d = self.esc_nbr(); self.rr += 1   # escalated retry: round robin
+                 if d is not None:
+                     # no room for the commutation: PULL protocol, the roomy neighbour re-homes P and
+                     # asks for Q (which then migrates with the ordinary NODE rule); poor -> rich
+@@ -1044,6 +1081,11 @@ class Fabric:
+         self.rng.shuffle(cells)
+         for c in cells:
+             c.engine(self.rng)
++        if RGRAD:
++            nr = {k: (0 if c.roomy() else min(RGRAD, 1 + min(self.cells[c.nbr_xy(d)].rd for d in c.nbrs)) if c.nbrs else RGRAD)
++                  for k, c in self.cells.items()}
++            for k, c in self.cells.items():
++                c.rd = nr[k]
+         if self.grad:
+             G = self.grad
+             nh = {k: (0 if c.hungry() else min(G, 1 + min(self.cells[c.nbr_xy(d)].hd for d in c.nbrs)) if c.nbrs else G)
