@@ -255,7 +255,13 @@ Correctness argument (also checked by fuzzing):
   (directory bit 56), **2 = default: fork definitions that are not stream-fed** (loader bit 59: the fork
   SCC calls no producer recursion; qsort's partitions are lists that `lo` / `hi` emit piece by piece,
   and handing its oldest task away moves the consumer away from its producers: +5% / +7% cycles on
-  4×4 / 8×8 in mode 1).
+  4×4 / 8×8 in mode 1). **Step 15** narrows bit 59 further, in the loader only (no RTL change): a fork SCC
+  is also left out when it is *data-walking*, i.e. one of its templates takes its first argument apart
+  as a Scott value (the root's argument var meets a CON node in a template redex: treesum's `tsum` walks
+  gen's tree, `qs` a list), as opposed to a numeric fork that switches / computes on its argument (fib,
+  gen, the direct tsum). A given data-walking task leaves the structure it walks at the giver, so every
+  match step crosses the mesh: treesum(9) 8×8 under step 14 sent 0.526 msgs/interaction, 0.466 with
+  step 15's bit 59 (and 5.7% fewer cycles). `OMEGA_DQF_DATA=1` restores step 14's bit 59.
 * **Governor relax with a hungry neighbour (step 14, knobs).** `+govnb` = k (mesh input `gov_nb`, 0 = off):
   at epoch end a cell with a hungry neighbour that sent at most k/4 × the budget relaxes one level (this
   test comes before the over-budget test); `+govl0` = reset level (step 13: 2). The fabric study's nb5l1
