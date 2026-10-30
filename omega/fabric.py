@@ -45,8 +45,11 @@ GOV_E = 32                         # governor epoch: interactions
 GOV_K = (0, 2, 4, 8, 16)           # producer threshold per governor level (reset level 2)
 MSG_NAMES = ["LINK", "NODE", "SPAWN", "PULL"]
 T_LINK, T_EXPAND, T_SPAWN, T_FWD = 0, 1, 2, 3
-RTO = int(__import__('os').environ.get('OMEGA_RTO', '32'))   # retry-slot timeout (cycles), RTL +rto (step 18 knob; default 32)
+RTO = int(__import__('os').environ.get('OMEGA_RTO', '8'))    # retry-slot timeout (cycles), RTL +rto (step 18 knob; default 8 since step 19, 32 before)
 ESCN = int(__import__('os').environ.get('OMEGA_ESCN', '3'))   # step 18 fabric-only knob: a retry escalates on park number ESCN + 1 (RTL: 2-bit rs_n, 3)
+RGM = int(__import__('os').environ.get('OMEGA_RGM', '1'))     # step 19 (with RGRAD): 1 = a SPAWN without room goes downhill at once instead of parking (RTL), 2 = only after one park, 0 = escalations only
+RSV = int(__import__('os').environ.get('OMEGA_RSV', '4'))     # step 19 (with RGRAD): slots an expansion must leave free when a neighbour is closer to room (RTL RSV19)
+RGRAD = int(__import__('os').environ.get('OMEGA_RGRAD', '3')) # step 19: room-distance gradient cap, RTL +rgrad (default 3; 0 = off = step 18)
 DIRS = ["N", "E", "S", "W"]
 DXY = {"N": (0, -1), "E": (1, 0), "S": (0, 1), "W": (-1, 0)}
 OPP = {"N": "S", "S": "N", "E": "W", "W": "E"}
@@ -364,6 +367,7 @@ class Cell:
         self.rr = 0
         # single non-LIFO retry slot (step 10, SPEC 9.1): (kind, a, b), timeout, park count
         self.rs, self.rs_tm, self.rs_n, self.cur_rs, self.cur_rsn = None, 0, 0, False, 0
+        self.rd = 0                                                   # step 19 room distance (registered)
         self.nbrs = [d for d in ("E", "S", "W", "N")
                      if 0 <= x + DXY[d][0] < fab.W and 0 <= y + DXY[d][1] < fab.H]
         self.spawn_targets = [None] + self.nbrs
@@ -540,6 +544,28 @@ class Cell:
         """The current task is a retry parked 4 times in a row: fall back to round-robin moves."""
         return bool(self.nbrs) and self.cur_rs and self.cur_rsn == ESCN
 
+    def esc_nbr(self):
+        """Escalated retry target: round robin over the neighbours (step 10); step 19 RGRAD: a neighbour
+        closer to room (rotating order) when there is one."""
+        if RGRAD:
+            d = self.downhill_room()
+            if d is not None:
+                return d
+        d = self.nbrs[self.rr % len(self.nbrs)]
+        self.rr += 1
+        return d
+
+    def has_downhill(self):
+        return any(self.fab.cells[self.nbr_xy(d)].rd < self.rd for d in self.nbrs)
+
+    def downhill_room(self):
+        for k in range(len(self.nbrs)):
+            d = self.nbrs[(self.rr + k) % len(self.nbrs)]
+            if self.fab.cells[self.nbr_xy(d)].rd < self.rd:
+                self.rr += 1
+                return d
+        return None
+
     def park(self, kind, a, b):
         """Memory-pressure retry: park in the single retry slot for RTO cycles (False if it is full)."""
         if self.rs is not None:
@@ -650,15 +676,17 @@ class Cell:
         ref, o = label(refp), owner(refp)
         d = self.fab.book[ref]
         nn, nv = len(d.nodes), d.nvars
-        if len(self.nfree) < nn or len(self.vfree) < nv:
+        rsv = RSV if RGRAD and self.has_downhill() else 0   # step 19: keep a reserve when room is downhill
+        if len(self.nfree) < nn + rsv or len(self.vfree) < nv + rsv:
             if self.nbrs:
                 t = self.roomy_nbr()          # out of memory: prefer a roomy neighbour
+                if t is None and RGRAD and (RGM == 1 or (RGM == 2 and self.cur_rs)) and self.can_send():
+                    t = self.downhill_room()   # step 19 RGM: no roomy neighbour: one closer to room
                 if t is None and not self.escalated() and self.park(T_SPAWN, refp, x):
                     self.st["requeue"] += 1   # no roomy neighbour: park (forwarded after 4 parks)
                     return 1
                 if t is None:
-                    t = self.nbrs[self.rr % len(self.nbrs)]
-                    self.rr += 1
+                    t = self.esc_nbr()
                 self.send_or_retry(MSG_SPAWN, self.nbr_xy(t), refp, x)
                 self.st["requeue"] += 1
                 return 1
@@ -710,7 +738,7 @@ class Cell:
             if ta == SWI and tb == NUM and payload(b) != 0 and not self.nfree:
                 d = self.roomy_nbr() if self.can_send() else None
                 if d is None and self.escalated() and self.can_send():
-                    d = self.nbrs[self.rr % len(self.nbrs)]; self.rr += 1   # escalated retry: round robin
+                    d = self.esc_nbr()   # escalated retry: round robin (step 19: downhill)
                 if d is not None:             # no slot: move the SWI node to a roomy neighbour
                     a1, a2 = self.free_node(a)
                     self.send(MSG_NODE, self.nbr_xy(d), a, a1, a2, b)
@@ -764,7 +792,7 @@ class Cell:
             if not anni and (len(self.nfree) < 2 or len(self.vfree) < 4):
                 d = self.roomy_nbr() if self.can_send() else None
                 if d is None and self.escalated() and self.can_send():
-                    d = self.nbrs[self.rr % len(self.nbrs)]; self.rr += 1   # escalated retry: round robin
+                    d = self.esc_nbr()   # escalated retry: round robin (step 19: downhill)
                 if d is not None:
                     # no room for the commutation: PULL protocol, the roomy neighbour re-homes P and
                     # asks for Q (which then migrates with the ordinary NODE rule); poor -> rich
@@ -850,6 +878,17 @@ class Cell:
         if src != "m" and self.rs is not None and self.rs_tm == 0:
             src = "r"                          # the parked retry before the task stack (non-LIFO)
         if src is None:
+            if RGRAD and self.eject and self.eject[0][0] in (MSG_NODE, MSG_PULL) and not self.nfree and self.nbrs \
+                    and self.can_send() and not self.busy:
+                # step 19 (RTL fwd_full): a NODE / PULL at the head of a cell with no free node slot and nothing
+                # else to do is passed on instead of blocking the LINKs queued behind it
+                m = self.eject.popleft()
+                d = self.roomy_nbr()
+                if d is None:
+                    d = self.esc_nbr()
+                k = MSG_PULL if m[0] == MSG_NODE and tag(m[6]) in NODE_TAGS else m[0]   # partner a node: ask for it
+                self.send(k, self.nbr_xy(d), *m[3:])
+                self.st["fwdfull"] = self.st.get("fwdfull", 0) + 1
             return
         if self.fab.p_stall and rng.random() < self.fab.p_stall:
             self.busy = 1
@@ -1045,6 +1084,11 @@ class Fabric:
         self.rng.shuffle(cells)
         for c in cells:
             c.engine(self.rng)
+        if RGRAD:
+            nr = {k: (0 if c.roomy() else min(RGRAD, 1 + min(self.cells[c.nbr_xy(d)].rd for d in c.nbrs)) if c.nbrs else RGRAD)
+                  for k, c in self.cells.items()}
+            for k, c in self.cells.items():
+                c.rd = nr[k]
         if self.grad:
             G = self.grad
             nh = {k: (0 if c.hungry() else min(G, 1 + min(self.cells[c.nbr_xy(d)].hd for d in c.nbrs)) if c.nbrs else G)

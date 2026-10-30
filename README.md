@@ -78,7 +78,7 @@ def main = tsum(gen(N))
 
 ## Results
 
-### Verification (full regression on step 18 = step 15 + the `+rto` input at its default: v4 engine + retry slot + spawn threshold / fork hints + local-first link orientation + producer hint / message-budget governor + fork deque with the step-15 deque hint; default 2×2 cells per ROM, one port)
+### Verification (full regression on step 19 = step 18 + the room-distance gradient, with the new defaults `+rto=8 +rgrad=3`: v4 engine + retry slot + spawn threshold / fork hints + local-first link orientation + producer hint / message-budget governor + fork deque with the step-15 deque hint; default 2×2 cells per ROM, one port)
 
 | suite | result | what it checks |
 |---|---|---|
@@ -88,8 +88,8 @@ def main = tsum(gen(N))
 | RTL differential fuzz, small nets (`tests/fuzz_rtl.py 0 600`) | **600 / 600** | random books (all node kinds, 3 DUP labels, all 16 operators with both flip bits, SWI, REF DAGs) on 1×1, 2×2, 4×4, 3×2, 1×4 with random arbitration seed, link jitter (0–63%), engine stalls, message/task priority, random scatter of `@main` over the cells, random spawn thresholds / fork-hint use (step 11), link orientation (step 12), producer threshold and governor budget 0–200 (step 13), fork-deque mode 0 / 1 / 2 (step 14). Readback, interaction count and live node count must equal the semantic model's (165 diverging nets rejected) |
 | RTL differential fuzz, big nets (`--big`) | **200 / 200** | 3–8 definitions, 20–60 nodes each, deeper trees, more references; only nets with ≥ 30 interactions are kept (avg 375, max 16,239 interactions; 4,088 candidates rejected as diverging or trivial) |
 | owner-capability isolation (`tests/test_security.py --fuzz 300`) | **420 / 420** | 2- and 4-tenant program demos (fib ∥ qsort; treesum ∥ list ∥ sort ∥ higher-order) on 1×1/2×2/4×4/3×2, each tenant gets its known answer with zero traps; 10 attack programs (overwrite / capture the victim's result through a forged root-var pointer, out-of-bounds slot and cell, forged node pointers to the victim's result node, an attack hidden in a lazily expanded definition) and 3 cross-owner fault injections, each with the sender-side check on and off (`fi`); 300 random multi-tenant cases (2–4 random tenants, random owners, half with an attacker carrying random forged redexes); link orientation (step 12) varies with the seed. Semantic model, fabric model and RTL must agree on every honest tenant's result and node count, on the trap set and on the interaction count (SPEC §12) |
-| memory pressure (`tests/test_mempress.py`) | **43 / 43** | cell (0,0) pre-filled with foreign ballast so only 4–30 slots are free (30 cases), small-cell capacity cases (5), **global pressure (step 10, 5 cases): every cell except the far corner holds ballast (8 free node / 8 free var slots), so the room is up to 6 hops away** (fib(12) 3×3, treesum(6) 3×3, list(20) 3×2, qsort(15) 4×4, sort(10) 3×3), security fuzz case 265 — semantic model, fabric model and RTL must agree; **2 overfull cases** (the whole 2×2 fabric too small) must end in status 3 without a wrong answer |
-| mutation testing (`tests/mutants.py`) | **49 / 49 caught** | 15 functional mutants of the rule logic / protocol / quiescence + 1 performance mutant (no work distribution, caught by the speed-up bound) + 6 security mutants (each owner-capability check disabled, owner stamping missing, trap not blocking). Two mutants (eraser reaches only aux1; REF~DUP expands instead of copying) produce the *right* answer and are caught only by the node count / interaction count. That is why all three observables are compared. + 5 v3 engine mutants (read-ahead write bypass, write-queue drain, var owner-tag queue, allocation pop count, ROM read-ahead) + 2 memory-pressure mutants (caught by `tests/test_mempress.py`) + 3 cluster-ROM mutants (grant beyond the port count, EXPAND not waiting for its template word, stale buffered word) + 7 v4 mutants (second node write port not bypassed into the read-ahead, second EXPAND entry's var tag to the wrong slot, EXPAND skipping an entry, VHU without the same-slot stall, VHU hand-back never taken, VHU disabled = performance mutant caught by a fib(12) cycle bound, VHU read-ahead without bypass of write port 1) + 3 retry-slot mutants (39 parked retry never taken, 40 quiescence ignores the slot, 41 no escalation). Mutant 27 (roomy offload disabled) now survives on its own, because escalation also rescues every pressure case (roomy offload became a fast path); it is run together with 41 and caught. + 3 step-11/12 performance mutants, each caught by its own bound: 42 spawn threshold ignored (qsort(20) 4×4 > 0.6 messages per interaction), 43 fork hint ignored (fib(12) 4×4 > 1.3× slower), 44 local-first link orientation disabled (treesum(7) 4×4 > 1.3× more LINKs) + 2 step-13 performance mutants: 45 producer hint ignored (qsort(30) 4×4 > 1.15× slower: 11,383 vs 9,118 cycles), 46 governor never tightens (qsort(30) 4×4 > 1.15× more messages per interaction: 0.529 vs 0.398) + 2 step-14 mutants: 47 oldest-fork give disabled (performance only: fib(16) 4×4 seed 1 > 1.05× slower, 8,254 vs 7,530 cycles; a treesum(7) bound let it survive at 1.04×, because the step-11 path still gives a fork task popped from an empty stack), 48 a fork task finding the deque full is dropped (caught by the program suite: fib(8) 2×2 loses work) |
+| memory pressure (`tests/test_mempress.py`) | **44 / 44** | cell (0,0) pre-filled with foreign ballast so only 4–30 slots are free (30 cases), small-cell capacity cases (5), **global pressure (step 10, 5 cases): every cell except the far corner holds ballast (8 free node / 8 free var slots), so the room is up to 6 hops away** (fib(12) 3×3, treesum(6) 3×3, list(20) 3×2, qsort(15) 4×4, sort(10) 3×3) + **the near-overfull global treesum(9) 3×3 (step 19)**, security fuzz case 265 — semantic model, fabric model and RTL must agree; **2 overfull cases** (the whole 2×2 fabric too small) must end in status 3 without a wrong answer |
+| mutation testing (`tests/mutants.py`) | **51 / 51 caught** | 15 functional mutants of the rule logic / protocol / quiescence + 1 performance mutant (no work distribution, caught by the speed-up bound) + 6 security mutants (each owner-capability check disabled, owner stamping missing, trap not blocking). Two mutants (eraser reaches only aux1; REF~DUP expands instead of copying) produce the *right* answer and are caught only by the node count / interaction count. That is why all three observables are compared. + 5 v3 engine mutants (read-ahead write bypass, write-queue drain, var owner-tag queue, allocation pop count, ROM read-ahead) + 2 memory-pressure mutants (caught by `tests/test_mempress.py`) + 3 cluster-ROM mutants (grant beyond the port count, EXPAND not waiting for its template word, stale buffered word) + 7 v4 mutants (second node write port not bypassed into the read-ahead, second EXPAND entry's var tag to the wrong slot, EXPAND skipping an entry, VHU without the same-slot stall, VHU hand-back never taken, VHU disabled = performance mutant caught by a fib(12) cycle bound, VHU read-ahead without bypass of write port 1) + 3 retry-slot mutants (39 parked retry never taken, 40 quiescence ignores the slot, 41 no escalation). Mutant 27 (roomy offload disabled) now survives on its own, because escalation also rescues every pressure case (roomy offload became a fast path); it is run together with 41 and caught. Mutant 28 (a full cell still asks for work) is tolerated by the step-19 full-cell pass-on on the quick pressure set, so since step 19 it runs on the full set and is caught by the global treesum(9) 3×3 case. + 3 step-11/12 performance mutants, each caught by its own bound: 42 spawn threshold ignored (qsort(20) 4×4 > 0.6 messages per interaction), 43 fork hint ignored (fib(12) 4×4 > 1.3× slower), 44 local-first link orientation disabled (treesum(7) 4×4 > 1.3× more LINKs) + 2 step-13 performance mutants: 45 producer hint ignored (qsort(30) 4×4 > 1.15× slower: 11,383 vs 9,118 cycles), 46 governor never tightens (qsort(30) 4×4 > 1.15× more messages per interaction: 0.529 vs 0.398) + 2 step-14 mutants: 47 oldest-fork give disabled (performance only: fib(16) 4×4 seed 1 > 1.05× slower, 8,254 vs 7,530 cycles; a treesum(7) bound let it survive at 1.04×, because the step-11 path still gives a fork task popped from an empty stack), 48 a fork task finding the deque full is dropped (caught by the program suite: fib(8) 2×2 loses work) + 2 step-19 mutants, each caught by the livelock / deadlock seeds that motivated the change at the new default: 49 room-distance gradient ignored (global treesum(9) 3×3 seeds 3 / 10 / 11 stop without progress), 50 full-cell pass-on off (global treesum(7) 8×8 seeds 16 / 18 stop at ~4,560 of 4,586 interactions) |
 
 Strong confluence is the test oracle. Any schedule (arbitration, delays, stalls, task/message priority,
 initial placement) must produce exactly the same normal form, the same number of interactions and the
@@ -135,7 +135,128 @@ step 12 the cost was qsort: on meshes it was 16–27% slower than with step 10's
 because its filter chains (lo/hi/app) stayed where they started; step 13 (next section) fixes that. treesum(9)
 on 8×8 varies ±20% with the arbitration seed; over seeds 1–4 the mean is 2,374 vs 2,470 for step 10.
 
+### Short retry timeout made safe: room-distance gradient, slot reserve and full-cell pass-on (step 19)
+
+Step 18 left `+rto=8` as a knob: up to 58% faster under global memory pressure, but the fabric model
+livelocked more often. Step 19 found why, fixed it, and makes the short timeout the default:
+**`+rto=8 +rgrad=3`** (testbench defaults; `OMEGA_RTO` / `OMEGA_RGRAD` for the fabric model and
+`omega/rtl.py`). **`+rto=32 +rgrad=0` is step 18 cycle for cycle** (all 24 runs of `results/s18/rto_global.jsonl`
+at 32 reproduce exactly on the final RTL: `results/s19/rto_global_old.jsonl`, `rto_global_old2.jsonl`).
+
+**Root cause 1: not a retry storm, but a global out-of-memory reached by ordering.** The livelock case is
+global treesum(9) 3×3 (every cell but the far corner left with 8 free node / 8 free var slots). A stuck run
+(`results/s19/diag.py`, `traj.py`, `bound.py`, `cq.py`, `exps.py`) ends with the corner's 1,024 var slots
+full: 199 vars bound to tree constructors, 58 to unexpanded `gen` leaves, all other cells idle, only SPAWNs
+circulating (300k of them), so nothing can ever be expanded again. One cell on its own needs 118 vars at the
+peak (depth-first), so the program fits easily; what differs is the order. In a failing run the consumer
+(`tsum`) expands 3–8 times in the first 3,000 cycles against ~76 producer (`gen`) expansions; in a
+successful one 18–57 against 58–70 (`results/s19/ratio.py`). Parked producer SPAWNs (`gen__a2`, 6 nodes /
+6 vars) escalate after 4 short parks and wander round robin into whichever ballast cell happens to fit them,
+so the top of the tree is built in scattered poor cells; the consumer arms that must match it there
+(`tsum__a3`, 5 / 5) find no room, and the matching consumer tasks end at the *bottom* of the corner's LIFO
+stack while new producer work keeps arriving on top. The corner then materialises the whole tree and runs
+out of vars. A shorter timeout makes the early wandering faster; rto = 32 hits the same race 2 times in 20.
+The RTL reproduces it: global treesum(9) 3×3, seeds 1–30, `+rto=8` stops at ~2,900 of 18,410 interactions
+10 times (status 3, cycle limit), `+rto=32` never (`results/s19/rtl_ts9.jsonl`).
+
+**What did not work** (fabric model, treesum(9) 3×3 seeds 1–20 + the global set; `results/s19/fabric_table.md`,
+`sweep1.jsonl`, `sweep2.txt`; patch of all probe knobs `results/s19/probe19_fabric_all_knobs.patch`):
+per-cell exponential backoff of the retry timer (shift 1–3, reset on success or on any interaction) and
+LFSR jitter on the reload: 7–16 livelocks of 20 instead of 19, and the backoff gives back the 8×8 gain
+(treesum(7) 8×8 up to 26,190 fabric cycles); escalating later (`OMEGA_ESCN`, step 18): 7 / 20; aging the
+LIFO (every k-th pop under pressure takes the oldest task, several gates): consumers run again but memory
+grows breadth-first, 3–7 of 10 still livelock (`sweep2.txt`) and finishing runs are up to 50% slower. Retry timing is not the lever; *where* homeless
+work goes is.
+
+**The fix.** Each cell registers a 3-bit room distance `rdist` (0 when roomy, else 1 + the neighbours'
+minimum, saturating at the run-time cap `rgrad`) and drives it to its neighbours next to `roomy`. Rules 1–3
+apply when a neighbour is closer to room (*downhill*), rule 4 whenever `rgrad` ≠ 0:
+1. a SPAWN that has no room and no roomy neighbour is forwarded downhill **at once** instead of being parked
+   (so producer work goes to the room instead of wandering into poor cells; downhill only after one park:
+   8 / 20 livelocks; only escalations downhill: 15 / 20);
+2. escalated retries (SPAWN, SWI `NODE`, commutation `PULL`) go downhill instead of round robin;
+3. an expansion must leave **4 free node and var slots** (`RSV19`). Root cause 2, found on the RTL once (1)
+   was in: with only (1)–(2), global treesum(7) 8×8 stopped 4 times in 13 at `rgrad=3` (once in 3 at `rgrad=7`,
+   at 4,565 of 4,586 interactions, few messages). The stuck mesh had a cell on the downhill path with 0 free
+   node / 0 free var slots (`results/s19/diag_g7_ts7.txt`): SPAWNs passing through had been expanded there
+   because they just fitted, and a cell with no free node cannot take the `NODE` / `PULL` at the head of its
+   ejection port, so it blocks for good. The reserve keeps passing work moving downhill.
+4. a `NODE` / `PULL` at the ejection head of a cell with **no free node slot at all and nothing else to
+   do** is passed on to a roomy neighbour, else downhill, else round robin (a `NODE` whose partner is a
+   node goes on as a `PULL`, so the taker asks for the partner and the full cell empties). Root cause 3:
+   with (1)–(3), 30 seeds of global treesum(7) 8×8 still stopped twice (seeds 16 and 18, at 4,566 /
+   4,551 of 4,586 interactions; `results/s19/rtl_ts7.jsonl`): a cell *more* than `rgrad` hops from the
+   room (no downhill neighbour, so no reserve) had expanded to 0 / 0, and the `LINK`s that would have
+   freed it were queued behind the blocked `NODE` (head-of-line; `results/s19/diag_rsv_ts7_s16.txt`).
+   The same deadlock stops `+rto=8 +rgrad=0` on seed 9 (4,535 of 4,586), so it was there in step 18 at
+   the short timeout. Passing the `NODE` on unchanged was not enough (it was migrated straight back by
+   the redex rule: 207,337 `NODE` messages on seed 16, still stuck; log of that attempt not kept); as a `PULL` both seeds finish (7,528 / 6,206
+   cycles, `results/s19/diag_fwd_ts7_s1*.txt`). Re-homing a node is not an interaction and is location
+   free, so the rewrite keeps the result.
+
+Without a downhill neighbour (room more than `rgrad` hops away, or the whole fabric full) rules 1–3 are the
+step-10 rule and rule 4 only moves blocked arrivals on, so the overfull cases still end in status 3. All
+four rules are off at `rgrad=0`. Cap 3 was chosen over 7 on both models: at 7
+cells far from the room all funnel into one corner (RTL fib(12) 6×6 14,785 vs 12,888 cycles at `+rto=8`
+alone; fabric fib(12) 6×6 +10%, treesum(7) 8×8 +58%); at 2 the fabric livelocks treesum(9) 3×3 8 / 20 again.
+
+**Livelock rates** (runs that stop without progress; fabric: "no progress for 100,000 cycles", RTL: cycle limit):
+
+| case (seeds) | model | `+rto=32 +rgrad=0` (step 18) | `+rto=8 +rgrad=0` | `+rto=8 +rgrad=3` (step 19) |
+|---|---|---:|---:|---:|
+| treesum(9) 3×3 (1–20) | fabric | 2/20 | **19/20** | **0/20** |
+| list(20) 3×2 (1–20) | fabric | 0/20 | 0/20 | 0/20 |
+| treesum(7) 8×8, fib(12) 6×6, qsort(15) 6×6, list(20) 3×2 (21–40 each) | fabric | 1/80 | 2/80 | 0/80 |
+| treesum(9) 3×3 (1–30) | RTL | 0/30 | **10/30** | **0/30** |
+| treesum(7) 8×8 (1–30) | RTL | 0/30 | 1/30 | 0/30 (rules 1–3 only: 2/30) |
+| the other 7 global cases of the cycle table (1–13) | RTL | 0 | 0 | 0/91 |
+
+Fabric: `results/s19/sweep5.jsonl`, `sweep6.jsonl`, `sweep7.jsonl` (final model), `fabric_table.md`; RTL:
+`rtl_ts9.jsonl`, `rtl_ts9_fwd.jsonl`, `rtl_big.jsonl`, `rtl_ts7.jsonl`, `rtl_fwd.jsonl` (final RTL).
+
+**Cycles under global memory pressure (RTL, seeds 1–13, treesum(7) 8×8 seeds 1–30, jitter 30%; mean of the runs that finished; every run checked against the semantic
+reducer; `bench/rto18_rtl.py`, `results/s19/rtl_big.py`, table `results/s19/table19.py`):**
+
+| case | `+rto=32 +rgrad=0` (step 18) | `+rto=8 +rgrad=0` | `+rto=8 +rgrad=3` (step 19) | Δ new vs 32 | Δ new vs 8/0 |
+|---|---:|---:|---:|---:|---:|
+| fib(12) 3x3 | 15,190 · 32 msgs [13] | 14,951 · 32 msgs [13] | 14,916 · 6 msgs [13] | -1.8% | -0.2% |
+| treesum(6) 3x3 | 5,880 · 279 msgs [13] | 5,824 · 238 msgs [13] | 6,098 · 10 msgs [13] | +3.7% | +4.7% |
+| list(20) 3x2 | 3,592 · 547 msgs [13] | 3,021 · 492 msgs [13] | 3,236 · 176 msgs [13] | -9.9% | +7.1% |
+| qsort(15) 4x4 | 12,107 · 29 msgs [13] | 11,607 · 29 msgs [13] | 11,542 · 29 msgs [13] | -4.7% | -0.6% |
+| sort(10) 3x3 | 4,113 · 27 msgs [13] | 3,828 · 27 msgs [13] | 3,761 · 21 msgs [13] | -8.6% | -1.7% |
+| fib(12) 6x6 | 15,161 · 2,223 msgs [13] | 12,913 · 2,178 msgs [13] | 13,917 · 734 msgs [13] | -8.2% | +7.8% |
+| qsort(15) 6x6 | 12,584 · 33 msgs [13] | 11,728 · 33 msgs [13] | 11,653 · 33 msgs [13] | -7.4% | -0.6% |
+| treesum(7) 8x8 | 28,003 · 8,084 msgs [30] | 8,436 (**1/30 stuck**: seed 9) · 7,898 msgs [30] | 7,685 · 5,359 msgs [30] | -72.6% | -8.9% |
+
+* **Decision: the default becomes `+rto=8 +rgrad=3`.** No run of the new default stopped (livelock column above:
+  0 on both models, against 2 / 20 fabric and 0 RTL at `+rto=32`, and 19 / 20 fabric, 10 / 30 + 1 / 30 RTL at
+  `+rto=8` alone), and it keeps or beats the short timeout's gain on 5 of 8 cases: treesum(7) 8×8 28,003 →
+  7,685 cycles (−72.6%, 30 seeds; `+rto=8` alone 8,436 and one stuck seed), qsort(15) 4×4 / 6×6 −4.7% / −7.4%,
+  sort(10) 3×3 −8.6%, fib(12) 3×3 −1.8%.
+* **Where it gives something back.** list(20) 3×2 and fib(12) 6×6 keep about half of the `+rto=8` gain
+  (−9.9% / −8.2% against `+rto=32`, +7.1% / +7.8% against `+rto=8` alone): homeless work now goes to the room
+  instead of being spread round robin over the ballast cells. treesum(6) 3×3 is **3.7% slower than step 18**
+  (6,098 vs 5,880): with the room 1–4 hops away, everything funnels to the corner. Known gap 3.
+* **Fewer messages everywhere work moves**: treesum(6) 3×3 279 → 10, list(20) 3×2 547 → 176, fib(12) 6×6
+  2,223 → 734, treesum(7) 8×8 8,084 → 5,359.
+* `+rto=32 +rgrad=0` reproduces step 18 cycle for cycle on the final RTL as well (all 24 runs of
+  `results/s18/rto_global.jsonl` at 32: `results/s19/rto_global_old2.jsonl`).
+
+**No change without memory pressure.** With nothing parked and every cell roomy, `rdist` stays 0 and the
+timeout is never loaded, so the default changes nothing: all 8 benchmark programs on 4×4 and 8×8, seeds 1–8,
+reproduce `results/s15/final_*.jsonl` cycle for cycle with the same message counts (128/128 runs;
+`results/s19/id_4x4.jsonl`, `id_8x8.jsonl`).
+
+**Hardware cost.** 3 flip-flops per cell (`rdist`), 4 × 3 bits of neighbour wires, a 4-way 3-bit minimum,
+four 3-bit comparators, a saturating increment, two adders on the room check and, for rule 4, one more
+branch in the pick logic that re-addresses the ejection head into the outbox (a 2-bit kind rewrite and
+two 4-bit coordinate muxes, reusing the existing roomy / downhill / round-robin selection): roughly
+60–100 GE of logic per cell (estimate, not synthesised), under 0.1% of the step-8 cell's standard-cell logic; no memory. `rgrad` is a 3-bit run-time input
+shared by all cells.
+
 ### Retry-slot timeout as a knob: faster under pressure, but more livelock (step 18)
+
+*(Superseded in step 19: the livelock is fixed and `+rto=8` is the default together with `+rgrad=3`.)*
 
 Step 17's probe showed that a global-pressure run spends most of its time parked, so the timeout itself was
 swept. It is now a run-time input of the cell (`rto_m1`, testbench `+rto=`, `OMEGA_RTO` for the fabric model
@@ -805,10 +926,16 @@ What this says:
    * task-stack overflow (`err = 1`) or a 1×1 cell that cannot place an expansion (`err = 2`) still
      halts the cell;
    * a *globally* full fabric still bounces work (status 3 / "no progress"); there is no spilling to
-     off-fabric memory and spawning is not throttled. Step 10's retry slot parks a retry for 32
-     cycles (`+rto`, step 18: shorter is up to 58% faster under pressure but livelocks more often) and escalates after 4 parks (round robin, not toward the room: there is no gradient), so
-     room several hops away is found by diffusion, not routing; only one retry fits the slot, further
-     ones take the old path;
+     off-fabric memory and spawning is not throttled. Step 10's retry slot parks a retry for `rto`
+     cycles (8 since step 19, 32 before) and escalates after 4 parks; since step 19 a homeless SPAWN and
+     escalated retries follow the room-distance gradient downhill, but only within `rgrad` = 3 hops of a
+     roomy cell: room farther away is still found by round-robin diffusion, and the gradient is a
+     heuristic, not a proof of progress (no livelock in the runs of README step 19, which is evidence,
+     not a guarantee). Only one retry fits the slot, further ones take the old path. The step-19
+     default costs treesum(6) 3×3 under global pressure 3.7% cycles against `+rto=32` (RTL, 13 seeds),
+     and list(20) 3×2 / fib(12) 6×6 keep only part of the `+rto=8` gain (+7% / +8% against `+rto=8`
+     alone, which livelocks); the full-cell pass-on (rule 4) moves a blocked `NODE` / `PULL` on but has
+     no hop budget, so on a globally full fabric it can bounce like the SPAWNs (status 3, as before);
    * mutant 27 (roomy offload disabled) survives on its own since step 10: escalation alone rescues
      every pressure case in the suite, so the roomy offload is now only a fast path, and no current
      benchmark shows its speed benefit.
@@ -868,10 +995,11 @@ What this says:
    place and route, routed area and timing closure are out of scope). Shrink the node RAM / task queue.
 2. Re-synthesise the v4 cell (2W RAMs, VHU) and re-do the area × time comparison. Cut cycles per
    interaction below 2.36: dual-issue independent tasks, or overlap the rule cycle with the next pick.
-3. Global memory pressure: a gradient (distance-to-room) side band was probed in step 17 (fewer messages,
-   but slower, and livelock when parking is skipped); a useful version would have to keep the round-robin
-   spread and add a progress guarantee; throttle SPAWN bouncing on a globally full fabric; spill
-   to off-fabric memory.
+3. Global memory pressure: the step-19 gradient removes the short-timeout livelock in the runs measured,
+   but is not a progress proof; a real guarantee (e.g. a hop budget on forwarded SPAWNs, or a consumer-first
+   priority when the room is far) is still open, as are the treesum(6) 3×3 +3.7% and the list / fib 6×6 loss
+   against `+rto=8` alone (a gradient that keeps more of the round-robin spread among the ballast cells);
+   throttle SPAWN bouncing on a globally full fabric; spill to off-fabric memory.
 4. Bigger language: signed numbers, strings, `fold`/`bend`, parameterised data types; a TACHYON-128 host
    interface (DMA of graph images, result readback).
 5. Fork deque: narrower entries (`{REF label, owner, x}`, 76 b) and one hint vector; a dynamic locality
@@ -920,3 +1048,4 @@ What this says:
 * step 16: two fabric-model probes rejected (dynamic fork-deque locality test; SPAWN carrying the partner node), README section and `results/s16/`; no model / RTL change
 * step 17: room-distance gradient for global memory pressure, fabric probe rejected (fewer messages, up to +15% cycles, livelock without parking); README section, `results/s16/`
 * step 18: retry-slot timeout as a run-time input (`+rto`, `OMEGA_RTO`; default 32, unchanged): `+rto=8` cuts global-pressure cases by 0.4–58% on RTL but raises the fabric model's livelock rate, so it stays a knob
+* step 19: room-distance gradient (`+rgrad`, `OMEGA_RGRAD`) + slot reserve + full-cell pass-on (rule d) fix the short-timeout livelock / deadlock; new defaults `+rto=8 +rgrad=3` (`+rto=32 +rgrad=0` = step 18 cycle for cycle); no stopped run of the new default on either model, global treesum(7) 8×8 28,003 → 7,685 cycles (−72.6%, 30 seeds); units 42/42, programs 315/315, step-14 cross-check 90/90, fuzz 600/600 + big 200/200, security 420/420, mempress 44/44, mutants 51/51

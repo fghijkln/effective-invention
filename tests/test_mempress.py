@@ -33,6 +33,9 @@ CAPACITY = [("qsort", 24, 256, 2, 2), ("higher", 30, 256, 2, 2), ("sort", 30, 12
 # run must not finish with a wrong answer (status 3 = out of memory / no progress is the accepted end).
 GLOBAL = [("fib", 12, 3, 3), ("treesum", 6, 3, 3), ("list", 20, 3, 2), ("qsort", 15, 4, 4), ("sort", 10, 3, 3)]
 GKEEP = (8, 8)
+# step 19: the near-overfull global case whose livelock at a short retry timeout led to the room-distance
+# gradient (kept out of GLOBAL so bench/rto18_rtl.py stays comparable with step 18)
+GLOBAL19 = [("treesum", 9, 3, 3)]
 OVERFULL = [("treesum", 9, 2, 2, 24), ("qsort", 30, 2, 2, 24)]
 
 
@@ -76,6 +79,9 @@ def cases(quick=False):
             for kn, kv in BKEEP:
                 out.append((f"ballast {name}({N}) {W}x{H} keep {kn}/{kv}", name, N, W, H, 1024, (kn, kv)))
     for name, N, W, H in (GLOBAL[:2] if quick else GLOBAL):
+        cells = tuple((x, y) for x in range(W) for y in range(H) if (x, y) != (W - 1, H - 1))
+        out.append((f"global {name}({N}) {W}x{H} keep {GKEEP[0]}/{GKEEP[1]} in {len(cells)} cells", name, N, W, H, 1024, GKEEP + (cells,)))
+    for name, N, W, H in ([] if quick else GLOBAL19):
         cells = tuple((x, y) for x in range(W) for y in range(H) if (x, y) != (W - 1, H - 1))
         out.append((f"global {name}({N}) {W}x{H} keep {GKEEP[0]}/{GKEEP[1]} in {len(cells)} cells", name, N, W, H, 1024, GKEEP + (cells,)))
     if not quick:

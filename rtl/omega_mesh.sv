@@ -22,6 +22,7 @@ module omega_mesh #(
   input  logic [3:0]  gov_nb,              // step 14 governor: relax with a hungry neighbour (0 = off)
   input  logic [2:0]  gov_l0,              //   governor reset level
   input  logic [5:0]  rto_m1,              //   step 18: retry-slot timeout - 1
+  input  logic [2:0]  rgrad,               //   step 19: room-distance gradient cap (0 = off)
   input  logic        link_local,          // step 12 local-first link orientation (configuration, SPEC 4)
   input  logic        dump,
   output logic        all_ready,
@@ -41,6 +42,8 @@ module omega_mesh #(
   logic [3:0]  nhung [W][H];
   logic        croom [W][H];
   logic [3:0]  nroom [W][H];
+  logic [2:0]  crd [W][H];                 // step 19 room distance
+  logic [3:0][2:0] nrd [W][H];
   logic  crdy [W][H];
   logic [3:0]  cerr [W][H];
   logic [31:0] cint [W][H];
@@ -77,16 +80,20 @@ module omega_mesh #(
     for (genvar y = 0; y < H; y++) begin : gy
       omega_cell #(.X(x), .Y(y), .W(W), .H(H), .SLOTS(SLOTS), .QDEPTH(QDEPTH), .ROMSZ(ROMSZ),
                    .DIRSZ(DIRSZ), .DEPTH(DEPTH), .RDXSZ(RDXSZ), .MUT(MUT)) u_cell (
-        .clk, .rst, .seed, .jitter, .stall, .pmsg, .fi, .spawn_k, .spawn_hint, .spawn_k2, .spawn_kp, .gov_b, .fork_dq, .gov_nb, .gov_l0, .rto_m1, .link_local,
+        .clk, .rst, .seed, .jitter, .stall, .pmsg, .fi, .spawn_k, .spawn_hint, .spawn_k2, .spawn_kp, .gov_b, .fork_dq, .gov_nb, .gov_l0, .rto_m1, .rgrad, .link_local,
         .in_v(iv[x][y]), .in_f(inf[x][y]), .in_rdy(irdy[x][y]),
         .out_v(ov[x][y]), .out_f(of[x][y]), .out_rdy(ordy[x][y]),
-        .idle(cidle[x][y]), .hungry(chung[x][y]), .nbr_hungry(nhung[x][y]), .roomy(croom[x][y]), .nbr_roomy(nroom[x][y]), .ready(crdy[x][y]), .err(cerr[x][y]), .dump,
+        .idle(cidle[x][y]), .hungry(chung[x][y]), .nbr_hungry(nhung[x][y]), .roomy(croom[x][y]), .nbr_roomy(nroom[x][y]), .rdist(crd[x][y]), .nbr_rdist(nrd[x][y]), .ready(crdy[x][y]), .err(cerr[x][y]), .dump,
         .rom_req(rreq[x][y]), .rom_an(ran[x][y]), .rom_ar(rar[x][y]), .rom_gnt(rgnt[x][y]), .rom_dn(rdn[x][y]), .rom_dr(rdr[x][y]),
         .cfg_we(1'b0), .cfg_sel(2'd0), .cfg_a(16'd0), .cfg_d(128'd0), .st_inter(cint[x][y]));
       assign nhung[x][y][0] = (y > 0)     ? chung[x][(y > 0) ? y-1 : 0] : 1'b0;
       assign nhung[x][y][1] = (x < W - 1) ? chung[(x < W - 1) ? x+1 : x][y] : 1'b0;
       assign nhung[x][y][2] = (y < H - 1) ? chung[x][(y < H - 1) ? y+1 : y] : 1'b0;
       assign nhung[x][y][3] = (x > 0)     ? chung[(x > 0) ? x-1 : 0][y] : 1'b0;
+      assign nrd[x][y][0] = (y > 0)     ? crd[x][(y > 0) ? y-1 : 0] : 3'd7;
+      assign nrd[x][y][1] = (x < W - 1) ? crd[(x < W - 1) ? x+1 : x][y] : 3'd7;
+      assign nrd[x][y][2] = (y < H - 1) ? crd[x][(y < H - 1) ? y+1 : y] : 3'd7;
+      assign nrd[x][y][3] = (x > 0)     ? crd[(x > 0) ? x-1 : 0][y] : 3'd7;
       assign nroom[x][y][0] = (y > 0)     ? croom[x][(y > 0) ? y-1 : 0] : 1'b0;
       assign nroom[x][y][1] = (x < W - 1) ? croom[(x < W - 1) ? x+1 : x][y] : 1'b0;
       assign nroom[x][y][2] = (y < H - 1) ? croom[x][(y < H - 1) ? y+1 : y] : 1'b0;

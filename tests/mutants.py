@@ -35,7 +35,7 @@ MUTANTS = {
     25: "v3 EXPAND allocation pops one node slot fewer than it maps (slot aliasing)",
     26: "v4 EXPAND: template word entry select wrong (entry i reads entry i xor 1)",
     27: "memory pressure: roomy neighbours ignored (no PULL / NODE offload); run with bit 41 (no escalation) because since step 10 escalation alone also rescues every pressure case (alone: survives)",
-    28: "memory pressure: hungry does not require roomy (a full cell still asks for work)",
+    28: "memory pressure: hungry does not require roomy (a full cell still asks for work); since step 19 the full-cell pass-on tolerates it on the quick pressure set, so it runs on the full set and is caught by the step-19 global treesum(9) 3x3 case",
     29: "cluster ROM: arbiter grants more requesters than it has read ports (they get another cell's data)",
     30: "cluster ROM: EXPAND does not wait for its template pair (proceeds on a missed grant)",
     31: "cluster ROM: buffered template word not dropped when a new expansion starts (stale definition)",
@@ -56,6 +56,8 @@ MUTANTS = {
     46: "step 13 governor never tightens (the level only relaxes; performance only: caught by the message bound with the governor on)",
     47: "step 14 oldest-fork give disabled (fork tasks leave the deque only when the stack is empty; performance only: caught by the fib(16) 4x4 cycle bound)",
     48: "step 14 fork deque: a fork task that finds the deque full is dropped (lost work)",
+    49: "step 19 room-distance gradient ignored (no downhill neighbour is ever found: a SPAWN without room parks and escalates round robin as in step 18; caught by the global treesum(9) 3x3 livelock seeds at the short timeout)",
+    50: "step 19 full-cell pass-on off (a NODE / PULL at the ejection head of a cell with no free node slot blocks it again; caught by global treesum(7) 8x8 seeds 16 / 18, which stop at ~4,560 of 4,586 interactions)",
 }
 BOUND47 = 1.05
 PROGS = [("fib", 8), ("list", 6), ("sort", 6), ("higher", 5), ("fact", 5), ("treesum", 4), ("qsort", 5), ("sum", 20)]
@@ -89,7 +91,7 @@ def try_mutant(bit):
         mut |= 1 << 41      # escalation masks the missing roomy offload (it is a fast path since step 10)
     if bit in (27, 28, 39, 40, 41):
         import test_mempress
-        n, fails, tag = test_mempress.run_cases(True, mut, verbose=False, quick=bit in (27, 28))
+        n, fails, tag = test_mempress.run_cases(True, mut, verbose=False, quick=bit == 27)
         return bool(fails), (f"{tag}: wrong result / timeout" if fails else f"survived {n} memory-pressure cases")
     if bit == 37:
         b = progs.book("fib", 12)
@@ -128,6 +130,31 @@ def try_mutant(bit):
         c0 = rtl.run(b, 4, 4, seed=1)["cycles"]
         c1 = rtl.run(b, 4, 4, seed=1, mut=mut)["cycles"]
         return (c1 > BOUND47 * c0), f"fib(16) 4x4 cycles {c1} with the mutant vs {c0} (bound: > {BOUND47}x)"
+    if bit == 49:
+        # step 19: without the gradient the short retry timeout livelocks global treesum(9) 3x3 (RTL seeds 3, 10, 11
+        # of 30 at +rto=8 stop at ~2,900 of 18,410 interactions); with it all 30 seeds finish
+        import test_mempress as tm
+        b = progs.book("treesum", 9); W, H = 3, 3
+        cells = tuple((x, y) for x in range(W) for y in range(H) if (x, y) != (W - 1, H - 1))
+        bad = []; rto0, rg0 = fabric.RTO, fabric.RGRAD; fabric.RTO, fabric.RGRAD = 8, (rg0 or 3)
+        for s in (3, 10, 11):
+            r = rtl.run(b, W, H, img=tm.ballast_img(b, W, H, 1024, *tm.GKEEP, cells), seed=s, jitter=30, mut=mut, maxcycles=300_000, timeout=600)
+            if r["status"] != 0:
+                bad.append(s)
+        fabric.RTO, fabric.RGRAD = rto0, rg0
+        return bool(bad), f"global treesum(9) 3x3 seeds 3/10/11: {len(bad)} stop without progress with the mutant"
+    if bit == 50:
+        # step 19: without the pass-on the default (+rto=8 +rgrad=3) deadlocks global treesum(7) 8x8 on seeds 16 and 18
+        import test_mempress as tm
+        b = progs.book("treesum", 7); W, H = 8, 8
+        cells = tuple((x, y) for x in range(W) for y in range(H) if (x, y) != (W - 1, H - 1))
+        bad = []; rto0, rg0 = fabric.RTO, fabric.RGRAD; fabric.RTO, fabric.RGRAD = 8, (rg0 or 3)
+        for s in (16, 18):
+            r = rtl.run(b, W, H, img=tm.ballast_img(b, W, H, 1024, *tm.GKEEP, cells), seed=s, jitter=30, mut=mut, maxcycles=200_000, timeout=1800)
+            if r["status"] != 0:
+                bad.append(s)
+        fabric.RTO, fabric.RGRAD = rto0, rg0
+        return bool(bad), f"global treesum(7) 8x8 seeds 16/18: {len(bad)} stop without progress with the mutant"
     if bit == 7:
         b = progs.book("treesum_direct", 8)
         c1 = rtl.run(b, 1, 1, mut=mut)["cycles"]

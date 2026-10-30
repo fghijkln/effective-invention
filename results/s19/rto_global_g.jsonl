@@ -1,0 +1,25 @@
+{"rto": 8, "case": "fib(12) 3x3", "seed": 1, "ok": true, "cycles": 14863, "msgs": 32, "park": 0}
+{"rto": 8, "case": "fib(12) 3x3", "seed": 2, "ok": true, "cycles": 14831, "msgs": 32, "park": 0}
+{"rto": 8, "case": "fib(12) 3x3", "seed": 3, "ok": true, "cycles": 14916, "msgs": 32, "park": 0}
+{"rto": 8, "case": "treesum(6) 3x3", "seed": 1, "ok": true, "cycles": 6023, "msgs": 59, "park": 0}
+{"rto": 8, "case": "treesum(6) 3x3", "seed": 2, "ok": true, "cycles": 6031, "msgs": 63, "park": 0}
+{"rto": 8, "case": "treesum(6) 3x3", "seed": 3, "ok": true, "cycles": 6050, "msgs": 63, "park": 0}
+{"rto": 8, "case": "list(20) 3x2", "seed": 1, "ok": true, "cycles": 3150, "msgs": 275, "park": 39}
+{"rto": 8, "case": "list(20) 3x2", "seed": 2, "ok": true, "cycles": 3154, "msgs": 213, "park": 29}
+{"rto": 8, "case": "list(20) 3x2", "seed": 3, "ok": true, "cycles": 3163, "msgs": 241, "park": 37}
+{"rto": 8, "case": "qsort(15) 4x4", "seed": 1, "ok": true, "cycles": 11457, "msgs": 29, "park": 0}
+{"rto": 8, "case": "qsort(15) 4x4", "seed": 2, "ok": true, "cycles": 11445, "msgs": 29, "park": 0}
+{"rto": 8, "case": "qsort(15) 4x4", "seed": 3, "ok": true, "cycles": 11445, "msgs": 29, "park": 0}
+{"rto": 8, "case": "sort(10) 3x3", "seed": 1, "ok": true, "cycles": 3712, "msgs": 27, "park": 0}
+{"rto": 8, "case": "sort(10) 3x3", "seed": 2, "ok": true, "cycles": 3708, "msgs": 27, "park": 0}
+{"rto": 8, "case": "sort(10) 3x3", "seed": 3, "ok": true, "cycles": 3695, "msgs": 27, "park": 0}
+{"rto": 8, "case": "fib(12) 6x6", "seed": 1, "ok": true, "cycles": 14784, "msgs": 137, "park": 16}
+{"rto": 8, "case": "fib(12) 6x6", "seed": 2, "ok": true, "cycles": 14787, "msgs": 137, "park": 16}
+{"rto": 8, "case": "fib(12) 6x6", "seed": 3, "ok": true, "cycles": 14783, "msgs": 137, "park": 16}
+{"rto": 8, "case": "qsort(15) 6x6", "seed": 1, "ok": true, "cycles": 11504, "msgs": 33, "park": 12}
+{"rto": 8, "case": "qsort(15) 6x6", "seed": 2, "ok": true, "cycles": 11514, "msgs": 33, "park": 12}
+{"rto": 8, "case": "qsort(15) 6x6", "seed": 3, "ok": true, "cycles": 11501, "msgs": 33, "park": 12}
+{"rto": 8, "case": "treesum(7) 8x8", "seed": 1, "ok": true, "cycles": 9401, "msgs": 2649, "park": 1542}
+{"rto": 8, "case": "treesum(7) 8x8", "seed": 2, "ok": true, "cycles": 9121, "msgs": 2756, "park": 1478}
+{"rto": 8, "case": "treesum(7) 8x8", "seed": 3, "ok": false, "cycles": 2000000, "msgs": 3373, "park": 2410}
+DONE

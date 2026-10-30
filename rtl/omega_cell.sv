@@ -58,7 +58,8 @@ module omega_cell #(
                                            //   task, 2 = tasks of fork definitions that are not stream-fed: directory bit 59)
   input  logic [3:0]  gov_nb,              //   governor: with a hungry neighbour relax while sent <= gov_nb/4 x budget (0 = off)
   input  logic [2:0]  gov_l0,              //   governor reset level (step 13: 2)
-  input  logic [5:0]  rto_m1,              //   step 18: retry-slot timeout - 1 (cycles; step 10-17: 31)
+  input  logic [5:0]  rto_m1,              //   step 18: retry-slot timeout - 1 (cycles; step 10-18: 31, step 19 default: 7)
+  input  logic [2:0]  rgrad,               //   step 19: room-distance gradient cap (0 = off = step 18)
   input  logic [3:0]  in_v,
   input  flit_t [3:0] in_f,
   output logic [3:0]  in_rdy,
@@ -70,6 +71,8 @@ module omega_cell #(
   input  logic [3:0]  nbr_hungry,          // from neighbours N, E, S, W
   output logic        roomy,               // to neighbours: free node and var slots above the watermark
   input  logic [3:0]  nbr_roomy,           // from neighbours N, E, S, W
+  output logic [2:0]  rdist,               // step 19: room distance to neighbours (0 = roomy, saturates at rgrad)
+  input  logic [3:0][2:0] nbr_rdist,       // from neighbours N, E, S, W
   output logic        ready,               // initialisation finished
   output logic [3:0]  err,
   input  logic        dump,
@@ -219,6 +222,24 @@ module omega_cell #(
       logic [1:0] d;
       d = 2'(mrot + 2'(k));
       if (!rv_found && EXISTS[d] && nbr_roomy[d] && !MUT[27]) begin rv_found = 1'b1; rv_dir = d; end
+    end
+  end
+  // step 19 room-distance gradient: first existing neighbour (rotating order) closer to room than this cell,
+  // and the next distance 1 + min over the neighbours (saturating at rgrad).  A SPAWN without room and
+  // without a roomy neighbour goes downhill at once instead of parking; escalated retries go downhill
+  // instead of round robin; with a downhill neighbour an expansion leaves RSV19 free slots
+  // (rgrad = 0: step 18 behaviour cycle for cycle).
+  localparam int RSV19 = 4;
+  logic       dh_found;
+  logic [1:0] dh_dir;
+  logic [2:0] rd_min;
+  always_comb begin
+    dh_found = 1'b0; dh_dir = 2'd0; rd_min = 3'd7;
+    for (int k = 0; k < 4; k++) begin
+      logic [1:0] d;
+      d = 2'(mrot + 2'(k));
+      if (!dh_found && EXISTS[d] && nbr_rdist[d] < rdist && rgrad != 3'd0 && !MUT[49]) begin dh_found = 1'b1; dh_dir = d; end
+      if (EXISTS[k] && nbr_rdist[k] < rd_min) rd_min = nbr_rdist[k];
     end
   end
   function automatic logic [3:0] dir_x(input logic [1:0] d);
@@ -497,7 +518,7 @@ module omega_cell #(
       st_traps <= '0; tr_addr <= '0; tr_reason <= '0; tr_owner <= '0; tr_mask <= '0;
       vh_v <= 1'b0; vh_ov <= 1'b0; st_vhu <= '0;
       wq_n <= '0; vq_n <= '0; bufok <= 1'b0; rom_v <= 1'b0; rsp <= 1'b0; rsx <= 1'b0; rfw <= 1'b0; ej_taken <= 1'b0;
-      roomy <= 1'b0; mrot <= 2'(X + Y + 1);
+      roomy <= 1'b0; mrot <= 2'(X + Y + 1); rdist <= 3'd0;
       rs_v <= 1'b0; rs_e <= '0; rs_tm <= '0; rs_n <= '0; cur_rs <= 1'b0; cur_rsn <= '0; st_park <= '0;
       gv_lvl <= gov_l0; ep_i <= '0; ep_m <= '0; gv_pi <= '0;   // step 14: reset level 1
       fcnt <= '0; st_fgive <= '0;
@@ -531,6 +552,9 @@ module omega_cell #(
         if (nf_tot >= (SB+2)'(SLOTS / 4) && vf_tot >= (SB+2)'(SLOTS / 4)) roomy <= 1'b1;
         else if (nf_tot < (SB+2)'(SLOTS / 8) || vf_tot < (SB+2)'(SLOTS / 8)) roomy <= 1'b0;
       end
+      // step 19 room distance (registered): 0 when roomy, else 1 + the smallest neighbour distance, capped at rgrad
+      if (rgrad == 3'd0 || roomy) rdist <= 3'd0;
+      else rdist <= (4'(rd_min) + 4'd1 > 4'(rgrad)) ? rgrad : rd_min + 3'd1;
       if (state != S_IDLE && state != S_INIT && state != S_HALT) st_busy <= st_busy + 1;
 
       case (state)
@@ -616,9 +640,9 @@ module omega_cell #(
                 // no free slot: move the SWI node to a roomy neighbour (it applies the rule there);
                 // escalated retry (parked 4 times, no roomy neighbour): to the next neighbour round robin
                 logic [2:0] t; t = (rr == 3'd0) ? 3'd1 : rr;
-                snd = 1'b1; sf = {M_NODE, rv_found ? dir_x(rv_dir) : tx[t], rv_found ? dir_y(rv_dir) : ty[t], dQ, a2, a1, dP};
+                snd = 1'b1; sf = {M_NODE, rv_found ? dir_x(rv_dir) : dh_found ? dir_x(dh_dir) : tx[t], rv_found ? dir_y(rv_dir) : dh_found ? dir_y(dh_dir) : ty[t], dQ, a2, a1, dP};
                 nf_push = 3'd1; nf_pd[0] = SB'(pslot(dP)); nalloc[SB'(pslot(dP))] <= 1'b0;
-                if (rv_found) mrot <= mrot + 2'd1; else rr <= (t == 3'(NT - 1)) ? 3'd0 : t + 1;
+                if (rv_found || dh_found) mrot <= mrot + 2'd1; else rr <= (t == 3'(NT - 1)) ? 3'd0 : t + 1;
               end else begin pn = 2'd1; pq[0] = {K_LINK, dQ, dP}; park = 1'b1; st_retry <= st_retry + 1; end
               fin = 1'b1;
             end else if (tP == T_SWI && tQ == T_NUM && pval(dQ) != 0 && nf_av == 0) begin
@@ -687,9 +711,9 @@ module omega_cell #(
                   // re-homes P and sends LINK(Q ~ P') back; Q then migrates with the ordinary NODE rule.
                   // Escalated retry without a roomy neighbour: PULL to the next neighbour round robin.
                   logic [2:0] t; t = (rr == 3'd0) ? 3'd1 : rr;
-                  snd = 1'b1; sf = {M_PULL, rv_found ? dir_x(rv_dir) : tx[t], rv_found ? dir_y(rv_dir) : ty[t], dQ, a2, a1, dP};
+                  snd = 1'b1; sf = {M_PULL, rv_found ? dir_x(rv_dir) : dh_found ? dir_x(dh_dir) : tx[t], rv_found ? dir_y(rv_dir) : dh_found ? dir_y(dh_dir) : ty[t], dQ, a2, a1, dP};
                   nf_push = 3'd1; nf_pd[0] = sP; nalloc[sP] <= 1'b0;
-                  if (rv_found) mrot <= mrot + 2'd1; else rr <= (t == 3'(NT - 1)) ? 3'd0 : t + 1;
+                  if (rv_found || dh_found) mrot <= mrot + 2'd1; else rr <= (t == 3'(NT - 1)) ? 3'd0 : t + 1;
                 end else begin pn = 2'd1; pq[0] = {K_LINK, dQ, dP}; park = 1'b1; st_retry <= st_retry + 1; end
                 fin = 1'b1;
               end else if (!anni && (nf_av < 2 || vf_av < 4)) begin
@@ -794,12 +818,21 @@ module omega_cell #(
         if (!sp_local_only && sp_give) begin
           snd = 1'b1; sf = {M_SPAWN, dir_x(hv_dir), dir_y(hv_dir), 64'd0, 64'd0, sp_x_p, sp_ref_p};
           fin = 1'b1;
-        end else if ((SB+2)'(nn) <= nf_tot && (SB+2)'(nv) <= vf_tot && (32'(tq_tot) + 32'(nr) + 1) < QDEPTH) begin
+        end else if ((SB+2)'(nn) + (dh_found ? (SB+2)'(RSV19) : '0) <= nf_tot && (SB+2)'(nv) + (dh_found ? (SB+2)'(RSV19) : '0) <= vf_tot
+                     && (32'(tq_tot) + 32'(nr) + 1) < QDEPTH) begin
+          // (step 19: with a cell closer to room next door, an expansion must leave RSV19 node and var slots free,
+          //  so a poor cell on the way does not spend its last slots and then block on NODE / PULL arrivals)
           ex_nbase <= d_rd[15:0]; ex_rbase <= d_rd[31:16]; ex_root <= d_rd[127:64];
           ex_nn <= nn; ex_nv <= nv; ex_nr <= nr; ex_own <= pown(sp_ref_p); ex_x <= sp_x_p;
           ex_ref <= plab(sp_ref_p);
           alloc = 1'b1; al_start = 1'b1; al_nn = nn; al_nv = nv; al_in = '0; al_iv = '0;   // first allocation batch now
           if (!MUT[31]) bufok <= 1'b0;                                      // new definition: drop the buffered pair
+        end else if (NT > 1 && !rv_found && dh_found && can_send) begin
+          // step 19: not enough room here, no roomy neighbour, but one closer to room: forward the SPAWN
+          // downhill at once (parking lets producer work wander and fill the scarce room of poor cells)
+          snd = 1'b1; sf = {M_SPAWN, dir_x(dh_dir), dir_y(dh_dir), 64'd0, 64'd0, sp_x_p, sp_ref_p};
+          mrot <= mrot + 2'd1; st_retry <= st_retry + 1;
+          fin = 1'b1;
         end else if (NT > 1 && !rv_found && !rs_v && !esc) begin
           // not enough room here and no roomy neighbour: park the SPAWN in the retry slot (no blind
           // round-robin forwarding); after 4 parks in a row it is forwarded below
@@ -812,6 +845,7 @@ module omega_cell #(
           t = (rr == 3'd0) ? 3'd1 : rr;
           fx = tx[t]; fy = ty[t];
           if (rv_found) begin fx = dir_x(rv_dir); fy = dir_y(rv_dir); mrot <= mrot + 2'd1; end   // prefer a roomy neighbour
+          else if (dh_found) begin fx = dir_x(dh_dir); fy = dir_y(dh_dir); mrot <= mrot + 2'd1; end   // step 19: downhill
           else rr <= (t == 3'(NT - 1)) ? 3'd0 : t + 1;
           st_retry <= st_retry + 1;
           if (can_send) begin snd = 1'b1; sf = {M_SPAWN, fx, fy, 64'd0, 64'd0, sp_x_p, sp_ref_p}; end
@@ -872,7 +906,7 @@ module omega_cell #(
 
       // ---- the step finished: pick the next task or message in the same cycle (no IDLE cycle) ----
       if (fin && nst != S_HALT) begin
-        logic msg_ok, pick_msg, fgive, fnew;
+        logic msg_ok, pick_msg, fgive, fnew, fwd_full;
         // step 14: while a neighbour is hungry and at least two tasks wait, the OLDEST fork task is taken
         // (and handed over by the step-11 spawn path in S_LINK); otherwise the stack top; the newest fork
         // task only when the stack is empty
@@ -880,6 +914,12 @@ module omega_cell #(
         fnew = fork_dq != 2'd0 && fcnt != 0 && tq_tot == 0;
         msg_ok = ej_v && !ej_taken && !((ej_f.kind == M_NODE || ej_f.kind == M_PULL) && (nf_av == 0 || n_we || nf_pop != 0));
         pick_msg = msg_ok && (!(q_ok || fgive || fnew) || !can_send || rnd_msg);
+        // step 19: a NODE / PULL at the ejection head of a cell with no free node slot at all, and nothing else to
+        // do, is passed on (roomy neighbour, else downhill, else round robin) instead of blocking the head: the
+        // LINKs queued behind it may be what frees the cell (head-of-line deadlock; rgrad = 0: step 18).
+        // The re-homing is location free (migration is not an interaction), so the rewrite keeps the result.
+        fwd_full = rgrad != 3'd0 && !MUT[50] && NT > 1 && ej_v && !ej_taken && (ej_f.kind == M_NODE || ej_f.kind == M_PULL)
+                   && nf_tot == 0 && !n_we && nf_pop == 0 && !snd && can_send;
         nst = S_IDLE; nrsp = 1'b0; nrsx = 1'b0; nrfw = 1'b0;
         cur_rs <= 1'b0;
         if (stall_now) begin
@@ -925,6 +965,16 @@ module omega_cell #(
         end else if (fnew) begin
           st_tasks <= st_tasks + 1;
           nra = fq[fcnt - 3'd1][63:0]; nrb = fq[fcnt - 3'd1][127:64]; fpop_new = 1'b1; nst = S_LINK;
+        end else if (fwd_full) begin
+          logic [2:0] t; t = (rr == 3'd0) ? 3'd1 : rr;
+          ej_taken <= 1'b1;
+          // a NODE whose partner is a node goes on as a PULL: the cell that takes it asks for the partner, so the
+          // partner leaves this full cell (a NODE would be migrated straight back here by the redex rule)
+          snd = 1'b1; sf = ej_f;
+          if (ej_f.kind == M_NODE && is_node(ej_f.p3)) sf.kind = M_PULL;
+          sf.dx = rv_found ? dir_x(rv_dir) : dh_found ? dir_x(dh_dir) : tx[t];
+          sf.dy = rv_found ? dir_y(rv_dir) : dh_found ? dir_y(dh_dir) : ty[t];
+          if (rv_found || dh_found) mrot <= mrot + 2'd1; else rr <= (t == 3'(NT - 1)) ? 3'd0 : t + 1;
         end
       end
 

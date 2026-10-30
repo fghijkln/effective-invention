@@ -1,1 +1,1 @@
-big fuzz: 200/200 pass in results/fuzz_rtl_big.jsonl (summary line lost to a sandbox restart; default +rto=32 is cycle-identical to step 15)
+fuzz (big) 0..4287: 200/200 pass, 4088 rejected (diverging), 1195s

@@ -283,7 +283,7 @@ Correctness argument (also checked by fuzzing):
 * **Retry slot and global pressure (step 10).** Since step 10 the retry of the last bullet, and a SPAWN
   that has neither room nor a roomy neighbour, no longer go on the LIFO task stack (where they were
   popped again at once and starved the tasks that free memory) nor round robin to any neighbour. Each
-  cell has **one non-LIFO retry slot** (`rs_v`, `rs_e`, a timer `rs_tm` loaded with the run-time input `rto_m1` (an input since step 18; default 32 cycles), a park count
+  cell has **one non-LIFO retry slot** (`rs_v`, `rs_e`, a timer `rs_tm` loaded with the run-time input `rto_m1` (an input since step 18; default 8 cycles since step 19, 32 before), a park count
   `rs_n`): the retry is parked there, the engine keeps working on its stack and messages, and the
   parked entry is taken (before the stack) when its timer expires. A retry taken from the slot that has
   to park again counts up `rs_n`; on the 4th consecutive park the task **escalates**: a SPAWN is
@@ -293,6 +293,22 @@ Correctness argument (also checked by fuzzing):
   slot is single: a second retry while it is occupied takes the old path (stack / round robin), so no
   retry can be locked out of the slot forever. A parked entry keeps the cell non-idle and non-hungry
   (§8). Mutants 39–41 (parked entry never taken, quiescence ignoring the slot, no escalation).
+* **Room-distance gradient (step 19).** Each cell registers a 3-bit room distance `rdist` (0 when
+  `roomy`, else 1 + the smallest `rdist` of its neighbours, saturating at the run-time cap `rgrad`;
+  `rgrad` = 0 switches the gradient off and gives the step-18 behaviour cycle for cycle) and sends it to
+  its neighbours next to `roomy`. A neighbour with a smaller `rdist` is *downhill*. With a downhill
+  neighbour (a) a SPAWN that has neither room nor a roomy neighbour is forwarded downhill at once instead
+  of being parked; (b) escalated retries (SPAWN, SWI `NODE`, commutation `PULL`) go downhill instead of
+  round robin; (c) an expansion must leave `RSV19` = 4 free node and var slots, so a poor cell on the
+  path does not spend its last slots and then block its ejection port on a `NODE` / `PULL` arrival that
+  needs a free slot; (d) with `rgrad` ≠ 0, a `NODE` / `PULL` at the head of the ejection queue of a cell
+  that has no free node slot at all and nothing else to pick (no task, no expired retry) is passed on
+  unchanged to a roomy neighbour, else a downhill one, else the next neighbour round robin, instead of
+  blocking the head (the `LINK`s queued behind it can be what frees the cell: a head-of-line deadlock seen
+  on the RTL at `rto` = 8 with and without the gradient, global treesum(7) 8×8). Without a downhill
+  neighbour (no room within `rgrad` hops, or the whole fabric full) rules (a)–(c) are the step-10 rule. Default `rgrad` = 3 with `rto` = 8 (README step 19: the short
+  timeout alone livelocked the fabric and the RTL under global pressure; the gradient removes that).
+  Mutants 49 (no downhill neighbour is ever found) and 50 (rule (d) off).
   None of these change the result or the interaction count (migration is not an interaction), only
   where a rule runs. `tests/test_mempress.py` pre-fills cell (0,0) with foreign "ballast" so that only
   4–30 slots are free there: without the mechanism the v3 RTL livelocks on 7 of 30 such cases.
@@ -428,7 +444,7 @@ The result is a canonical string, for example `#6765` or `((x0 x0) (x1 x1))`.
   * a 1×1 fabric unable to place an expansion: `err = 2`;
   * a fabric that is globally full can bounce SPAWNs forever. The Python model stops with "no progress
     for 100000 cycles" and the RTL testbench with a cycle limit (status 3). Since step 10 parked
-    retries poll every 32 cycles (`+rto`, step 18) instead of every cycle, but escalated SPAWNs (and SPAWNs that find the
+    retries poll every `rto` cycles (`+rto`, step 18; default 8 since step 19) instead of every cycle, but escalated SPAWNs (and SPAWNs that find the
     retry slot occupied) still bounce; `tests/test_mempress.py` checks that a globally full fabric ends
     in status 3 without a wrong answer.
 

@@ -1,0 +1,171 @@
+diff --git a/omega/fabric.py b/omega/fabric.py
+index cfee604..8125017 100644
+--- a/omega/fabric.py
++++ b/omega/fabric.py
+@@ -47,6 +47,14 @@ MSG_NAMES = ["LINK", "NODE", "SPAWN", "PULL"]
+ T_LINK, T_EXPAND, T_SPAWN, T_FWD = 0, 1, 2, 3
+ RTO = int(__import__('os').environ.get('OMEGA_RTO', '32'))   # retry-slot timeout (cycles), RTL +rto (step 18 knob; default 32)
+ ESCN = int(__import__('os').environ.get('OMEGA_ESCN', '3'))   # step 18 fabric-only knob: a retry escalates on park number ESCN + 1 (RTL: 2-bit rs_n, 3)
++RBO = int(__import__('os').environ.get('OMEGA_RBO', '0'))     # step 19: per-cell retry backoff, max shift (0 = off)
++RJIT = int(__import__('os').environ.get('OMEGA_RJIT', '0'))   # step 19: retry timer jitter bits (LFSR low bits added)
++AGE = int(__import__('os').environ.get('OMEGA_AGE', '0'))     # step 19: under memory pressure every AGE-th stack pop takes the oldest task (0 = off)
++AGEW = int(__import__('os').environ.get('OMEGA_AGEW', '0'))   # step 19: pressure = free node or var slots below AGEW (0 = room_hi)
++AGEM = int(__import__('os').environ.get('OMEGA_AGEM', '0'))   # step 19 aging filter: 1 = only a bottom task that touches a remote node
++RRST = int(__import__('os').environ.get('OMEGA_RRST', '0'))   # step 19 backoff reset: 0 = retried task not re-parked, 1 = any interaction at the cell
++RGM = int(__import__('os').environ.get('OMEGA_RGM', '1'))     # step 19 (with RGRAD): 1 = a SPAWN without room goes downhill at once instead of parking (RTL), 2 = only after one park, 0 = escalations only
++RGRAD = int(__import__('os').environ.get('OMEGA_RGRAD', '0')) # step 19: room-distance gradient cap (0 = off): escalated retries go downhill instead of round robin
+ DIRS = ["N", "E", "S", "W"]
+ DXY = {"N": (0, -1), "E": (1, 0), "S": (0, 1), "W": (-1, 0)}
+ OPP = {"N": "S", "S": "N", "E": "W", "W": "E"}
+@@ -364,6 +372,8 @@ class Cell:
+         self.rr = 0
+         # single non-LIFO retry slot (step 10, SPEC 9.1): (kind, a, b), timeout, park count
+         self.rs, self.rs_tm, self.rs_n, self.cur_rs, self.cur_rsn = None, 0, 0, False, 0
++        self.rd = 0                                                   # step 19 room distance (registered)
++        self.bo, self.lfsr = 0, ((x * 37 + y * 11) & 0xFFFF) | 1      # step 19 backoff level, jitter LFSR
+         self.nbrs = [d for d in ("E", "S", "W", "N")
+                      if 0 <= x + DXY[d][0] < fab.W and 0 <= y + DXY[d][1] < fab.H]
+         self.spawn_targets = [None] + self.nbrs
+@@ -441,6 +451,8 @@ class Cell:
+     def count(self):
+         self.st["interactions"] += 1
+         self.fab.interactions += 1
++        if RRST == 1:
++            self.bo = 0
+         if self.fab.gov_b:
+             self.ep_i += 1
+             if self.ep_i == self.fab.gov_e:
+@@ -540,11 +552,60 @@ class Cell:
+         """The current task is a retry parked 4 times in a row: fall back to round-robin moves."""
+         return bool(self.nbrs) and self.cur_rs and self.cur_rsn == ESCN
+ 
++    def esc_nbr(self):
++        """Escalated retry target: round robin over the neighbours (step 10); step 19 RGRAD: a neighbour
++        closer to room (rotating order) when there is one."""
++        if RGRAD:
++            d = self.downhill_room()
++            if d is not None:
++                return d
++        d = self.nbrs[self.rr % len(self.nbrs)]
++        self.rr += 1
++        return d
++
++    def downhill_room(self):
++        for k in range(len(self.nbrs)):
++            d = self.nbrs[(self.rr + k) % len(self.nbrs)]
++            if self.fab.cells[self.nbr_xy(d)].rd < self.rd:
++                self.rr += 1
++                return d
++        return None
++
++    def pop_task(self):
++        """LIFO task stack (depth-first, bounded memory).  Step 19 aging: while the cell is short of memory,
++        every AGE-th pop takes the oldest task instead, so work parked at the bottom (often the consumer
++        that would free memory) cannot starve under a stream of newer producer tasks."""
++        if AGE:
++            w = AGEW or self.room_hi
++            if (not any(self.fab.cells[self.nbr_xy(d)].roomy() for d in self.nbrs) and bool(self.nbrs)) if AGEW < 0 \
++                    else (len(self.nfree) < w or len(self.vfree) < w):
++                self.agec = getattr(self, "agec", 0) + 1
++                if self.agec >= AGE:
++                    self.agec = 0
++                    self.st["aged"] = self.st.get("aged", 0) + 1
++                    q = self.queue
++                    m = q.m if isinstance(q, TaskStack) else q
++                    if AGEM == 0:
++                        return m.popleft() if m else q.f.popleft()
++                    if m:
++                        k0, a0, b0 = m[0]
++                        rem = lambda p: tag(p) >= CON and not self.local(p)
++                        if k0 == T_LINK and (rem(a0) or rem(b0)):
++                            return m.popleft()
++        return self.queue.pop()
++
+     def park(self, kind, a, b):
+         """Memory-pressure retry: park in the single retry slot for RTO cycles (False if it is full)."""
+         if self.rs is not None:
+             return False
+-        self.rs, self.rs_tm = (kind, a, b), RTO
++        if RBO and self.cur_rs:
++            self.bo = min(self.bo + 1, RBO)        # step 19: the same work failed again: back off
++        jit = 0
++        if RJIT:
++            l = self.lfsr
++            self.lfsr = ((l >> 1) | ((((l >> 0) ^ (l >> 2) ^ (l >> 3) ^ (l >> 5)) & 1) << 15)) & 0xFFFF
++            jit = self.lfsr & ((1 << RJIT) - 1)
++        self.rs, self.rs_tm = (kind, a, b), (RTO << self.bo) + jit
+         self.rs_n = min(self.cur_rsn + 1, ESCN) if self.cur_rs else 0
+         self.st["park"] = self.st.get("park", 0) + 1
+         return True
+@@ -653,12 +714,13 @@ class Cell:
+         if len(self.nfree) < nn or len(self.vfree) < nv:
+             if self.nbrs:
+                 t = self.roomy_nbr()          # out of memory: prefer a roomy neighbour
++                if t is None and RGRAD and (RGM == 1 or (RGM == 2 and self.cur_rs)) and self.can_send():
++                    t = self.downhill_room()   # step 19 RGM: no roomy neighbour: one closer to room
+                 if t is None and not self.escalated() and self.park(T_SPAWN, refp, x):
+                     self.st["requeue"] += 1   # no roomy neighbour: park (forwarded after 4 parks)
+                     return 1
+                 if t is None:
+-                    t = self.nbrs[self.rr % len(self.nbrs)]
+-                    self.rr += 1
++                    t = self.esc_nbr()
+                 self.send_or_retry(MSG_SPAWN, self.nbr_xy(t), refp, x)
+                 self.st["requeue"] += 1
+                 return 1
+@@ -710,7 +772,7 @@ class Cell:
+             if ta == SWI and tb == NUM and payload(b) != 0 and not self.nfree:
+                 d = self.roomy_nbr() if self.can_send() else None
+                 if d is None and self.escalated() and self.can_send():
+-                    d = self.nbrs[self.rr % len(self.nbrs)]; self.rr += 1   # escalated retry: round robin
++                    d = self.esc_nbr()   # escalated retry: round robin (step 19: downhill)
+                 if d is not None:             # no slot: move the SWI node to a roomy neighbour
+                     a1, a2 = self.free_node(a)
+                     self.send(MSG_NODE, self.nbr_xy(d), a, a1, a2, b)
+@@ -764,7 +826,7 @@ class Cell:
+             if not anni and (len(self.nfree) < 2 or len(self.vfree) < 4):
+                 d = self.roomy_nbr() if self.can_send() else None
+                 if d is None and self.escalated() and self.can_send():
+-                    d = self.nbrs[self.rr % len(self.nbrs)]; self.rr += 1   # escalated retry: round robin
++                    d = self.esc_nbr()   # escalated retry: round robin (step 19: downhill)
+                 if d is not None:
+                     # no room for the commutation: PULL protocol, the roomy neighbour re-homes P and
+                     # asks for Q (which then migrates with the ordinary NODE rule); poor -> rich
+@@ -840,6 +902,7 @@ class Cell:
+         self.update_roomy()
+         if msg_ok and self.eject[0][0] in (MSG_NODE, MSG_PULL) and not self.nfree:
+             msg_ok = False
++            self.st["holb"] = self.st.get("holb", 0) + 1
+         if msg_ok and self.queue:
+             p = self.fab.p_msg if self.can_send() else 1.0
+             src = "m" if rng.random() < p else "q"
+@@ -880,7 +943,7 @@ class Cell:
+                 (k, a, b), self.rs = self.rs, None
+                 self.cur_rsn = self.rs_n
+             else:
+-                k, a, b = self.queue.pop()   # LIFO task stack (depth-first, bounded memory)
++                k, a, b = self.pop_task()
+             vh = None
+             if k == T_LINK and not self.vh_busy and self.vh_out is None:
+                 vh = self.vhu_chain(a, b)          # hand the var chain to the VHU (no-op if not a local var link)
+@@ -921,6 +984,8 @@ class Cell:
+                         cost = 1 + self.forward(m[6], with_payload(m[3], self.here(s)))
+                     else:
+                         cost = 1 + self.do_link(with_payload(m[3], self.here(s)), m[6])
++        if RRST == 0 and self.cur_rs and src == "r" and self.rs is None:
++            self.bo = 0                        # step 19: the retried work went through: reset the backoff
+         if len(self.queue) > self.fab.qdepth:
+             raise FabricError(f"task queue overflow at cell {self.x},{self.y}")
+         self.st["max_q"] = max(self.st["max_q"], len(self.queue))
+@@ -1045,6 +1110,11 @@ class Fabric:
+         self.rng.shuffle(cells)
+         for c in cells:
+             c.engine(self.rng)
++        if RGRAD:
++            nr = {k: (0 if c.roomy() else min(RGRAD, 1 + min(self.cells[c.nbr_xy(d)].rd for d in c.nbrs)) if c.nbrs else RGRAD)
++                  for k, c in self.cells.items()}
++            for k, c in self.cells.items():
++                c.rd = nr[k]
+         if self.grad:
+             G = self.grad
+             nh = {k: (0 if c.hungry() else min(G, 1 + min(self.cells[c.nbr_xy(d)].hd for d in c.nbrs)) if c.nbrs else G)
