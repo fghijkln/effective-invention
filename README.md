@@ -135,6 +135,39 @@ step 12 the cost was qsort: on meshes it was 16–27% slower than with step 10's
 because its filter chains (lo/hi/app) stayed where they started; step 13 (next section) fixes that. treesum(9)
 on 8×8 varies ±20% with the arbitration seed; over seeds 1–4 the mean is 2,374 vs 2,470 for step 10.
 
+### Shorter retry-slot timeout: 32 → 8 cycles (step 18)
+
+Step 17's probe showed that a global-pressure run spends most of its time parked, so the timeout itself was
+swept (fabric model first, `results/s18/rto18_fabric.py` → `rto_fabric.txt`: 4 / 8 / 16 / 32 / 64 cycles;
+shorter was better on every case but fib(12) 6×6, and 4 was no better than 8). The timeout is now a
+run-time input of the cell (`rto_m1`, testbench `+rto=`, `OMEGA_RTO` for the fabric model and `omega/rtl.py`;
+default **8**, `+rto=32` = step 17), loaded into the same 6-bit `rs_tm`; no other RTL change.
+
+RTL, Verilator, seeds 1–3, jitter 30%, every cell but the far corner left with 8 free node / 8 free var
+slots (the five global-pressure cases of `tests/test_mempress.py` plus three bigger meshes;
+`bench/rto18_rtl.py` → `results/s18/rto_global.jsonl`; every run checked against the semantic reducer):
+
+| case | rto 32 (step 17) | rto 16 | **rto 8 (step 18)** | Δ |
+|---|---:|---:|---:|---:|
+| fib(12) 3×3 | 15,205 | 15,027 | **14,969** | −1.6% |
+| treesum(6) 3×3 | 5,866 | 5,841 | **5,843** | −0.4% |
+| list(20) 3×2 | 3,606 | 3,109 | **2,969** | −17.6% |
+| qsort(15) 4×4 | 12,108 | 11,785 | **11,595** | −4.2% |
+| sort(10) 3×3 | 4,114 | 3,927 | **3,827** | −7.0% |
+| fib(12) 6×6 | 15,589 | 12,925 | **12,888** | −17.3% |
+| qsort(15) 6×6 | 12,572 | 12,013 | **11,758** | −6.5% |
+| treesum(7) 8×8 | 21,407 | 11,534 | **8,926** | **−58.3%** |
+
+* Faster on every case; the more work moves between cramped cells, the more it gains (treesum(7) 8×8
+  parks 14,917 times per run at 32 cycles). A parked retry costs no engine cycles (the engine keeps
+  working on its stack and messages), so polling the slot more often only adds retries that fail again,
+  and those were never the bottleneck.
+* Programs without memory pressure never park, so the step-15 benchmark runs cycle for cycle as before:
+  all 8 programs × seeds 1–2 on 4×4 and 8×8 reproduce `results/s15/final_*.jsonl` exactly
+  (`results/s18/id_*.jsonl`).
+* Cost: none in area (the timer and its 6-bit load value were already there; the constant became an input
+  that a real chip would tie off or put in a configuration register).
+
 ### Room-distance gradient under global memory pressure: probe rejected (step 17)
 
 Next step 3 on the fabric model (`results/s16/rgrad17.py`, patch `results/s16/probe17_rgrad.patch`; the five
@@ -766,8 +799,8 @@ What this says:
    * task-stack overflow (`err = 1`) or a 1×1 cell that cannot place an expansion (`err = 2`) still
      halts the cell;
    * a *globally* full fabric still bounces work (status 3 / "no progress"); there is no spilling to
-     off-fabric memory and spawning is not throttled. Step 10's retry slot parks a retry for 32
-     cycles and escalates after 4 parks (round robin, not toward the room: there is no gradient), so
+     off-fabric memory and spawning is not throttled. Step 10's retry slot parks a retry for 8
+     cycles (32 before step 18) and escalates after 4 parks (round robin, not toward the room: there is no gradient), so
      room several hops away is found by diffusion, not routing; only one retry fits the slot, further
      ones take the old path;
    * mutant 27 (roomy offload disabled) survives on its own since step 10: escalation alone rescues
