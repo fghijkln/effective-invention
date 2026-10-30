@@ -78,7 +78,7 @@ def main = tsum(gen(N))
 
 ## Results
 
-### Verification (full regression on step 15: v4 engine + retry slot + spawn threshold / fork hints + local-first link orientation + producer hint / message-budget governor + fork deque with the step-15 deque hint; default 2×2 cells per ROM, one port)
+### Verification (full regression on step 18 = step 15 + the `+rto` input at its default: v4 engine + retry slot + spawn threshold / fork hints + local-first link orientation + producer hint / message-budget governor + fork deque with the step-15 deque hint; default 2×2 cells per ROM, one port)
 
 | suite | result | what it checks |
 |---|---|---|
@@ -135,38 +135,44 @@ step 12 the cost was qsort: on meshes it was 16–27% slower than with step 10's
 because its filter chains (lo/hi/app) stayed where they started; step 13 (next section) fixes that. treesum(9)
 on 8×8 varies ±20% with the arbitration seed; over seeds 1–4 the mean is 2,374 vs 2,470 for step 10.
 
-### Shorter retry-slot timeout: 32 → 8 cycles (step 18)
+### Retry-slot timeout as a knob: faster under pressure, but more livelock (step 18)
 
 Step 17's probe showed that a global-pressure run spends most of its time parked, so the timeout itself was
-swept (fabric model first, `results/s18/rto18_fabric.py` → `rto_fabric.txt`: 4 / 8 / 16 / 32 / 64 cycles;
-shorter was better on every case but fib(12) 6×6, and 4 was no better than 8). The timeout is now a
-run-time input of the cell (`rto_m1`, testbench `+rto=`, `OMEGA_RTO` for the fabric model and `omega/rtl.py`;
-default **8**, `+rto=32` = step 17), loaded into the same 6-bit `rs_tm`; no other RTL change.
+swept. It is now a run-time input of the cell (`rto_m1`, testbench `+rto=`, `OMEGA_RTO` for the fabric model
+and `omega/rtl.py`), loaded into the same 6-bit `rs_tm`; no other RTL change. **The default stays 32**
+(step 17's behaviour, cycle for cycle), for the reason below.
 
 RTL, Verilator, seeds 1–3, jitter 30%, every cell but the far corner left with 8 free node / 8 free var
 slots (the five global-pressure cases of `tests/test_mempress.py` plus three bigger meshes;
 `bench/rto18_rtl.py` → `results/s18/rto_global.jsonl`; every run checked against the semantic reducer):
 
-| case | rto 32 (step 17) | rto 16 | **rto 8 (step 18)** | Δ |
+| case | `+rto=32` (default) | `+rto=16` | `+rto=8` | Δ 8 vs 32 |
 |---|---:|---:|---:|---:|
-| fib(12) 3×3 | 15,205 | 15,027 | **14,969** | −1.6% |
-| treesum(6) 3×3 | 5,866 | 5,841 | **5,843** | −0.4% |
-| list(20) 3×2 | 3,606 | 3,109 | **2,969** | −17.6% |
-| qsort(15) 4×4 | 12,108 | 11,785 | **11,595** | −4.2% |
-| sort(10) 3×3 | 4,114 | 3,927 | **3,827** | −7.0% |
-| fib(12) 6×6 | 15,589 | 12,925 | **12,888** | −17.3% |
-| qsort(15) 6×6 | 12,572 | 12,013 | **11,758** | −6.5% |
-| treesum(7) 8×8 | 21,407 | 11,534 | **8,926** | **−58.3%** |
+| fib(12) 3×3 | 15,205 | 15,027 | 14,969 | −1.6% |
+| treesum(6) 3×3 | 5,866 | 5,841 | 5,843 | −0.4% |
+| list(20) 3×2 | 3,606 | 3,109 | 2,969 | −17.6% |
+| qsort(15) 4×4 | 12,108 | 11,785 | 11,595 | −4.2% |
+| sort(10) 3×3 | 4,114 | 3,927 | 3,827 | −7.0% |
+| fib(12) 6×6 | 15,589 | 12,925 | 12,888 | −17.3% |
+| qsort(15) 6×6 | 12,572 | 12,013 | 11,758 | −6.5% |
+| treesum(7) 8×8 | 21,407 | 11,534 | 8,926 | **−58.3%** |
 
-* Faster on every case; the more work moves between cramped cells, the more it gains (treesum(7) 8×8
-  parks 14,917 times per run at 32 cycles). A parked retry costs no engine cycles (the engine keeps
-  working on its stack and messages), so polling the slot more often only adds retries that fail again,
-  and those were never the bottleneck.
-* Programs without memory pressure never park, so the step-15 benchmark runs cycle for cycle as before:
-  all 8 programs × seeds 1–2 on 4×4 and 8×8 reproduce `results/s15/final_*.jsonl` exactly
-  (`results/s18/id_*.jsonl`).
-* Cost: none in area (the timer and its 6-bit load value were already there; the constant became an input
-  that a real chip would tie off or put in a configuration register).
+* **Faster on every case.** A parked retry costs no engine cycles, and with a short timeout the 4th park
+  (escalation: round-robin forwarding) comes after 32 instead of 128 cycles, so work leaves cramped cells
+  sooner (treesum(7) 8×8 parks 14,917 times per run at 32 cycles).
+* **No effect without memory pressure.** Programs that never park run cycle for cycle as in step 15 at
+  `+rto=8`: all 8 benchmark programs × seeds 1–2 on 4×4 and 8×8 reproduce `results/s15/final_*.jsonl`
+  exactly (`results/s18/id_*.jsonl`). At `+rto=8` units 42/42, programs 315/315, step-14 cross-check 90/90,
+  fuzz 600/600, security 420/420 and the RTL half of the memory-pressure suite passed.
+* **Why it is not the default: livelock.** The fabric model's memory-pressure case global list(20) 3×2
+  (seed 33) stops with "no progress for 100,000 cycles" at 8 (fine at 4, 12, 16, 32). Over seeds 1–20
+  (`results/s18/livelock_rto*.txt`): list(20) 3×2 livelocks 0 / 1 / 0 / 0 times at 8 / 16 / 12 / 32, and the
+  near-overfull treesum(9) 3×3 19 / 5 / 10 / 2 times. Early escalation is both the gain and the risk: keeping
+  escalation at ≈128 cycles (fabric knob `OMEGA_ESCN`: escalate on the 16th park at 8 cycles) removes most of
+  the gain (treesum(7) 8×8 back to 18,759 fabric cycles) and still livelocks treesum(9) 3×3 7 / 20 times. The
+  RTL did not livelock in any run above, but it has no progress detector, only a cycle limit.
+* Taking the gain safely needs the progress guarantee that known gap 3 already asks for (a forwarded SPAWN
+  that cannot bounce forever, e.g. a hop budget or forwarding toward room); until then `+rto` is a knob.
 
 ### Room-distance gradient under global memory pressure: probe rejected (step 17)
 
@@ -799,8 +805,8 @@ What this says:
    * task-stack overflow (`err = 1`) or a 1×1 cell that cannot place an expansion (`err = 2`) still
      halts the cell;
    * a *globally* full fabric still bounces work (status 3 / "no progress"); there is no spilling to
-     off-fabric memory and spawning is not throttled. Step 10's retry slot parks a retry for 8
-     cycles (32 before step 18) and escalates after 4 parks (round robin, not toward the room: there is no gradient), so
+     off-fabric memory and spawning is not throttled. Step 10's retry slot parks a retry for 32
+     cycles (`+rto`, step 18: shorter is up to 58% faster under pressure but livelocks more often) and escalates after 4 parks (round robin, not toward the room: there is no gradient), so
      room several hops away is found by diffusion, not routing; only one retry fits the slot, further
      ones take the old path;
    * mutant 27 (roomy offload disabled) survives on its own since step 10: escalation alone rescues
@@ -913,3 +919,4 @@ What this says:
 * step 15: directory bit 59 (fork deque) leaves out data-walking fork recursions (loader only, no RTL change; `OMEGA_DQF_DATA=1` = step 14); 8 seeds: treesum(9) 8×8 2,255 → 2,126 cycles (−5.7%), 0.526 → 0.466 msgs/interaction; every other program cycle for cycle as step 14; units 42/42, programs 315/315, step-14 cross-check 90/90, fabric knobs 1,782/1,782, fuzz 600/600 + big 200/200, security 420/420, mempress 43/43, mutants 49/49
 * step 16: two fabric-model probes rejected (dynamic fork-deque locality test; SPAWN carrying the partner node), README section and `results/s16/`; no model / RTL change
 * step 17: room-distance gradient for global memory pressure, fabric probe rejected (fewer messages, up to +15% cycles, livelock without parking); README section, `results/s16/`
+* step 18: retry-slot timeout as a run-time input (`+rto`, `OMEGA_RTO`; default 32, unchanged): `+rto=8` cuts global-pressure cases by 0.4–58% on RTL but raises the fabric model's livelock rate, so it stays a knob
