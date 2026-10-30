@@ -57,6 +57,7 @@ MUTANTS = {
     47: "step 14 oldest-fork give disabled (fork tasks leave the deque only when the stack is empty; performance only: caught by the fib(16) 4x4 cycle bound)",
     48: "step 14 fork deque: a fork task that finds the deque full is dropped (lost work)",
     49: "step 19 room-distance gradient ignored (no downhill neighbour is ever found: a SPAWN without room parks and escalates round robin as in step 18; caught by the global treesum(9) 3x3 livelock seeds at the short timeout)",
+    51: "step 20 slot reserve applied without a downhill neighbour (an expansion always leaves rsv slots free while rgrad != 0; caught by fib(10) on 1x1 with exactly the 93 free node / var slots its RTL run needs)",
     50: "step 19 full-cell pass-on off (a NODE / PULL at the ejection head of a cell with no free node slot blocks it again; caught by global treesum(7) 8x8 seeds 16 / 18, which stop at ~4,560 of 4,586 interactions)",
 }
 BOUND47 = 1.05
@@ -155,6 +156,17 @@ def try_mutant(bit):
                 bad.append(s)
         fabric.RTO, fabric.RGRAD = rto0, rg0
         return bool(bad), f"global treesum(7) 8x8 seeds 16/18: {len(bad)} stop without progress with the mutant"
+    if bit == 51:
+        # step 20: the reserve only applies with a neighbour closer to room; a 1x1 cell has none, so fib(10) with
+        # exactly the 93 free node / var slots its RTL run needs (results/s20/minkeep_rtl.py) must still finish
+        import test_mempress as tm
+        b = progs.book("fib", 10); want = progs.expected("fib", 10)
+        rg0 = fabric.RGRAD; fabric.RGRAD = rg0 or 3
+        r0 = rtl.run(b, 1, 1, img=tm.ballast_img(b, 1, 1, 1024, 93, 93, ((0, 0),)), maxcycles=200_000)
+        r1 = rtl.run(b, 1, 1, img=tm.ballast_img(b, 1, 1, 1024, 93, 93, ((0, 0),)), mut=mut, maxcycles=200_000)
+        fabric.RGRAD = rg0
+        good = r0["status"] == 0 and r0["readback"] == want
+        return (good and not (r1["status"] == 0 and r1["readback"] == want)), f"fib(10) 1x1 with 93 free slots: status {r0['status']} correct design, {r1['status']} mutant"
     if bit == 7:
         b = progs.book("treesum_direct", 8)
         c1 = rtl.run(b, 1, 1, mut=mut)["cycles"]

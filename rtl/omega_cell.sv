@@ -60,6 +60,7 @@ module omega_cell #(
   input  logic [2:0]  gov_l0,              //   governor reset level (step 13: 2)
   input  logic [5:0]  rto_m1,              //   step 18: retry-slot timeout - 1 (cycles; step 10-18: 31, step 19 default: 7)
   input  logic [2:0]  rgrad,               //   step 19: room-distance gradient cap (0 = off = step 18)
+  input  logic [2:0]  rsv,                 //   step 20: slots an expansion leaves free when room is downhill (step 19: 4)
   input  logic [3:0]  in_v,
   input  flit_t [3:0] in_f,
   output logic [3:0]  in_rdy,
@@ -227,9 +228,8 @@ module omega_cell #(
   // step 19 room-distance gradient: first existing neighbour (rotating order) closer to room than this cell,
   // and the next distance 1 + min over the neighbours (saturating at rgrad).  A SPAWN without room and
   // without a roomy neighbour goes downhill at once instead of parking; escalated retries go downhill
-  // instead of round robin; with a downhill neighbour an expansion leaves RSV19 free slots
+  // instead of round robin; with a downhill neighbour an expansion leaves rsv free slots (an input since step 20; step 19: 4)
   // (rgrad = 0: step 18 behaviour cycle for cycle).
-  localparam int RSV19 = 4;
   logic       dh_found;
   logic [1:0] dh_dir;
   logic [2:0] rd_min;
@@ -818,9 +818,9 @@ module omega_cell #(
         if (!sp_local_only && sp_give) begin
           snd = 1'b1; sf = {M_SPAWN, dir_x(hv_dir), dir_y(hv_dir), 64'd0, 64'd0, sp_x_p, sp_ref_p};
           fin = 1'b1;
-        end else if ((SB+2)'(nn) + (dh_found ? (SB+2)'(RSV19) : '0) <= nf_tot && (SB+2)'(nv) + (dh_found ? (SB+2)'(RSV19) : '0) <= vf_tot
+        end else if ((SB+2)'(nn) + ((dh_found || (MUT[51] && rgrad != 3'd0)) ? (SB+2)'(rsv) : '0) <= nf_tot && (SB+2)'(nv) + ((dh_found || (MUT[51] && rgrad != 3'd0)) ? (SB+2)'(rsv) : '0) <= vf_tot
                      && (32'(tq_tot) + 32'(nr) + 1) < QDEPTH) begin
-          // (step 19: with a cell closer to room next door, an expansion must leave RSV19 node and var slots free,
+          // (step 19: with a cell closer to room next door, an expansion must leave rsv node and var slots free,
           //  so a poor cell on the way does not spend its last slots and then block on NODE / PULL arrivals)
           ex_nbase <= d_rd[15:0]; ex_rbase <= d_rd[31:16]; ex_root <= d_rd[127:64];
           ex_nn <= nn; ex_nv <= nv; ex_nr <= nr; ex_own <= pown(sp_ref_p); ex_x <= sp_x_p;

@@ -1,0 +1,6 @@
+stopped: no progress for 100000 cycles (out of memory / livelock) at cycle 104160
+interactions 791
+free    6/   2 q  0 rs1 ej0 | free    6/   2 q  0 rs1 ej0 | free    7/   4 q  0 rs1 ej0
+free    6/   4 q  0 rs1 ej0 | free    7/   3 q  0 rs1 ej3 | free    6/   1 q  0 rs1 ej0
+free    7/   3 q  0 rs1 ej0 | free    5/   2 q  5 rs1 ej0 | free   97/   2 q  0 rs1 ej0
+pending tasks by kind (0 LINK, 1 EXPAND, 2 SPAWN, 3 FWD; rs: = parked in the retry slot) {'rs:2': 9, 2: 5}

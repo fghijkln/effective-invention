@@ -9,7 +9,7 @@ int main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
     auto* m = new Vomega_mesh;
     unsigned long long maxc = 50000000ULL;
-    unsigned seed = 1, jit = 0, stl = 0, pmsg = 128, fi = 0, spk = 16, sph = 1, ll = 1, spk2 = 4, spkp = 4, govb = 30, s14 = 2, govnb = 0, govl0 = 2, rto = 8, rgrad = 3;   // step 14 knobs: omega/rtl.py always passes +s14 / +govnb / +govl0; step 18: +rto = retry timeout (rtl.py passes OMEGA_RTO); step 19: +rgrad, defaults 8 / 3 (+rto=32 +rgrad=0 = step 18)
+    unsigned seed = 1, jit = 0, stl = 0, pmsg = 128, fi = 0, spk = 16, sph = 1, ll = 1, spk2 = 4, spkp = 4, govb = 30, s14 = 2, govnb = 0, govl0 = 2, rto = 8, rgrad = 3, rsv = 1;   // step 14 knobs: omega/rtl.py always passes +s14 / +govnb / +govl0; step 18: +rto = retry timeout (rtl.py passes OMEGA_RTO); step 19: +rgrad, defaults 8 / 3 (+rto=32 +rgrad=0 = step 18); step 20: +rsv, default 1 (+rsv=4 = step 19)
     for (int i = 1; i < argc; i++) {
         if (!strncmp(argv[i], "+seed=", 6)) seed = strtoul(argv[i] + 6, 0, 0);
         if (!strncmp(argv[i], "+jitter=", 8)) jit = strtoul(argv[i] + 8, 0, 0);
@@ -23,13 +23,14 @@ int main(int argc, char** argv) {
         if (!strncmp(argv[i], "+s14=", 5)) s14 = strtoul(argv[i] + 5, 0, 0);
         if (!strncmp(argv[i], "+rto=", 5)) rto = strtoul(argv[i] + 5, 0, 0);
         if (!strncmp(argv[i], "+rgrad=", 7)) rgrad = strtoul(argv[i] + 7, 0, 0);   // step 19: room-distance gradient cap (0 = off)
+        if (!strncmp(argv[i], "+rsv=", 5)) rsv = strtoul(argv[i] + 5, 0, 0);         // step 20: reserve with room downhill (step 19: 4)
         if (!strncmp(argv[i], "+govnb=", 7)) govnb = strtoul(argv[i] + 7, 0, 0);
         if (!strncmp(argv[i], "+govl0=", 7)) govl0 = strtoul(argv[i] + 7, 0, 0);
         if (!strncmp(argv[i], "+linklocal=", 11)) ll = strtoul(argv[i] + 11, 0, 0);
         if (!strncmp(argv[i], "+pmsg=", 6)) pmsg = strtoul(argv[i] + 6, 0, 0);
         if (!strncmp(argv[i], "+maxcycles=", 11)) maxc = strtoull(argv[i] + 11, 0, 0);
     }
-    m->seed = seed; m->jitter = jit; m->stall = stl; m->pmsg = pmsg; m->fi = fi; m->spawn_k = spk; m->spawn_hint = sph; m->link_local = ll; m->spawn_k2 = spk2; m->spawn_kp = spkp; m->gov_b = govb; m->fork_dq = s14 & 3; m->gov_nb = govnb; m->gov_l0 = govl0; m->rto_m1 = (rto < 1 ? 1 : rto > 64 ? 64 : rto) - 1; m->rgrad = rgrad > 7 ? 7 : rgrad; m->dump = 0;
+    m->seed = seed; m->jitter = jit; m->stall = stl; m->pmsg = pmsg; m->fi = fi; m->spawn_k = spk; m->spawn_hint = sph; m->link_local = ll; m->spawn_k2 = spk2; m->spawn_kp = spkp; m->gov_b = govb; m->fork_dq = s14 & 3; m->gov_nb = govnb; m->gov_l0 = govl0; m->rto_m1 = (rto < 1 ? 1 : rto > 64 ? 64 : rto) - 1; m->rgrad = rgrad > 7 ? 7 : rgrad; m->rsv = rsv > 7 ? 7 : rsv; m->dump = 0;
     m->rst = 1; m->clk = 0;
     for (int i = 0; i < 4; i++) { m->clk = 1; m->eval(); m->clk = 0; m->eval(); }
     m->rst = 0;

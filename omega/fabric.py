@@ -48,8 +48,14 @@ T_LINK, T_EXPAND, T_SPAWN, T_FWD = 0, 1, 2, 3
 RTO = int(__import__('os').environ.get('OMEGA_RTO', '8'))    # retry-slot timeout (cycles), RTL +rto (step 18 knob; default 8 since step 19, 32 before)
 ESCN = int(__import__('os').environ.get('OMEGA_ESCN', '3'))   # step 18 fabric-only knob: a retry escalates on park number ESCN + 1 (RTL: 2-bit rs_n, 3)
 RGM = int(__import__('os').environ.get('OMEGA_RGM', '1'))     # step 19 (with RGRAD): 1 = a SPAWN without room goes downhill at once instead of parking (RTL), 2 = only after one park, 0 = escalations only
-RSV = int(__import__('os').environ.get('OMEGA_RSV', '4'))     # step 19 (with RGRAD): slots an expansion must leave free when a neighbour is closer to room (RTL RSV19)
+RSV = int(__import__('os').environ.get('OMEGA_RSV', '1'))     # step 19 (with RGRAD): slots an expansion must leave free when a neighbour is closer to room; RTL +rsv (step 20 default 1; step 19: 4)
 RGRAD = int(__import__('os').environ.get('OMEGA_RGRAD', '3')) # step 19: room-distance gradient cap, RTL +rgrad (default 3; 0 = off = step 18)
+# step 20 probe knobs (fabric only; all 0 = step 19)
+RSVI = int(__import__('os').environ.get('OMEGA_RSVI', '0'))   # 1 = reserve waived when the cell has no other task and an empty ejection port
+RG1F = int(__import__('os').environ.get('OMEGA_RG1F', '0'))   # 1 = rule 1 (downhill at once) only when the expansion does not fit even without the reserve
+RG1D = int(__import__('os').environ.get('OMEGA_RG1D', '0'))   # rule 1 only when own room distance >= RG1D
+RSVD = int(__import__('os').environ.get('OMEGA_RSVD', '0'))   # reserve only when own room distance >= RSVD
+RG2 = int(__import__('os').environ.get('OMEGA_RG2', '1'))     # 0 = escalated retries round robin (rule 2 off, diagnosis)
 DIRS = ["N", "E", "S", "W"]
 DXY = {"N": (0, -1), "E": (1, 0), "S": (0, 1), "W": (-1, 0)}
 OPP = {"N": "S", "S": "N", "E": "W", "W": "E"}
@@ -547,7 +553,7 @@ class Cell:
     def esc_nbr(self):
         """Escalated retry target: round robin over the neighbours (step 10); step 19 RGRAD: a neighbour
         closer to room (rotating order) when there is one."""
-        if RGRAD:
+        if RGRAD and RG2:
             d = self.downhill_room()
             if d is not None:
                 return d
@@ -677,10 +683,13 @@ class Cell:
         d = self.fab.book[ref]
         nn, nv = len(d.nodes), d.nvars
         rsv = RSV if RGRAD and self.has_downhill() else 0   # step 19: keep a reserve when room is downhill
+        if rsv and ((RSVI and not self.queue and not self.eject) or self.rd < RSVD):
+            rsv = 0                           # step 20 probes
         if len(self.nfree) < nn + rsv or len(self.vfree) < nv + rsv:
             if self.nbrs:
                 t = self.roomy_nbr()          # out of memory: prefer a roomy neighbour
-                if t is None and RGRAD and (RGM == 1 or (RGM == 2 and self.cur_rs)) and self.can_send():
+                g1 = (not RG1F or len(self.nfree) < nn or len(self.vfree) < nv) and self.rd >= RG1D
+                if t is None and RGRAD and g1 and (RGM == 1 or (RGM == 2 and self.cur_rs)) and self.can_send():
                     t = self.downhill_room()   # step 19 RGM: no roomy neighbour: one closer to room
                 if t is None and not self.escalated() and self.park(T_SPAWN, refp, x):
                     self.st["requeue"] += 1   # no roomy neighbour: park (forwarded after 4 parks)

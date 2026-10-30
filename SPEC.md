@@ -299,16 +299,19 @@ Correctness argument (also checked by fuzzing):
   its neighbours next to `roomy`. A neighbour with a smaller `rdist` is *downhill*. With a downhill
   neighbour (a) a SPAWN that has neither room nor a roomy neighbour is forwarded downhill at once instead
   of being parked; (b) escalated retries (SPAWN, SWI `NODE`, commutation `PULL`) go downhill instead of
-  round robin; (c) an expansion must leave `RSV19` = 4 free node and var slots, so a poor cell on the
+  round robin; (c) an expansion must leave `rsv` free node and var slots (3-bit run-time input since
+  step 20, default 1; step 19 had the constant `RSV19` = 4, `+rsv=4` reproduces it), so a poor cell on the
   path does not spend its last slots and then block its ejection port on a `NODE` / `PULL` arrival that
-  needs a free slot; (d) with `rgrad` ≠ 0, a `NODE` / `PULL` at the head of the ejection queue of a cell
+  needs a free slot (one slot is enough for that; 4 also kept 8-free-slot cells from running any 5–6-node
+  expansion, README step 20); (d) with `rgrad` ≠ 0, a `NODE` / `PULL` at the head of the ejection queue of a cell
   that has no free node slot at all and nothing else to pick (no task, no expired retry) is passed on
   unchanged to a roomy neighbour, else a downhill one, else the next neighbour round robin, instead of
   blocking the head (the `LINK`s queued behind it can be what frees the cell: a head-of-line deadlock seen
   on the RTL at `rto` = 8 with and without the gradient, global treesum(7) 8×8). Without a downhill
   neighbour (no room within `rgrad` hops, or the whole fabric full) rules (a)–(c) are the step-10 rule. Default `rgrad` = 3 with `rto` = 8 (README step 19: the short
   timeout alone livelocked the fabric and the RTL under global pressure; the gradient removes that).
-  Mutants 49 (no downhill neighbour is ever found) and 50 (rule (d) off).
+  Mutants 49 (no downhill neighbour is ever found), 50 (rule (d) off) and 51 (the reserve applied without a
+  downhill neighbour).
   None of these change the result or the interaction count (migration is not an interaction), only
   where a rule runs. `tests/test_mempress.py` pre-fills cell (0,0) with foreign "ballast" so that only
   4–30 slots are free there: without the mechanism the v3 RTL livelocks on 7 of 30 such cases.
@@ -449,6 +452,44 @@ The result is a canonical string, for example `#6765` or `((x0 x0) (x1 x1))`.
     in status 3 without a wrong answer.
 
   All are Known gaps (§11).
+
+### 7.1 Progress: what the memory-pressure rules guarantee (step 20)
+
+Interaction nets give *safety* for free: every rule is local, re-homing a node or a SPAWN is not an
+interaction and is location free, so whenever a run ends its normal form and interaction count are the
+semantic reducer's (strong confluence). *Liveness* is a different matter. The argument below is what the
+default (`rto` = 8, `rgrad` = 3, `rsv` = 1) gives and where it stops; it is an argument, not a machine-checked
+proof.
+
+1. **No network deadlock while node slots exist.** XY routing has no cyclic channel dependency, so the mesh
+   deadlocks only if an ejection port stops draining. Its head can stall only on a `NODE` / `PULL` in a cell
+   with zero free node slots (LINK, SPAWN never wait for a slot: a SPAWN without room parks or moves on). In
+   such a cell every task either finishes in bounded time (sends never block: a full outbox turns them into
+   retries, §7) or leaves it (homeless expansions, SWI moves and commutations park for `rto` cycles and leave
+   on the fifth try), and annihilations free slots. So the cell eventually has nothing else to pick, and rule
+   (d) of §5 then passes the head on. With a downhill neighbour, `rsv` ≥ 1 keeps an expansion from taking a
+   cell's last node or var slot in the first place.
+2. **Placement is live inside the gradient.** Let cell R stay `roomy` (≥ SLOTS/8 free slots, more than any
+   definition of the suite plus `rsv`; a 255-node definition would need SLOTS ≥ 2,096 for this). Once
+   `rdist` has settled (it is registered, so ≤ `rgrad` cycles after R's `roomy` bit settles), a SPAWN within
+   `rgrad` hops of R that does not fit moves to a neighbour with a strictly smaller `rdist` at every failure
+   (rule (a), or rule (b) after parking), so it reaches a roomy neighbour, which takes it, within `rgrad`
+   hops. Farther away all cells read `rdist` = `rgrad`, nobody is downhill, and escalated retries move
+   round robin: a rotor-router walk, which for a single walker visits every cell within O(|E|·D) moves
+   (Yanovski, Wagner, Bruckstein 2003). The rotors here are shared with other traffic and the retry slot holds
+   one task, so beyond `rgrad` hops this is a plausibility argument only.
+3. **No completion guarantee.** (i) A fabric with too little memory in total cannot finish (`OVERFULL`,
+   status 3). (ii) Nor can one with *enough* memory if the parallel order needs more than the fabric has: the
+   peak live graph depends on the reduction order, and the fabric picks the order locally. Counterexample
+   (README step 20, `results/s20/cex.py`): treesum(9) runs on one cell with 115 free node / var slots, but on
+   3×3 with 8 free slots in each of 8 cells and 200 in the ninth (264 in total) the default stops on 20 / 20
+   seeds. In the stopped state every pending task is a SPAWN, the free var slots are fragmented (≤ 4 per cell,
+   every definition needs ≥ 5) and the live graph holds more than twice the sequential peak, so *no* schedule
+   can continue. Therefore no local re-routing mechanism (hop budget, escape network, bounded detours) can
+   give a progress guarantee: there is nowhere to put the work. A guarantee needs memory-aware admission
+   before the fabric fills (e.g. a global low-memory mode that stops giving work away and reduces depth first,
+   bounding the peak by the sequential one) or spilling to off-fabric memory. Until then, running out of
+   memory is detected (status 3 / "no progress"), never silently wrong.
 
 ## 8. Termination detection
 

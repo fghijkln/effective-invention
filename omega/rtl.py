@@ -97,7 +97,7 @@ def run(book, W, H, seed=1, jitter=0, stall=0, pmsg=128, slots=1024, qdepth=1024
                             f"+pmsg={pmsg}", f"+maxcycles={maxcycles}", f"+fi={fi}",
                             f"+spawnk={255 if sk < 0 else min(sk, 254)}", f"+spawnhint={int(bool(sh))}", f"+linklocal={int(bool(ll))}",
                             f"+spawnk2={255 if sk2 < 0 else min(sk2, 254)}", f"+spawnkp={255 if skp < 0 else min(skp, 254)}",
-                            f"+govb={max(0, min(gov, 255))}", f"+s14={s14}", f"+govnb={govnb}", f"+govl0={govl0}", f"+rto={fabric.RTO}", f"+rgrad={fabric.RGRAD}"], capture_output=True, text=True, timeout=timeout)
+                            f"+govb={max(0, min(gov, 255))}", f"+s14={s14}", f"+govnb={govnb}", f"+govl0={govl0}", f"+rto={fabric.RTO}", f"+rgrad={fabric.RGRAD}", f"+rsv={fabric.RSV}"], capture_output=True, text=True, timeout=timeout)
         res = {}
         for line in r.stdout.splitlines():
             k, _, v = line.partition(" ")

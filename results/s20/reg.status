@@ -1,0 +1,6 @@
+mut51 0 mutants: 1/1 caught (rerun with keep 93)
+id identity: 128/128 runs identical to step 15 (cycles, interactions, per-type message counts)
+units 0 unit tests: 42/42 pass (semantic + fabric + RTL 1x1/2x2/4x4)
+programs 0 program tests: 315/315 pass (131s)
+s14 0 step 14 cross-check: 90/90 pass (14s)
+fuzz fuzz 0..764: 600/600 pass, 165 rejected (diverging), 38s
