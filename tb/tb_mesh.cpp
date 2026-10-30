@@ -9,7 +9,7 @@ int main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
     auto* m = new Vomega_mesh;
     unsigned long long maxc = 50000000ULL;
-    unsigned seed = 1, jit = 0, stl = 0, pmsg = 128, fi = 0, spk = 16, sph = 1, ll = 1, spk2 = 4, spkp = 4, govb = 30, s14 = 2, govnb = 0, govl0 = 2, rto = 8;   // step 14 knobs: omega/rtl.py always passes +s14 / +govnb / +govl0; step 18 +rto: retry timeout (steps 10-17: 32)
+    unsigned seed = 1, jit = 0, stl = 0, pmsg = 128, fi = 0, spk = 16, sph = 1, ll = 1, spk2 = 4, spkp = 4, govb = 30, s14 = 2, govnb = 0, govl0 = 2, rto = 32;   // step 14 knobs: omega/rtl.py always passes +s14 / +govnb / +govl0; step 18: +rto = retry timeout (rtl.py passes OMEGA_RTO)
     for (int i = 1; i < argc; i++) {
         if (!strncmp(argv[i], "+seed=", 6)) seed = strtoul(argv[i] + 6, 0, 0);
         if (!strncmp(argv[i], "+jitter=", 8)) jit = strtoul(argv[i] + 8, 0, 0);

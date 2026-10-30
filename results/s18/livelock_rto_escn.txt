@@ -1,0 +1,19 @@
+8 15 treesum 9 3 3 livelock [6, 9, 10, 12, 16, 17, 20] cycles 113607
+8 15 list 20 3 2 livelock [] cycles 6405
+8 15 fib 12 3 3 livelock [] cycles 36371
+8 15 treesum 6 3 3 livelock [] cycles 13272
+8 15 list 20 3 2 livelock [] cycles 6405
+8 15 qsort 15 4 4 livelock [] cycles 25300
+8 15 sort 10 3 3 livelock [] cycles 8362
+8 15 fib 12 6 6 livelock [] cycles 31492
+8 15 treesum 7 8 8 livelock [] cycles 18759
+8 7 treesum 9 3 3 livelock [1, 3, 4, 6, 8, 9, 10, 11, 13, 14, 16, 18, 19, 20] cycles 108947
+8 7 list 20 3 2 livelock [] cycles 6304
+8 7 fib 12 3 3 livelock [] cycles 36247
+8 7 treesum 6 3 3 livelock [] cycles 12803
+8 7 list 20 3 2 livelock [] cycles 6304
+8 7 qsort 15 4 4 livelock [] cycles 24936
+8 7 sort 10 3 3 livelock [] cycles 8145
+8 7 fib 12 6 6 livelock [] cycles 31903
+8 7 treesum 7 8 8 livelock [] cycles 13757
+DONE

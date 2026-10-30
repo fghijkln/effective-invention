@@ -283,7 +283,7 @@ Correctness argument (also checked by fuzzing):
 * **Retry slot and global pressure (step 10).** Since step 10 the retry of the last bullet, and a SPAWN
   that has neither room nor a roomy neighbour, no longer go on the LIFO task stack (where they were
   popped again at once and starved the tasks that free memory) nor round robin to any neighbour. Each
-  cell has **one non-LIFO retry slot** (`rs_v`, `rs_e`, a timer `rs_tm` loaded with the run-time input `rto_m1` (8 cycles since step 18, 32 before), a park count
+  cell has **one non-LIFO retry slot** (`rs_v`, `rs_e`, a timer `rs_tm` loaded with the run-time input `rto_m1` (an input since step 18; default 32 cycles), a park count
   `rs_n`): the retry is parked there, the engine keeps working on its stack and messages, and the
   parked entry is taken (before the stack) when its timer expires. A retry taken from the slot that has
   to park again counts up `rs_n`; on the 4th consecutive park the task **escalates**: a SPAWN is
@@ -428,7 +428,7 @@ The result is a canonical string, for example `#6765` or `((x0 x0) (x1 x1))`.
   * a 1×1 fabric unable to place an expansion: `err = 2`;
   * a fabric that is globally full can bounce SPAWNs forever. The Python model stops with "no progress
     for 100000 cycles" and the RTL testbench with a cycle limit (status 3). Since step 10 parked
-    retries poll every 8 cycles (32 in steps 10–17) instead of every cycle, but escalated SPAWNs (and SPAWNs that find the
+    retries poll every 32 cycles (`+rto`, step 18) instead of every cycle, but escalated SPAWNs (and SPAWNs that find the
     retry slot occupied) still bounce; `tests/test_mempress.py` checks that a globally full fabric ends
     in status 3 without a wrong answer.
 

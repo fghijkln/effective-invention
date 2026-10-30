@@ -262,8 +262,8 @@ module omega_cell #(
   logic [47:0] tr_mask;                 // (reason, owner) pairs seen: bit (reason-1)*16 + owner
   logic [2:0]  rr;
   // single non-LIFO retry slot (step 10, SPEC 9.1): a memory-pressure retry (rule without slots, SPAWN
-  // without room and without a roomy neighbour) is parked here for rto_m1 + 1 cycles (step 18: 8, an input;
-  // steps 10-17: 32) instead of being pushed on
+  // without room and without a roomy neighbour) is parked here for rto_m1 + 1 cycles (an input since step 18, default 32;
+  // shorter is faster but livelocks more often, README step 18) instead of being pushed on
   // the LIFO task stack (where it would be popped again at once and starve the tasks that free memory).
   // A SPAWN parked 4 times in a row falls back to round-robin forwarding (no deadlock when the room is
   // further than one hop).  Only one slot: a second retry while it is full takes the old path.

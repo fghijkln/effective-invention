@@ -45,7 +45,8 @@ GOV_E = 32                         # governor epoch: interactions
 GOV_K = (0, 2, 4, 8, 16)           # producer threshold per governor level (reset level 2)
 MSG_NAMES = ["LINK", "NODE", "SPAWN", "PULL"]
 T_LINK, T_EXPAND, T_SPAWN, T_FWD = 0, 1, 2, 3
-RTO = int(__import__('os').environ.get('OMEGA_RTO', '8'))   # retry-slot timeout (cycles), RTL +rto (step 18: 8; steps 10-17: 32)
+RTO = int(__import__('os').environ.get('OMEGA_RTO', '32'))   # retry-slot timeout (cycles), RTL +rto (step 18 knob; default 32)
+ESCN = int(__import__('os').environ.get('OMEGA_ESCN', '3'))   # step 18 fabric-only knob: a retry escalates on park number ESCN + 1 (RTL: 2-bit rs_n, 3)
 DIRS = ["N", "E", "S", "W"]
 DXY = {"N": (0, -1), "E": (1, 0), "S": (0, 1), "W": (-1, 0)}
 OPP = {"N": "S", "S": "N", "E": "W", "W": "E"}
@@ -537,14 +538,14 @@ class Cell:
 
     def escalated(self):
         """The current task is a retry parked 4 times in a row: fall back to round-robin moves."""
-        return bool(self.nbrs) and self.cur_rs and self.cur_rsn == 3
+        return bool(self.nbrs) and self.cur_rs and self.cur_rsn == ESCN
 
     def park(self, kind, a, b):
         """Memory-pressure retry: park in the single retry slot for RTO cycles (False if it is full)."""
         if self.rs is not None:
             return False
         self.rs, self.rs_tm = (kind, a, b), RTO
-        self.rs_n = min(self.cur_rsn + 1, 3) if self.cur_rs else 0
+        self.rs_n = min(self.cur_rsn + 1, ESCN) if self.cur_rs else 0
         self.st["park"] = self.st.get("park", 0) + 1
         return True
 
