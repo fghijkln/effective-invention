@@ -12,7 +12,7 @@ s=s.replace("| memory pressure (`tests/test_mempress.py`) | **44 / 44** |",f"| m
 s=s.replace("| mutation testing (`tests/mutants.py`) | **51 / 51 caught** |",f"| mutation testing (`tests/mutants.py`) | **{mu[0]} / {mu[1]} caught** |")
 old="50 full-cell pass-on off (global treesum(7) 8×8 seeds 16 / 18 stop at ~4,560 of 4,586 interactions) |"
 assert old in s
-s=s.replace(old,"50 full-cell pass-on off (global treesum(7) 8×8 seeds 16 / 18 stop at ~4,560 of 4,586 interactions) + 1 step-20 mutant: 51 slot reserve applied without a downhill neighbour (fib(10) on 1×1 with exactly the 93 free node / var slots its RTL run needs ends in status 2) |")
+s=s.replace(old,"50 full-cell pass-on off (global treesum(7) 8×8 seeds 16 / 18 stop at ~4,560 of 4,586 interactions; since step 20 the detector runs them at `+rsv=4`, because reserve 1 lets both finish without the pass-on) + 1 step-20 mutant: 51 slot reserve applied without a downhill neighbour (fib(10) on 1×1 with exactly the 93 free node / var slots its RTL run needs ends in status 2) |")
 line=(f"* step 20: slot reserve 4 → 1 as run-time input `+rsv` / `OMEGA_RSV` (`+rsv=4` = step 19): RTL global pressure list(20) 3×2 −3.8%, fib(12) 6×6 −1.6%, "
       f"treesum(7) 8×8 −1.8%, no stopped run; treesum(6) 3×3 +3.7% vs step 18 traced and kept as a known gap; SPEC §7.1 progress argument with a counterexample "
       f"(no local mechanism can guarantee completion); fabric probe knobs; units {un[0]}/{un[1]}, programs {pr[0]}/{pr[1]}, step-14 cross-check {s14[0]}/{s14[1]}, "

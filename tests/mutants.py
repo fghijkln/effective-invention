@@ -58,7 +58,7 @@ MUTANTS = {
     48: "step 14 fork deque: a fork task that finds the deque full is dropped (lost work)",
     49: "step 19 room-distance gradient ignored (no downhill neighbour is ever found: a SPAWN without room parks and escalates round robin as in step 18; caught by the global treesum(9) 3x3 livelock seeds at the short timeout)",
     51: "step 20 slot reserve applied without a downhill neighbour (an expansion always leaves rsv slots free while rgrad != 0; caught by fib(10) on 1x1 with exactly the 93 free node / var slots its RTL run needs)",
-    50: "step 19 full-cell pass-on off (a NODE / PULL at the ejection head of a cell with no free node slot blocks it again; caught by global treesum(7) 8x8 seeds 16 / 18, which stop at ~4,560 of 4,586 interactions)",
+    50: "step 19 full-cell pass-on off (a NODE / PULL at the ejection head of a cell with no free node slot blocks it again; caught by global treesum(7) 8x8 seeds 16 / 18, which stop at ~4,560 of 4,586 interactions; since step 20 run at +rsv=4, as reserve 1 lets them finish)",
 }
 BOUND47 = 1.05
 PROGS = [("fib", 8), ("list", 6), ("sort", 6), ("higher", 5), ("fact", 5), ("treesum", 4), ("qsort", 5), ("sum", 20)]
@@ -149,13 +149,18 @@ def try_mutant(bit):
         import test_mempress as tm
         b = progs.book("treesum", 7); W, H = 8, 8
         cells = tuple((x, y) for x in range(W) for y in range(H) if (x, y) != (W - 1, H - 1))
-        bad = []; rto0, rg0 = fabric.RTO, fabric.RGRAD; fabric.RTO, fabric.RGRAD = 8, (rg0 or 3)
-        for s in (16, 18):
-            r = rtl.run(b, W, H, img=tm.ballast_img(b, W, H, 1024, *tm.GKEEP, cells), seed=s, jitter=30, mut=mut, maxcycles=200_000, timeout=1800)
-            if r["status"] != 0:
-                bad.append(s)
-        fabric.RTO, fabric.RGRAD = rto0, rg0
-        return bool(bad), f"global treesum(7) 8x8 seeds 16/18: {len(bad)} stop without progress with the mutant"
+        # step 20: at the new default reserve 1 these two seeds finish even without the pass-on, so the detector
+        # runs them at +rsv=4 (= step 19 cycle for cycle) first and only then at the default +rsv=1
+        bad = []; rto0, rg0, rs0 = fabric.RTO, fabric.RGRAD, fabric.RSV; fabric.RTO, fabric.RGRAD = 8, (rg0 or 3)
+        for rsv in (4, 1):
+            fabric.RSV = rsv
+            for s in (16, 18):
+                r = rtl.run(b, W, H, img=tm.ballast_img(b, W, H, 1024, *tm.GKEEP, cells), seed=s, jitter=30, mut=mut, maxcycles=200_000, timeout=1800)
+                if r["status"] != 0:
+                    bad.append(f"seed {s} +rsv={rsv}")
+            if bad: break
+        fabric.RTO, fabric.RGRAD, fabric.RSV = rto0, rg0, rs0
+        return bool(bad), f"global treesum(7) 8x8 seeds 16/18 at +rsv=4 then +rsv=1: stop without progress with the mutant: {', '.join(bad) or 'none'}"
     if bit == 51:
         # step 20: the reserve only applies with a neighbour closer to room; a 1x1 cell has none, so fib(10) with
         # exactly the 93 free node / var slots its RTL run needs (results/s20/minkeep_rtl.py) must still finish

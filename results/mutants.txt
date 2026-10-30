@@ -1,7 +1,7 @@
 mutant  0 CAUGHT  erase/copy rule: aux2 receives aux1 instead of the atom -- prog fib(8) on 2x2: got STATUS 3 err 0 / 1533 interactions / 2897 nodes, want #21 / 901 / 0
 mutant  1 CAUGHT  OPR: operand order ignores the flip bit -- prog fib(8) on 2x2: got #8 / 10 interactions / 0 nodes, want #21 / 901 / 0
 mutant  2 CAUGHT  OPR: flip bit not toggled when the operator is turned around -- prog sort(6) on 2x2: got #607 / 577 interactions / 0 nodes, want #982 / 632 / 0
-mutant  3 CAUGHT  SWI: predecessor not decremented -- prog list(6) on 2x2: got STATUS 3 err 0 / 42713 interactions / 2291 nodes, want #97 / 341 / 0
+mutant  3 CAUGHT  SWI: predecessor not decremented -- prog list(6) on 2x2: got STATUS 3 err 0 / 41197 interactions / 2311 nodes, want #97 / 341 / 0
 mutant  4 CAUGHT  annihilation ignores DUP labels (commute rule never fires for different labels) -- prog list(6) on 2x2: got * / 327 interactions / 0 nodes, want #97 / 341 / 0
 mutant  5 CAUGHT  annihilation cross-wires aux1 with aux2 -- prog fib(8) on 2x2: got {1 x0 $(< #2 ?((@fib__a1 (* (x1 x1))) (x0 ^loop)))} / 2 interactions / 7 nodes, want #21 / 901 / 0
 mutant  6 CAUGHT  commutation: second copy of P has its aux ports swapped -- prog list(6) on 2x2: got STATUS 3 err 0 / 1793 interactions / 2763 nodes, want #97 / 341 / 0
@@ -12,7 +12,7 @@ mutant 10 CAUGHT  NODE migration: aux ports swapped when re-homed -- prog fib(8)
 mutant 11 CAUGHT  var exchange: substitution chain not followed (link dropped) -- prog fib(8) on 2x2: got x0 / 3 interactions / 6 nodes, want #21 / 901 / 0
 mutant 12 CAUGHT  eraser only reaches aux1 -- prog fib(8) on 2x2: got #21 / 835 interactions / 33 nodes, want #21 / 901 / 0
 mutant 13 CAUGHT  REF ~ DUP expands instead of copying the reference -- prog qsort(5) on 2x2: got #718 / 862 interactions / 0 nodes, want #718 / 852 / 0
-mutant 14 CAUGHT  commutation: two fresh wires share one var -- prog list(6) on 2x2: got STATUS 3 err 0 / 1594 interactions / 2734 nodes, want #97 / 341 / 0
+mutant 14 CAUGHT  commutation: two fresh wires share one var -- prog list(6) on 2x2: got STATUS 3 err 0 / 1593 interactions / 2733 nodes, want #97 / 341 / 0
 mutant 15 CAUGHT  quiescence detection ignores in-flight router flits -- prog fib(8) on 2x2: got x0 / 897 interactions / 3 nodes, want #21 / 901 / 0
 mutant 16 CAUGHT  security: var slot owner-tag check disabled (forged VAR pointers accepted) -- attack steal-result: write a forged result into the victim's root var on 2x2 fi=0: honest result / trap set differs (rtl traps [], semantic [(2, 9)])
 mutant 17 CAUGHT  security: cross-owner (T1) check disabled -- cross-owner fault injection @main = r & #7 ~ r & (x x) ~ (y y) on 2x2 fi=0: honest result / trap set differs (rtl traps [(2, 1)], semantic [(1, 1)])
@@ -27,9 +27,9 @@ mutant 25 CAUGHT  v3 EXPAND allocation pops one node slot fewer than it maps (sl
 mutant 26 CAUGHT  v4 EXPAND: template word entry select wrong (entry i reads entry i xor 1) -- prog fib(8) on 2x2: got $(< (* (#8 x0)) x1) / 3 interactions / 7 nodes, want #21 / 901 / 0
 mutant 27 CAUGHT  memory pressure: roomy neighbours ignored (no PULL / NODE offload); run with bit 41 (no escalation) because since step 10 escalation alone also rescues every pressure case (alone: survives) -- ballast list(20) 2x2 keep 8/8: wrong result / timeout
 mutant 28 CAUGHT  memory pressure: hungry does not require roomy (a full cell still asks for work); since step 19 the full-cell pass-on tolerates it on the quick pressure set, so it runs on the full set and is caught by the step-19 global treesum(9) 3x3 case -- global treesum(9) 3x3 keep 8/8 in 8 cells: wrong result / timeout
-mutant 29 CAUGHT  cluster ROM: arbiter grants more requesters than it has read ports (they get another cell's data) -- prog fib(8) on 2x2: got STATUS 3 err 0 / 5900 interactions / 2540 nodes, want #21 / 901 / 0
+mutant 29 CAUGHT  cluster ROM: arbiter grants more requesters than it has read ports (they get another cell's data) -- prog fib(8) on 2x2: got STATUS 3 err 0 / 5823 interactions / 2553 nodes, want #21 / 901 / 0
 mutant 30 CAUGHT  cluster ROM: EXPAND does not wait for its template pair (proceeds on a missed grant) -- prog fib(8) on 2x2: got STATUS 3 err 0 / 2850 interactions / 2702 nodes, want #21 / 901 / 0
-mutant 31 CAUGHT  cluster ROM: buffered template word not dropped when a new expansion starts (stale definition) -- prog fib(8) on 2x2: got STATUS 3 err 0 / 2955 interactions / 2739 nodes, want #21 / 901 / 0
+mutant 31 CAUGHT  cluster ROM: buffered template word not dropped when a new expansion starts (stale definition) -- prog fib(8) on 2x2: got STATUS 3 err 0 / 7764 interactions / 2562 nodes, want #21 / 901 / 0
 mutant 32 CAUGHT  v4 read-ahead: write bypass ignores the second node write port (stale node data) -- prog qsort(5) on 2x2: got x0 / 238 interactions / 20 nodes, want #718 / 852 / 0
 mutant 33 CAUGHT  v4 EXPAND: second entry's var tag written to the first entry's var slot -- prog fib(8) on 2x2: got x0 / 3 interactions / 6 nodes, want #21 / 901 / 0
 mutant 34 CAUGHT  v4 EXPAND: advances by two entries when only one was written (entry skipped) -- prog fib(8) on 2x2: got x0 / 885 interactions / 13 nodes, want #21 / 901 / 0
@@ -48,5 +48,6 @@ mutant 46 CAUGHT  step 13 governor never tightens (the level only relaxes; perfo
 mutant 47 CAUGHT  step 14 oldest-fork give disabled (fork tasks leave the deque only when the stack is empty; performance only: caught by the fib(16) 4x4 cycle bound) -- fib(16) 4x4 cycles 8254 with the mutant vs 7530 (bound: > 1.05x)
 mutant 48 CAUGHT  step 14 fork deque: a fork task that finds the deque full is dropped (lost work) -- prog fib(8) on 2x2: got x0 / 698 interactions / 15 nodes, want #21 / 901 / 0
 mutant 49 CAUGHT  step 19 room-distance gradient ignored (no downhill neighbour is ever found: a SPAWN without room parks and escalates round robin as in step 18; caught by the global treesum(9) 3x3 livelock seeds at the short timeout) -- global treesum(9) 3x3 seeds 3/10/11: 3 stop without progress with the mutant
-mutant 50 CAUGHT  step 19 full-cell pass-on off (a NODE / PULL at the ejection head of a cell with no free node slot blocks it again; caught by global treesum(7) 8x8 seeds 16 / 18, which stop at ~4,560 of 4,586 interactions) -- global treesum(7) 8x8 seeds 16/18: 2 stop without progress with the mutant
-mutants: 51/51 caught (mutant 28 rerun after moving it to the full pressure set; first pass 50/51)
+mutant 50 CAUGHT  step 19 full-cell pass-on off (a NODE / PULL at the ejection head of a cell with no free node slot blocks it again; caught by global treesum(7) 8x8 seeds 16 / 18, which stop at ~4,560 of 4,586 interactions; since step 20 run at +rsv=4, as reserve 1 lets them finish) -- global treesum(7) 8x8 seeds 16/18 at +rsv=4 then +rsv=1: stop without progress with the mutant: seed 16 +rsv=4, seed 18 +rsv=4
+mutant 51 CAUGHT  step 20 slot reserve applied without a downhill neighbour (an expansion always leaves rsv slots free while rgrad != 0; caught by fib(10) on 1x1 with exactly the 93 free node / var slots its RTL run needs) -- fib(10) 1x1 with 93 free slots: status 0 correct design, 2 mutant
+mutants: 52/52 caught

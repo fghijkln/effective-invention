@@ -4,3 +4,8 @@ units 0 unit tests: 42/42 pass (semantic + fabric + RTL 1x1/2x2/4x4)
 programs 0 program tests: 315/315 pass (131s)
 s14 0 step 14 cross-check: 90/90 pass (14s)
 fuzz fuzz 0..764: 600/600 pass, 165 rejected (diverging), 38s
+bigfuzz fuzz (big) 0..4287: 200/200 pass, 4088 rejected (diverging), 1103s
+security 0 security tests: 420/420 pass (300 multi-tenant fuzz, 0 rejected) [semantic + fabric + RTL] 45s
+mempress 0 memory-pressure tests: 44/44 pass [semantic + fabric + RTL] 287s
+mutants 0 mutants: 52/52 caught (mutant 50 survived at default +rsv=1 in the first run; detector moved to +rsv=4 first, rerun caught)
+ALLDONE

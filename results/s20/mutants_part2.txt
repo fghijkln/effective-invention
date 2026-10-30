@@ -1,0 +1,22 @@
+mutant 31 CAUGHT  cluster ROM: buffered template word not dropped when a new expansion starts (stale definition) -- prog fib(8) on 2x2: got STATUS 3 err 0 / 7764 interactions / 2562 nodes, want #21 / 901 / 0
+mutant 32 CAUGHT  v4 read-ahead: write bypass ignores the second node write port (stale node data) -- prog qsort(5) on 2x2: got x0 / 238 interactions / 20 nodes, want #718 / 852 / 0
+mutant 33 CAUGHT  v4 EXPAND: second entry's var tag written to the first entry's var slot -- prog fib(8) on 2x2: got x0 / 3 interactions / 6 nodes, want #21 / 901 / 0
+mutant 34 CAUGHT  v4 EXPAND: advances by two entries when only one was written (entry skipped) -- prog fib(8) on 2x2: got x0 / 885 interactions / 13 nodes, want #21 / 901 / 0
+mutant 35 CAUGHT  VHU: no stall when the main engine's link names the same var slot (non-atomic exchange) -- prog fib(8) on 2x2: got x0 / 750 interactions / 55 nodes, want #21 / 901 / 0
+mutant 36 CAUGHT  VHU: hand-back link never taken by the main engine (redex lost / hang) -- prog fib(8) on 2x2: got STATUS 3 err 0 / 4 interactions / 5 nodes, want #21 / 901 / 0
+mutant 37 CAUGHT  VHU disabled (performance only: main engine follows every chain; caught by the cycle bound) -- fib(12) 1x1 cycles 17892 with the mutant vs 14849 (bound: > 1.1x)
+mutant 38 CAUGHT  VHU read-ahead: no bypass of the main engine's var write port 1 (stale var data) -- prog fib(8) on 2x2: got x0 / 750 interactions / 55 nodes, want #21 / 901 / 0
+mutant 39 CAUGHT  retry slot: a parked retry is never taken again (lost work / hang) -- ballast fib(12) 2x2 keep 4/200: wrong result / timeout
+mutant 40 CAUGHT  retry slot: quiescence ignores a parked retry (premature termination) -- ballast fib(12) 2x2 keep 4/200: wrong result / timeout
+mutant 41 CAUGHT  retry slot: no escalation (a parked retry never falls back to round-robin SPAWN / NODE / PULL moves) -- global fib(12) 3x3 keep 8/8 in 8 cells: wrong result / timeout
+mutant 42 CAUGHT  spawn policy: threshold ignored (every REF to a hungry neighbour, the step-10 policy; performance only: caught by the message bound) -- qsort(20) 4x4 1.21 msgs/interaction with the mutant (bound <= 0.6)
+mutant 43 CAUGHT  spawn policy: fork hint ignored (divide-and-conquer REFs held back by the threshold; performance only: caught by the speed-up bound) -- fib(12) 4x4 cycles 2510 with the mutant vs 1623 (bound: > 1.3x)
+mutant 44 CAUGHT  local-first link orientation disabled (a remote var ~ local var link is always sent away; performance only: caught by the LINK bound) -- treesum(7) 4x4 LINK messages 1769 with the mutant vs 777 (bound: > 1.3x)
+mutant 45 CAUGHT  step 13 producer hint ignored (producer recursions held back by spawn_k like strict ones; performance only: caught by the qsort speed bound) -- qsort(30) 4x4 cycles 11383 with the mutant vs 9118 (bound: > 1.15x)
+mutant 46 CAUGHT  step 13 governor never tightens (the level only relaxes; performance only: caught by the message bound with the governor on) -- qsort(30) 4x4 0.529 msgs/interaction with the mutant vs 0.398 (bound: > 1.15x)
+mutant 47 CAUGHT  step 14 oldest-fork give disabled (fork tasks leave the deque only when the stack is empty; performance only: caught by the fib(16) 4x4 cycle bound) -- fib(16) 4x4 cycles 8254 with the mutant vs 7530 (bound: > 1.05x)
+mutant 48 CAUGHT  step 14 fork deque: a fork task that finds the deque full is dropped (lost work) -- prog fib(8) on 2x2: got x0 / 698 interactions / 15 nodes, want #21 / 901 / 0
+mutant 49 CAUGHT  step 19 room-distance gradient ignored (no downhill neighbour is ever found: a SPAWN without room parks and escalates round robin as in step 18; caught by the global treesum(9) 3x3 livelock seeds at the short timeout) -- global treesum(9) 3x3 seeds 3/10/11: 3 stop without progress with the mutant
+mutant 50 SURVIVED step 19 full-cell pass-on off (a NODE / PULL at the ejection head of a cell with no free node slot blocks it again; caught by global treesum(7) 8x8 seeds 16 / 18, which stop at ~4,560 of 4,586 interactions) -- global treesum(7) 8x8 seeds 16/18: 0 stop without progress with the mutant
+mutant 51 CAUGHT  step 20 slot reserve applied without a downhill neighbour (an expansion always leaves rsv slots free while rgrad != 0; caught by fib(10) on 1x1 with exactly the 93 free node / var slots its RTL run needs) -- fib(10) 1x1 with 93 free slots: status 0 correct design, 2 mutant
+mutants: 20/21 caught
