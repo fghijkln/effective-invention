@@ -51,6 +51,6 @@ mutant 49 CAUGHT  step 19 room-distance gradient ignored (no downhill neighbour 
 mutant 50 CAUGHT  step 19 full-cell pass-on off (a NODE / PULL at the ejection head of a cell with no free node slot blocks it again; caught since step 21 at the default +rsv=1 by mempress ballast keep 0/8, a home cell with no free node slot: fib(12) 2x2, treesum(6) 3x2 stop with status 3; step 19's global treesum(7) 8x8 seeds 16 / 18 only stop at +rsv=4) -- ballast keep 0/8 at the default +rsv=1: fib(12) 2x2 status 3, treesum(6) 3x2 status 3 stop with the mutant
 mutant 51 CAUGHT  step 20 slot reserve applied without a downhill neighbour (an expansion always leaves rsv slots free while rgrad != 0; caught by fib(10) on 1x1 with exactly the 93 free node / var slots its RTL run needs) -- fib(10) 1x1 with 93 free slots: status 0 correct design, 2 mutant
 mutant 52 CAUGHT  step 22 low-memory watermarks never engage (roomy stays SLOTS/4, reserve stays rsv; caught by the near-overfull treesum(9) 3x3 case, corner 500 free slots, RTL seed 9, which stops with status 3) -- near treesum(9) 3x3 corner 500 RTL seed 9: status 3
-mutants: 14/14 caught
-mutants: 53/53 caught
-rc 0
+mutant 53 CAUGHT  step 23 +ilr: the root link of an expansion is still linked at once (step-22 order; caught by the mempress treesum(9) 1x1 cases with 250 / 130 free slots at +ilr=1 / 2) -- ilr treesum(9) 1x1 keep 250 RTL +ilr=1: status 2
+mutant 54 CAUGHT  step 23 +ilr=2: the fabric child order never applies (a rule continues with its first link; caught by treesum(9) 1x1 with 130 free slots, which then needs 235) -- ilr treesum(9) 1x1 keep 130 RTL +ilr=2: status 2
+mutants: 55/55 caught (run as three resumed parts: 0-27, 28-41, 42-54)

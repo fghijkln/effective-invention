@@ -1,0 +1,4 @@
+{"note": "sum(1000) 1x1 with slots=4096 qdepth=4096 (the sweep's retry keeps qdepth 1024, which ilr>=1 overflows: task stack 2003). 1x1 is seed independent.",
+ "0": {"cycles": 29018, "maxq": 1005, "peak_nodes": 1007, "peak_vars": 3008},
+ "1": {"cycles": 27022, "maxq": 2003, "peak_nodes": 1011, "peak_vars": 3010},
+ "2": {"cycles": 29019, "maxq": 2003, "peak_nodes": 1012, "peak_vars": 4005}}

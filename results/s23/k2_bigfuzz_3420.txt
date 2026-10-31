@@ -1,0 +1,4 @@
+k2bigfuzz case 3420 (1x1, 1024 slots) under +ilr=2: status 3, var slots exhausted (peak_vars 1024, free_vars 3, retry loop). Repro /workspace/work/s23_repro.py:
+{"ilr": 2, "slots": 4096, "q": 1024, "status": 0, "err": 0, "cyc": 51838, "inter": 16239, "want_i": 16239, "ok": true, "nodes": 13, "want_n": 13, "cells": "{(0, 0): {'cycles': 51840, 'interactions': 16239, 'busy': 44657, 'tasks': 23609, 'links': 23723, 'retry'
+{"ilr": 1, "slots": 1024, "q": 1024, "status": 0, "err": 0, "cyc": 51445, "inter": 16239, "want_i": 16239, "ok": true, "nodes": 13, "want_n": 13, "cells": "{(0, 0): {'cycles': 51447, 'interactions': 16239, 'busy': 43861, 'tasks': 25122, 'links': 23297, 'retry'
+ilr=0 1024 slots: status 0, peak_vars 703; ilr=2 1024 slots: status 3, peak_vars 1024

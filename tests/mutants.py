@@ -57,6 +57,8 @@ MUTANTS = {
     47: "step 14 oldest-fork give disabled (fork tasks leave the deque only when the stack is empty; performance only: caught by the fib(16) 4x4 cycle bound)",
     48: "step 14 fork deque: a fork task that finds the deque full is dropped (lost work)",
     49: "step 19 room-distance gradient ignored (no downhill neighbour is ever found: a SPAWN without room parks and escalates round robin as in step 18; caught by the global treesum(9) 3x3 livelock seeds at the short timeout)",
+    53: "step 23 +ilr: the root link of an expansion is still linked at once (step-22 order; caught by the mempress treesum(9) 1x1 cases with 250 / 130 free slots at +ilr=1 / 2)",
+    54: "step 23 +ilr=2: the fabric child order never applies (a rule continues with its first link; caught by treesum(9) 1x1 with 130 free slots, which then needs 235)",
     52: "step 22 low-memory watermarks never engage (roomy stays SLOTS/4, reserve stays rsv; caught by the near-overfull treesum(9) 3x3 case, corner 500 free slots, RTL seed 9, which stops with status 3)",
     51: "step 20 slot reserve applied without a downhill neighbour (an expansion always leaves rsv slots free while rgrad != 0; caught by fib(10) on 1x1 with exactly the 93 free node / var slots its RTL run needs)",
     50: "step 19 full-cell pass-on off (a NODE / PULL at the ejection head of a cell with no free node slot blocks it again; caught since step 21 at the default +rsv=1 by mempress ballast keep 0/8, a home cell with no free node slot: fib(12) 2x2, treesum(6) 3x2 stop with status 3; step 19's global treesum(7) 8x8 seeds 16 / 18 only stop at +rsv=4)",
@@ -168,6 +170,10 @@ def try_mutant(bit):
         fabric.RGRAD = rg0
         good = r0["status"] == 0 and r0["readback"] == want
         return (good and not (r1["status"] == 0 and r1["readback"] == want)), f"fib(10) 1x1 with 93 free slots: status {r0['status']} correct design, {r1['status']} mutant"
+    if bit in (53, 54):
+        import test_mempress as tm
+        n, fails, tag = tm.run_ilr(True, mut, verbose=False)
+        return bool(fails), (f"{tag}" if fails else f"survived {n} expansion-order cases")
     if bit == 52:
         import test_mempress as tm
         n, fails, tag = tm.run_near(True, mut, verbose=False)

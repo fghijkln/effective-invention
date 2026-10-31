@@ -1,2 +1,1 @@
-mutants: 53/53 caught
-rc 0
+mutants: 55/55 caught (run as three resumed parts: 0-27, 28-41, 42-54)

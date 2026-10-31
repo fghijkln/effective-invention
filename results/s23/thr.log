@@ -1,0 +1,5 @@
+ilr=0 mut=0x0: treesum(9) 1x1 needs 460 free slots (459 stops)
+ilr=2 mut=0x20000000000000: treesum(9) 1x1 needs 470 free slots (469 stops)
+ilr=2 mut=0x40000000000000: treesum(9) 1x1 needs 235 free slots (234 stops)
+ilr=1 mut=0x20000000000000: treesum(9) 1x1 needs 460 free slots (459 stops)
+DONE

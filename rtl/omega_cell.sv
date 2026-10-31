@@ -65,6 +65,8 @@ module omega_cell #(
   input  logic [7:0]  lm_hi,               //     low-memory roomy watermarks (absolute free slots, set / clear)
   input  logic [7:0]  lm_lo,
   input  logic [4:0]  lm_rsv,              //     reserve with room downhill in low-memory mode
+  input  logic [1:0]  ilr,                 //   step 23: 1 = an expansion pushes its root link below its redexes (0 = step 22: S_EXN -> S_LINK root);
+                                           //     2 = also the fabric model's child order (a rule continues with its LAST new link); 3 = 2
   input  logic        lowmem,              //     from the mesh: registered OR tree says no cell is ample
   output logic        ample,               //     to the mesh: free node and var slots >= SLOTS/2 (cleared below SLOTS/4)
   input  logic [3:0]  in_v,
@@ -452,6 +454,11 @@ module omega_cell #(
   logic [7:0] ex_lrom, ex_lst;          // entries read from the ROM: max(nn, nr); entries in all: max(nn, nv, nr)
   logic       ex_e0, ex_e1;             // entry ex_i / ex_i + 1 is written this cycle
   logic [7:0] ex_adv;
+  logic       ex_ilr, ex_ilr0, co, ex_dfr; // step 23: this expansion defers its root link (decided when it starts: ex_dfr, and nr != 0);
+                                        //   this cycle pushes it; fabric child order for the rule applied this cycle
+  assign co = ilr[1] && !MUT[54];        // mutant 54: the child order never changes
+  assign ex_ilr  = ex_dfr && ex_nr != 8'd0 && !MUT[53];   // mutant 53: the root is always linked at once (step 22)
+  assign ex_ilr0 = ex_ilr && ex_i == 8'd0;
   logic [6:0] rom_q;                    // word requested this cycle
   function automatic logic [127:0] wsel(input logic [511:0] w, input logic [1:0] k);
     wsel = (k == 2'd0) ? w[127:0] : (k == 2'd1) ? w[255:128] : (k == 2'd2) ? w[383:256] : w[511:384];
@@ -474,8 +481,9 @@ module omega_cell #(
     k0 = j0[1:0] ^ {1'b0, MUT[26]}; k1 = j1[1:0] ^ {1'b0, MUT[26]};
     rn0 = wsel(w0n, k0); rr0 = wsel(w0r, k0); rn1 = wsel(w1n, k1); rr1 = wsel(w1r, k1);
     // every slot of the definition must be mapped first: template ports reference any node / var
-    ok0 = j0 < ex_lst && ex_in >= ex_nn && ex_iv >= ex_nv && (j0 >= ex_lrom || h0 || MUT[30]) && tq_room != 0;
-    ok1 = ok0 && j1 < ex_lst && (j1 >= ex_lrom || h1 || MUT[30]) && tq_room >= 4'd2;
+    // step 23 (+ilr): the first writing cycle also pushes the root link (below the redexes), one more stack entry
+    ok0 = j0 < ex_lst && ex_in >= ex_nn && ex_iv >= ex_nv && (j0 >= ex_lrom || h0 || MUT[30]) && tq_room > 4'(ex_ilr0);
+    ok1 = ok0 && j1 < ex_lst && (j1 >= ex_lrom || h1 || MUT[30]) && tq_room >= 4'd2 + 4'(ex_ilr0);
     ex_e0 = state == S_EXN && ok0;
     ex_e1 = state == S_EXN && ok1;
     ex_adv = (MUT[34] && ex_e0) ? 8'd2 : 8'(ex_e0) + 8'(ex_e1);
@@ -530,7 +538,7 @@ module omega_cell #(
       st_traps <= '0; tr_addr <= '0; tr_reason <= '0; tr_owner <= '0; tr_mask <= '0;
       vh_v <= 1'b0; vh_ov <= 1'b0; st_vhu <= '0;
       wq_n <= '0; vq_n <= '0; bufok <= 1'b0; rom_v <= 1'b0; rsp <= 1'b0; rsx <= 1'b0; rfw <= 1'b0; ej_taken <= 1'b0;
-      room_big <= 1'b0; room_lm <= 1'b0; ample <= 1'b0; mrot <= 2'(X + Y + 1); rdist <= 3'd0;
+      room_big <= 1'b0; room_lm <= 1'b0; ample <= 1'b0; ex_dfr <= 1'b0; mrot <= 2'(X + Y + 1); rdist <= 3'd0;
       rs_v <= 1'b0; rs_e <= '0; rs_tm <= '0; rs_n <= '0; cur_rs <= 1'b0; cur_rsn <= '0; st_park <= '0;
       gv_lvl <= gov_l0; ep_i <= '0; ep_m <= '0; gv_pi <= '0;   // step 14: reset level 1
       fcnt <= '0; st_fgive <= '0;
@@ -672,8 +680,9 @@ module omega_cell #(
                 // erase / copy: both aux ports receive Q
                 nf_push = 3'd1; nf_pd[0] = sP; nalloc[sP] <= 1'b0;
                 if (MUT[12] && tQ == T_ERA) pn = 2'd0;
+                else if (co) begin pn = 2'd1; pq[0] = {K_LINK, (MUT[0] ? a2 : dQ), a1}; end   // step 23: a2 first, as the model
                 else begin pn = 2'd1; pq[0] = {K_LINK, (MUT[0] ? a1 : dQ), a2}; end
-                nra = a1; nrb = dQ;
+                nra = co ? a2 : a1; nrb = dQ;
               end else if (tP == T_OPR) begin
                 logic [3:0] op; logic s;
                 op = dP[47:44]; s = dP[48];
@@ -738,8 +747,8 @@ module omega_cell #(
               end else if (anni) begin
                 st_inter <= st_inter + 1;
                 nf_push = 3'd2; nf_pd[0] = sP; nf_pd[1] = sQ; nalloc[sP] <= 1'b0; nalloc[sQ] <= 1'b0;
-                pn = 2'd1; pq[0] = {K_LINK, b2, a2};
-                nra = a1; nrb = (MUT[5] ? b2 : b1);
+                pn = 2'd1; pq[0] = co ? {K_LINK, b1, a1} : {K_LINK, b2, a2};
+                nra = co ? a2 : a1; nrb = co ? (MUT[5] ? b1 : b2) : (MUT[5] ? b2 : b1);
               end else begin
                 logic [SB-1:0] n1, n3, v0, v1, v2, v3;
                 logic [63:0] x11, x12, x21, x22;
@@ -760,10 +769,18 @@ module omega_cell #(
                 vq_a[0] <= v2; vq_a[1] <= v3; vq_n <= 2'd2; vq_o <= o;
                 nalloc[n1] <= 1'b1; nalloc[n3] <= 1'b1;
                 pn = 2'd3;
-                pq[0] = {K_LINK, withpay(dQ, here(n1)), a2};
-                pq[1] = {K_LINK, withpay(dP, here(sQ)), b1};
-                pq[2] = {K_LINK, withpay(dP, here(n3)), b2};
-                nra = a1; nrb = withpay(dQ, here(sP)); nst = S_WQ;
+                if (co) begin   // step 23 (+ilr=2): the model's order: b2 first, then b1, a2, a1 (S_WQ bypasses n3)
+                  pq[0] = {K_LINK, withpay(dQ, here(sP)), a1};
+                  pq[1] = {K_LINK, withpay(dQ, here(n1)), a2};
+                  pq[2] = {K_LINK, withpay(dP, here(sQ)), b1};
+                  nra = b2; nrb = withpay(dP, here(n3));
+                end else begin
+                  pq[0] = {K_LINK, withpay(dQ, here(n1)), a2};
+                  pq[1] = {K_LINK, withpay(dP, here(sQ)), b1};
+                  pq[2] = {K_LINK, withpay(dP, here(n3)), b2};
+                  nra = a1; nrb = withpay(dQ, here(sP));
+                end
+                nst = S_WQ;
               end
             end else if (dlP || dlQ) begin
               // one side local: migrate the local node to the partner's cell (MSG NODE)
@@ -805,7 +822,8 @@ module omega_cell #(
           if (ex_e0 && ex_i < ex_nv) begin
             v_we = 1'b1; v_wa = vmap[XB'(ex_i)]; v_wd = {MUT[19] ? 4'd0 : ex_own, 64'd0};
           end
-          if (ex_e0 && ex_i < ex_nr) begin pn = 2'd1; pq[0] = {K_LINK, `TR(rr0[127:64]), `TR(rr0[63:0])}; end
+          if (ex_e0 && ex_ilr0) begin pn = 2'd1; pq[0] = {K_LINK, ex_x, `TR(ex_root)}; end   // step 23: root link at the bottom
+          if (ex_e0 && ex_i < ex_nr) begin pq[pn] = {K_LINK, `TR(rr0[127:64]), `TR(rr0[63:0])}; pn = pn + 2'd1; end
           if (ex_e1 && j1 < ex_nn) begin
             s = nmap[XB'(j1)];
             n_we2 = 1'b1; n_wa2 = s; n_wd2 = {MUT[19] ? 4'd0 : ex_own, `TR(rn1[127:64]), `TR(rn1[63:0])};
@@ -817,7 +835,9 @@ module omega_cell #(
           if (ex_e1 && j1 < ex_nr) begin pq[pn] = {K_LINK, `TR(rr1[127:64]), `TR(rr1[63:0])}; pn = pn + 2'd1; end
           ex_i <= ex_i + ex_adv;
           if (32'(ex_i) + 32'(ex_adv) >= 32'(ex_lst)) begin
-            nra = `TR(ex_root); nrb = ex_x; nst = S_LINK;
+            if (!ex_ilr) begin nra = `TR(ex_root); nrb = ex_x; nst = S_LINK; end
+            else if (pn == 2'd0) fin = 1'b1;     // step 23: everything is on the stack: pick the next task now
+            else nst = S_IDLE;                    //   (this cycle's pushes become visible next cycle)
           end
           if (ex_in < ex_nn || ex_iv < ex_nv) begin
             alloc = 1'b1; al_nn = ex_nn; al_nv = ex_nv; al_in = ex_in; al_iv = ex_iv;
@@ -842,6 +862,7 @@ module omega_cell #(
           ex_nbase <= d_rd[15:0]; ex_rbase <= d_rd[31:16]; ex_root <= d_rd[127:64];
           ex_nn <= nn; ex_nv <= nv; ex_nr <= nr; ex_own <= pown(sp_ref_p); ex_x <= sp_x_p;
           ex_ref <= plab(sp_ref_p);
+          ex_dfr <= ilr != 2'd0;                                            // step 23: latched for the whole expansion
           alloc = 1'b1; al_start = 1'b1; al_nn = nn; al_nv = nv; al_in = '0; al_iv = '0;   // first allocation batch now
           if (!MUT[31]) bufok <= 1'b0;                                      // new definition: drop the buffered pair
         end else if (NT > 1 && !rv_found && dh_found && can_send) begin

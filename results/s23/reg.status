@@ -1,0 +1,19 @@
+id4 0 64
+id8 0 64
+id identity: 128/128 runs identical to step 15 (cycles, interactions, per-type message counts)
+units 0 unit tests: 42/42 pass (semantic + fabric + RTL 1x1/2x2/4x4)
+programs 0 program tests: 315/315 pass (230s)
+s14 0 step 14 cross-check: 90/90 pass (31s)
+fuzz fuzz 0..764: 600/600 pass, 165 rejected (diverging), 76s
+bigfuzz fuzz (big) 0..4287: 200/200 pass, 4088 rejected (diverging), 1519s
+security 0 security tests: 420/420 pass (300 multi-tenant fuzz, 0 rejected) [semantic + fabric + RTL] 123s
+mempress 0 memory-pressure tests: 60/60 pass [semantic + fabric + RTL] 587s
+k2units 0 unit tests: 42/42 pass (semantic + fabric + RTL 1x1/2x2/4x4)
+k2programs 0 program tests: 315/315 pass (99s)
+k2fuzz fuzz 0..764: 600/600 pass, 165 rejected (diverging), 64s
+k2bigfuzz fuzz (big) 0..4287: 199/200 pass, 4088 rejected (diverging), 1435s
+k1units 0 unit tests: 42/42 pass (semantic + fabric + RTL 1x1/2x2/4x4)
+k1fuzz fuzz 0..764: 600/600 pass, 165 rejected (diverging), 86s
+k1bigfuzz fuzz (big) 0..4287: 200/200 pass, 4088 rejected (diverging), 1368s
+mutants 0 mutants: 55/55 caught (run as three resumed parts: 0-27, 28-41, 42-54)
+b8 skipped (optional 8x8 knob sweeps not run)

@@ -78,7 +78,7 @@ def main = tsum(gen(N))
 
 ## Results
 
-### Verification (full regression on step 22 = step 21 + low-memory watermarks (`+lm=2`, default; `+lm=0` = step 21 cycle for cycle); step 21 = step 20 + the keep-0 pressure cases (tests only); step 20 = step 19 with slot reserve 1 (`+rsv=1`), defaults `+rto=8 +rgrad=3 +rsv=1`; step 19 = step 18 + the room-distance gradient: v4 engine + retry slot + spawn threshold / fork hints + local-first link orientation + producer hint / message-budget governor + fork deque with the step-15 deque hint; default 2×2 cells per ROM, one port)
+### Verification (full regression on step 23 = step 22 + the expansion-order knob `+ilr` (default 0 = step 22 cycle for cycle; identity 128 / 128); step 22 = step 21 + low-memory watermarks (`+lm=2`, default; `+lm=0` = step 21 cycle for cycle); step 21 = step 20 + the keep-0 pressure cases (tests only); step 20 = step 19 with slot reserve 1 (`+rsv=1`), defaults `+rto=8 +rgrad=3 +rsv=1`; step 19 = step 18 + the room-distance gradient: v4 engine + retry slot + spawn threshold / fork hints + local-first link orientation + producer hint / message-budget governor + fork deque with the step-15 deque hint; default 2×2 cells per ROM, one port)
 
 | suite | result | what it checks |
 |---|---|---|
@@ -88,8 +88,8 @@ def main = tsum(gen(N))
 | RTL differential fuzz, small nets (`tests/fuzz_rtl.py 0 600`) | **600 / 600** | random books (all node kinds, 3 DUP labels, all 16 operators with both flip bits, SWI, REF DAGs) on 1×1, 2×2, 4×4, 3×2, 1×4 with random arbitration seed, link jitter (0–63%), engine stalls, message/task priority, random scatter of `@main` over the cells, random spawn thresholds / fork-hint use (step 11), link orientation (step 12), producer threshold and governor budget 0–200 (step 13), fork-deque mode 0 / 1 / 2 (step 14). Readback, interaction count and live node count must equal the semantic model's (165 diverging nets rejected) |
 | RTL differential fuzz, big nets (`--big`) | **200 / 200** | 3–8 definitions, 20–60 nodes each, deeper trees, more references; only nets with ≥ 30 interactions are kept (avg 375, max 16,239 interactions; 4,088 candidates rejected as diverging or trivial) |
 | owner-capability isolation (`tests/test_security.py --fuzz 300`) | **420 / 420** | 2- and 4-tenant program demos (fib ∥ qsort; treesum ∥ list ∥ sort ∥ higher-order) on 1×1/2×2/4×4/3×2, each tenant gets its known answer with zero traps; 10 attack programs (overwrite / capture the victim's result through a forged root-var pointer, out-of-bounds slot and cell, forged node pointers to the victim's result node, an attack hidden in a lazily expanded definition) and 3 cross-owner fault injections, each with the sender-side check on and off (`fi`); 300 random multi-tenant cases (2–4 random tenants, random owners, half with an attacker carrying random forged redexes); link orientation (step 12) varies with the seed. Semantic model, fabric model and RTL must agree on every honest tenant's result and node count, on the trap set and on the interaction count (SPEC §12) |
-| memory pressure (`tests/test_mempress.py`) | **56 / 56** | cell (0,0) pre-filled with foreign ballast so only 4–30 slots are free (30 cases) **or no node slot at all (keep 0 / 8, step 21, 10 cases: needs the full-cell pass-on)**, small-cell capacity cases (5), **global pressure (step 10, 5 cases): every cell except the far corner holds ballast (8 free node / 8 free var slots), so the room is up to 6 hops away** (fib(12) 3×3, treesum(6) 3×3, list(20) 3×2, qsort(15) 4×4, sort(10) 3×3) + **the near-overfull global treesum(9) 3×3 (step 19)** + **near-overfull treesum(9) 3×3 with 500 free slots in the corner (step 22: fabric seed 14, RTL seed 9 stop at `+lm=0`)**, security fuzz case 265 — semantic model, fabric model and RTL must agree; **2 overfull cases** (the whole 2×2 fabric too small) must end in status 3 without a wrong answer |
-| mutation testing (`tests/mutants.py`) | **53 / 53 caught** | 15 functional mutants of the rule logic / protocol / quiescence + 1 performance mutant (no work distribution, caught by the speed-up bound) + 6 security mutants (each owner-capability check disabled, owner stamping missing, trap not blocking). Two mutants (eraser reaches only aux1; REF~DUP expands instead of copying) produce the *right* answer and are caught only by the node count / interaction count. That is why all three observables are compared. + 5 v3 engine mutants (read-ahead write bypass, write-queue drain, var owner-tag queue, allocation pop count, ROM read-ahead) + 2 memory-pressure mutants (caught by `tests/test_mempress.py`) + 3 cluster-ROM mutants (grant beyond the port count, EXPAND not waiting for its template word, stale buffered word) + 7 v4 mutants (second node write port not bypassed into the read-ahead, second EXPAND entry's var tag to the wrong slot, EXPAND skipping an entry, VHU without the same-slot stall, VHU hand-back never taken, VHU disabled = performance mutant caught by a fib(12) cycle bound, VHU read-ahead without bypass of write port 1) + 3 retry-slot mutants (39 parked retry never taken, 40 quiescence ignores the slot, 41 no escalation). Mutant 27 (roomy offload disabled) now survives on its own, because escalation also rescues every pressure case (roomy offload became a fast path); it is run together with 41 and caught. Mutant 28 (a full cell still asks for work) is tolerated by the step-19 full-cell pass-on on the quick pressure set, so since step 19 it runs on the full set and is caught by the global treesum(9) 3×3 case. + 3 step-11/12 performance mutants, each caught by its own bound: 42 spawn threshold ignored (qsort(20) 4×4 > 0.6 messages per interaction), 43 fork hint ignored (fib(12) 4×4 > 1.3× slower), 44 local-first link orientation disabled (treesum(7) 4×4 > 1.3× more LINKs) + 2 step-13 performance mutants: 45 producer hint ignored (qsort(30) 4×4 > 1.15× slower: 11,383 vs 9,118 cycles), 46 governor never tightens (qsort(30) 4×4 > 1.15× more messages per interaction: 0.529 vs 0.398) + 2 step-14 mutants: 47 oldest-fork give disabled (performance only: fib(16) 4×4 seed 1 > 1.05× slower, 8,254 vs 7,530 cycles; a treesum(7) bound let it survive at 1.04×, because the step-11 path still gives a fork task popped from an empty stack), 48 a fork task finding the deque full is dropped (caught by the program suite: fib(8) 2×2 loses work) + 2 step-19 mutants, each caught by the livelock / deadlock seeds that motivated the change at the new default: 49 room-distance gradient ignored (global treesum(9) 3×3 seeds 3 / 10 / 11 stop without progress), 50 full-cell pass-on off (since step 21 caught at the default `+rsv=1` by the ballast keep 0 / 8 cases fib(12) 2×2 and treesum(6) 3×2, which stop with status 3; step 19's global treesum(7) 8×8 seeds 16 / 18 stop only at `+rsv=4`) + 1 step-20 mutant: 51 slot reserve applied without a downhill neighbour (fib(10) on 1×1 with exactly the 93 free node / var slots its RTL run needs ends in status 2) + 1 step-22 mutant: 52 low-memory watermarks never engage (caught by the near-overfull treesum(9) 3×3 corner-500 case, RTL seed 9 stops with status 3) |
+| memory pressure (`tests/test_mempress.py`) | **60 / 60** | cell (0,0) pre-filled with foreign ballast so only 4–30 slots are free (30 cases) **or no node slot at all (keep 0 / 8, step 21, 10 cases: needs the full-cell pass-on)**, small-cell capacity cases (5), **global pressure (step 10, 5 cases): every cell except the far corner holds ballast (8 free node / 8 free var slots), so the room is up to 6 hops away** (fib(12) 3×3, treesum(6) 3×3, list(20) 3×2, qsort(15) 4×4, sort(10) 3×3) + **the near-overfull global treesum(9) 3×3 (step 19)** + **near-overfull treesum(9) 3×3 with 500 free slots in the corner (step 22: fabric seed 14, RTL seed 9 stop at `+lm=0`)** + **treesum(9) on one cell with 130 / 250 free slots at `+ilr=2` / `+ilr=1` (step 23, fabric model and RTL; the step-22 order needs 460)**, security fuzz case 265 — semantic model, fabric model and RTL must agree; **2 overfull cases** (the whole 2×2 fabric too small) must end in status 3 without a wrong answer |
+| mutation testing (`tests/mutants.py`) | **55 / 55 caught** | 15 functional mutants of the rule logic / protocol / quiescence + 1 performance mutant (no work distribution, caught by the speed-up bound) + 6 security mutants (each owner-capability check disabled, owner stamping missing, trap not blocking). Two mutants (eraser reaches only aux1; REF~DUP expands instead of copying) produce the *right* answer and are caught only by the node count / interaction count. That is why all three observables are compared. + 5 v3 engine mutants (read-ahead write bypass, write-queue drain, var owner-tag queue, allocation pop count, ROM read-ahead) + 2 memory-pressure mutants (caught by `tests/test_mempress.py`) + 3 cluster-ROM mutants (grant beyond the port count, EXPAND not waiting for its template word, stale buffered word) + 7 v4 mutants (second node write port not bypassed into the read-ahead, second EXPAND entry's var tag to the wrong slot, EXPAND skipping an entry, VHU without the same-slot stall, VHU hand-back never taken, VHU disabled = performance mutant caught by a fib(12) cycle bound, VHU read-ahead without bypass of write port 1) + 3 retry-slot mutants (39 parked retry never taken, 40 quiescence ignores the slot, 41 no escalation). Mutant 27 (roomy offload disabled) now survives on its own, because escalation also rescues every pressure case (roomy offload became a fast path); it is run together with 41 and caught. Mutant 28 (a full cell still asks for work) is tolerated by the step-19 full-cell pass-on on the quick pressure set, so since step 19 it runs on the full set and is caught by the global treesum(9) 3×3 case. + 3 step-11/12 performance mutants, each caught by its own bound: 42 spawn threshold ignored (qsort(20) 4×4 > 0.6 messages per interaction), 43 fork hint ignored (fib(12) 4×4 > 1.3× slower), 44 local-first link orientation disabled (treesum(7) 4×4 > 1.3× more LINKs) + 2 step-13 performance mutants: 45 producer hint ignored (qsort(30) 4×4 > 1.15× slower: 11,383 vs 9,118 cycles), 46 governor never tightens (qsort(30) 4×4 > 1.15× more messages per interaction: 0.529 vs 0.398) + 2 step-14 mutants: 47 oldest-fork give disabled (performance only: fib(16) 4×4 seed 1 > 1.05× slower, 8,254 vs 7,530 cycles; a treesum(7) bound let it survive at 1.04×, because the step-11 path still gives a fork task popped from an empty stack), 48 a fork task finding the deque full is dropped (caught by the program suite: fib(8) 2×2 loses work) + 2 step-19 mutants, each caught by the livelock / deadlock seeds that motivated the change at the new default: 49 room-distance gradient ignored (global treesum(9) 3×3 seeds 3 / 10 / 11 stop without progress), 50 full-cell pass-on off (since step 21 caught at the default `+rsv=1` by the ballast keep 0 / 8 cases fib(12) 2×2 and treesum(6) 3×2, which stop with status 3; step 19's global treesum(7) 8×8 seeds 16 / 18 stop only at `+rsv=4`) + 1 step-20 mutant: 51 slot reserve applied without a downhill neighbour (fib(10) on 1×1 with exactly the 93 free node / var slots its RTL run needs ends in status 2) + 1 step-22 mutant: 52 low-memory watermarks never engage (caught by the near-overfull treesum(9) 3×3 corner-500 case, RTL seed 9 stops with status 3) + 2 step-23 mutants: 53 the root is linked at once whatever `+ilr` says, 54 `+ilr=2` without the model's child order (both caught by the expansion-order pressure cases) |
 
 Strong confluence is the test oracle. Any schedule (arbitration, delays, stalls, task/message priority,
 initial placement) must produce exactly the same normal form, the same number of interactions and the
@@ -134,6 +134,94 @@ slower than one cell (sum(1000) on 1×1 needs a 4,096-slot cell: 29,018 cycles v
 step 12 the cost was qsort: on meshes it was 16–27% slower than with step 10's eager spreading,
 because its filter chains (lo/hi/app) stayed where they started; step 13 (next section) fixes that. treesum(9)
 on 8×8 varies ±20% with the arbitration seed; over seeds 1–4 the mean is 2,374 vs 2,470 for step 10.
+
+### Expansion order: internal redexes before the root link (step 23)
+
+Step 22 found that the RTL and the fabric model reduce in different orders: after an expansion the RTL linked the
+definition's root to its partner at once (`S_EXN` → `S_LINK`), while the model pushes the root link *below* the
+definition's redexes. So a 1×1 RTL cell needed 451–470 free slots for treesum(9), against 115 on the model. Step 23
+adds the model's order to the RTL as a run-time knob, **`+ilr` / `OMEGA_ILR`** (SPEC §5, "Expansion order"):
+
+* `+ilr=0` (**default**): step 22, cycle for cycle (identity check: 128 / 128 runs identical to the step-15
+  references).
+* `+ilr=1`: if a definition has at least one redex, the first writing `S_EXN` cycle pushes the root link under that
+  cycle's redexes. The internal redexes, and everything they push, are reduced before the root is linked.
+* `+ilr=2`: also the model's **child order**. Erase / copy, annihilation and commutation go on with their *last* new
+  link and push the others (step 22 goes on with the first), so tasks pop in the model's order.
+
+**Peak slots, one 1×1 cell** (`rtl.run` peak node / var slots; bisection of the free slots treesum(9) needs, in a 1×1
+cell with K free node and K free var slots: `results/s23/thr.py`, `thr.log`):
+
+| | `+ilr=0` (step 22) | `+ilr=1` | `+ilr=2` | fabric model |
+|---|---:|---:|---:|---:|
+| treesum(9): peak nodes / vars | 281 / 463 | 159 / 238 | **73 / 123** | 75 / 118 |
+| treesum(9): free slots needed | 460 | 235 | **120** | 115 |
+| qsort(40): peak vars | 769 | 848 | 1,282 | |
+| fib(20): peak vars | 158 | 269 | 278 | |
+| list(120) / higher(100): peak vars (4,096 slots) | 2,172 / 1,519 | 1,780 / 1,523 | 1,686 / 1,226 | |
+| sum(1000): peak vars, task-stack depth (4,096 slots and entries) | 3,008, 1,005 | 3,010, 2,003 | 4,005, 2,003 | 4,009, 2,005 |
+
+`+ilr=1` alone halves treesum's peak. The rest of the gap is the child order, not the root link: the model with
+the RTL's child order (`results/s23/fab_order_probe.py`, which reorders the model's rule pushes) peaks at
+157 / 252, the same as `+ilr=1`, and `+ilr=2` matches the model. But the better order depends on the program. treesum
+builds a tree that the deferred root keeps from growing ahead of the sum. In qsort, fib and sum the "internal"
+redexes are the recursive calls, so deferring the root makes the cell go deep before it combines anything. sum(1000)
+keeps one deferred root link per level, so its task stack doubles (it then needs `qdepth` 4,096 on 1×1; with 1,024
+it stops with `err` 2, never with a wrong answer).
+
+**Cycle cost** (standard benchmarks, 8 seeds each, mean cycles; step 22 = `results/s23/id_*.jsonl` and
+`b4_ilr0.jsonl`, the knob runs `results/s23/b4_ilr{1,2}.jsonl`; the optional 8×8 knob sweeps were not run; table from `results/s23/cmp.py`;
+sum(1000) on 1×1 is from the 4,096-entry stack runs, `results/s23/sum1x1_q4096.json`):
+
+| program | mesh | seeds | step 22 cycles (mean) | +ilr=1 | Δ | +ilr=2 | Δ | all ok |
+|---|---|---:|---:|---:|---:|---:|---:|---|
+| qsort(40) | 1x1 | 8 | 42,873 | 43,484 | +1.4% | 44,043 | +2.7% | yes |
+| list(120) | 1x1 | 8 | 19,024 | 18,780 | -1.3% | 19,249 | +1.2% | yes |
+| sum(1000) | 1x1 | 8 | 29,018 | 27,022 | -6.9% | 29,019 | +0.0% | yes |
+| sort(20) | 1x1 | 8 | 13,052 | 13,553 | +3.8% | 13,503 | +3.5% | yes |
+| higher(100) | 1x1 | 8 | 12,257 | 12,658 | +3.3% | 12,625 | +3.0% | yes |
+| fib(20) | 1x1 | 8 | 697,629 | 713,745 | +2.3% | 728,185 | +4.4% | yes |
+| treesum(9) | 1x1 | 8 | 49,199 | 49,141 | -0.1% | 49,385 | +0.4% | yes |
+| treesum_direct(14) | 1x1 | 8 | 521,785 | 515,989 | -1.1% | 536,531 | +2.8% | yes |
+| qsort(40) | 2x2 | 8 | 15,743 | 15,955 | +1.3% | 16,378 | +4.0% | yes |
+| list(120) | 2x2 | 8 | 10,038 | 13,117 | +30.7% | 12,566 | +25.2% | yes |
+| sum(1000) | 2x2 | 8 | 28,961 | 28,503 | -1.6% | 28,303 | -2.3% | yes |
+| sort(20) | 2x2 | 8 | 6,864 | 7,021 | +2.3% | 7,281 | +6.1% | yes |
+| higher(100) | 2x2 | 8 | 7,471 | 10,291 | +37.7% | 9,672 | +29.5% | yes |
+| fib(20) | 2x2 | 8 | 178,705 | 182,702 | +2.2% | 186,561 | +4.4% | yes |
+| treesum(9) | 2x2 | 8 | 13,155 | 13,414 | +2.0% | 13,733 | +4.4% | yes |
+| treesum_direct(14) | 2x2 | 8 | 137,374 | 135,246 | -1.5% | 140,690 | +2.4% | yes |
+| qsort(40) | 4x4 | 8 | 11,454 | 12,321 | +7.6% | 12,080 | +5.5% | yes |
+| list(120) | 4x4 | 8 | 8,396 | 10,990 | +30.9% | 10,827 | +28.9% | yes |
+| sum(1000) | 4x4 | 8 | 28,952 | 28,505 | -1.5% | 28,290 | -2.3% | yes |
+| sort(20) | 4x4 | 8 | 5,988 | 6,348 | +6.0% | 6,648 | +11.0% | yes |
+| higher(100) | 4x4 | 8 | 7,633 | 9,298 | +21.8% | 9,938 | +30.2% | yes |
+| fib(20) | 4x4 | 8 | 46,272 | 47,648 | +3.0% | 48,373 | +4.5% | yes |
+| treesum(9) | 4x4 | 8 | 3,994 | 4,082 | +2.2% | 4,286 | +7.3% | yes |
+| treesum_direct(14) | 4x4 | 8 | 35,205 | 34,882 | -0.9% | 36,728 | +4.3% | yes |
+
+Geometric mean of the cycle ratios over the 24 (program, mesh) cells: `+ilr=1` 1.054 (+5.4%), `+ilr=2` 1.071 (+7.1%).
+
+On one cell the order costs a few percent either way (fib(20) +2.3% / +4.4%, sum(1000) −6.9% at `+ilr=1`).
+With more cells, list(120) and higher(100) lose 22–38% at both settings: the root link is what hands a
+producer's result to its consumer, so deferring it holds back the work it would give to the neighbouring cells.
+That is well beyond the seed-to-seed spread of the 8-seed means.
+
+**Decision: `+ilr` stays a knob, default 0.** The benchmarks regress (list and higher on 2×2 / 4×4), and the
+peak-memory gain is specific to treesum-like programs (qsort, fib and sum peak higher). An adaptive variant was
+tried and dropped: the `+ilr=2` order only while a cell is not *ample* (fewer than SLOTS/2 free slots). It left
+treesum(9) 1×1 at 1,024 slots unchanged (the cell never drops below the clear watermark) and raised qsort(40) 1×1
+from 769 to 981 peak vars (+1.5% cycles), because qsort crosses the watermark and then goes deep.
+
+**Tests.** `tests/test_mempress.py` gets the expansion-order cases (4): treesum(9) on one cell with 130 free slots
+at `+ilr=2` and with 250 at `+ilr=1`, on the fabric model and the RTL (step 22 order: status 2, out of memory).
+Mutants **53** (the root is linked at once whatever `+ilr` says: needs 460 / 470 free slots, caught by both cases) and
+**54** (`+ilr=2` without the child order: needs 235, caught by the 130 case). The knob settings also pass the
+correctness suites: `+ilr=2` units 42 / 42, programs 315 / 315, fuzz 600 / 600 + big 199 / 200; `+ilr=1` units 42 / 42,
+fuzz 600 / 600 + big 200 / 200 (`results/s23/k*_*.log`). The one `+ilr=2` big-fuzz miss is a capacity stop, not a wrong
+answer: case 3420 (1×1, 1,024 slots) peaks at 703 var slots in the step-22 order but runs out of var slots under
+`+ilr=2` and ends in status 3 (no progress, detected); with 4,096 slots it finishes correctly at 1,106 peak var slots
+(`results/s23/k2_bigfuzz_3420.txt`, `repro_bigfuzz.py`), the same program-dependent peak growth as qsort above.
 
 ### Low-memory watermarks: the step-20 counterexample finishes (step 22)
 
@@ -1309,3 +1397,5 @@ What this says:
 * step 19: room-distance gradient (`+rgrad`, `OMEGA_RGRAD`) + slot reserve + full-cell pass-on (rule d) fix the short-timeout livelock / deadlock; new defaults `+rto=8 +rgrad=3` (`+rto=32 +rgrad=0` = step 18 cycle for cycle); no stopped run of the new default on either model, global treesum(7) 8×8 28,003 → 7,685 cycles (−72.6%, 30 seeds); units 42/42, programs 315/315, step-14 cross-check 90/90, fuzz 600/600 + big 200/200, security 420/420, mempress 44/44, mutants 51/51
 * step 20: slot reserve 4 → 1 as run-time input `+rsv` / `OMEGA_RSV` (`+rsv=4` = step 19): RTL global pressure list(20) 3×2 −3.8%, fib(12) 6×6 −1.6%, treesum(7) 8×8 −1.8%, no stopped run; treesum(6) 3×3 +3.7% vs step 18 traced and kept as a known gap; SPEC §7.1 progress argument with a counterexample (no local mechanism can guarantee completion); fabric probe knobs; units 42/42, programs 315/315, step-14 cross-check 90/90, fuzz 600/600 + big 200/200, security 420/420, mempress 44/44, mutants 52/52, identity 128/128
 * step 21: default-configuration test for the full-cell pass-on (tests only): mempress ballast keep 0 / 8 (10 cases, a home cell with no free node slot), mutant 50 detector at the default `+rsv=1` (fib(12) 2×2, treesum(6) 3×2), fabric knob `OMEGA_PASSON`; units 42/42, programs 315/315, step-14 cross-check 90/90, fuzz 600/600 + big 200/200, security 420/420, mempress 54/54, mutants 52/52, identity 128/128
+* `ec9ea3f` step 22: low-memory watermarks (`+lm=2` default, `OMEGA_LM`; `+lm=0` = step 21): absolute roomy 64 / 32 and a 16-slot expansion reserve near a roomier neighbour; fixes treesum(9) 3×3 near-full stalls; mutant 52; identity 128/128, units 42/42, programs 315/315, s14 90/90, fuzz 600/600 + big 200/200, security 420/420, mempress 56/56, mutants 53/53
+* step 23: expansion order as a run-time knob (`+ilr` / `OMEGA_ILR`, default 0 = step 22 cycle for cycle): 1 = internal redexes before the root link, 2 = also the fabric model's child order; 1×1 treesum(9) peak vars 463 / 238 / 123, but program dependent (qsort, fib, sum peak higher; list / higher +22–38% cycles on 2×2 / 4×4), so knob only; mutants 53 / 54; identity 128/128, units 42/42, programs 315/315, s14 90/90, fuzz 600/600 + big 200/200, security 420/420, mempress 60/60, mutants 55/55

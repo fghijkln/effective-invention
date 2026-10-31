@@ -1,0 +1,2 @@
+FAIL {"i": 3420, "W": 1, "H": 1, "ok": false, "knobs": {"seed": 5121295, "jitter": 80, "stall": 60, "pmsg": 201, "spawn": [8, 1, 4, 16, 0], "link_local": 1, "s14": 1}, "interactions": 16239, "cycles": 2000000, "got": "STATUS 3 err 0", "want": "#0", "got_i": 7063, "got_n": 522, "want_n": 13, "status": 3, "msgs": {"msg_link": 0, "msg_node": 0, "msg_spawn": 0}}
+fuzz (big) 0..4287: 199/200 pass, 4088 rejected (diverging), 1435s

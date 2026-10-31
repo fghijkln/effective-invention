@@ -74,6 +74,10 @@ LM = int(__import__('os').environ.get('OMEGA_LM', '2'))
 LM_HI = int(__import__('os').environ.get('OMEGA_LM_HI', '64'))
 LM_LO = int(__import__('os').environ.get('OMEGA_LM_LO', '32'))
 LM_RSV = int(__import__('os').environ.get('OMEGA_LM_RSV', '16'))
+# step 23: RTL only (+ilr, OMEGA_ILR): 1 = an expansion pushes its root link below its internal redexes, as this model
+# always does (Cell.expand); 2 = also this model's child order (a rule's LAST new link is processed first);
+# 0 = step 22 (default: the RTL links the root at once, S_EXN -> S_LINK).  The fabric model ignores it.
+ILR = int(__import__('os').environ.get('OMEGA_ILR', '0'))
 LM_AHI = int(__import__('os').environ.get('OMEGA_LM_AHI', '0'))  # "ample" (the mode trigger) = free >= LM_AHI, cleared below LM_AHI / 2 (0: SLOTS/2 = RTL)
 LM_T = int(__import__('os').environ.get('OMEGA_LM_T', '0'))   # > 0: total-free threshold; -1: "no cell is roomy" (OR tree)  # step 21 diagnosis: 0 = full-cell pass-on (rule d) off = RTL mutant 50
 DIRS = ["N", "E", "S", "W"]

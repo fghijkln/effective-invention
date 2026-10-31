@@ -329,6 +329,26 @@ Correctness argument (also checked by fuzzing):
   4–30 slots are free there: without the mechanism the v3 RTL livelocks on 7 of 30 such cases.
 * **Task stack.** Depth-first (LIFO) order keeps live memory small (HVM2 uses per-thread stacks for the
   same reason). Retry tasks (`K_SPAWN`, re-queued `LINK`) reuse it.
+* **Expansion order (step 23, `+ilr` / `OMEGA_ILR`, 2-bit run-time input, default 0).** `ilr` = 0 (step 22
+  cycle for cycle): the last `S_EXN` cycle links the definition's root to its partner at once (`S_EXN` →
+  `S_LINK`), while the definition's redexes wait on the stack. `ilr` ≥ 1: the expansion is marked deferred when it
+  starts (`ex_dfr`, latched for the whole expansion), and if the definition has at least one redex the first
+  writing `S_EXN` cycle pushes the root link `{K_LINK, x, root}` *below* that cycle's redexes (it needs one more
+  stack-cache entry: `tq_room` ≥ 2 / 3 instead of 1 / 2); the last cycle then picks the next task (`fin`) when it
+  pushed nothing, else goes to `S_IDLE` (this cycle's pushes are visible next cycle). The definition's internal
+  redexes, and everything they push, are reduced before the root is linked, as the fabric model always does
+  (`Cell.expand`). `ilr` = 2 also uses the fabric model's child order: erase / copy continues with aux 2 and
+  pushes aux 1, annihilation continues with aux 2 ~ aux 2 and pushes aux 1 ~ aux 1, commutation continues with
+  the fourth new link (b2 ~ P copy 2, read through the `S_WQ` bypass) and pushes the other three in the model's
+  order, so the pop order equals the model's (step 22: the first new link continues). The admission check of an
+  expansion already reserved a stack entry for the root (`tq_tot + nr + 1 < QDEPTH`). The orders change only the
+  schedule, never the result or the interaction count. Effect (one 1×1 cell, `rtl.run` peak node / var slots,
+  README step 23): treesum(9) 281 / 463 at `ilr` 0, 159 / 238 at 1, 73 / 123 at 2 (fabric model 75 / 118),
+  so it finishes with 460 / 235 / 120 free slots; but the order is program dependent: qsort(40) 769 → 848 → 1,282
+  vars, fib(20) 158 → 269 → 278, sum(1000) 3,008 → 3,010 → 4,005 vars with a task stack of 1,005 → 2,003 entries
+  (a linear recursion keeps one deferred root link per level). On 2×2 / 4×4 deferring the root delays the work
+  the root link exposes to other cells (list(120) +31%, higher(100) +22–38% cycles), so `ilr` stays a knob.
+  Mutants 53 (the root is linked at once whatever `ilr` says) and 54 (`ilr` = 2 without the child order).
 * **Owner tags.** 4 bits in each node RAM word (`{owner, aux2, aux1}`) and var RAM word (`{owner, port}`); see §12.
 * **Rule execution.** Reading both nodes, applying the rule, writing up to four node slots and
   launching the first resulting link take one cycle. Every further link costs one PUSH cycle, and is
@@ -523,7 +543,7 @@ AND tree with a pipelined tree or a Dijkstra–Safra token ring. Both preserve t
 (probability/256 that a link holds a flit for a cycle), `stall` (probability/256 that an idle engine
 skips a cycle) and `pmsg` (message vs. task priority) give the RTL a different interleaving on every
 run. Strong confluence makes any difference in the three observables a bug. `MUT` (512-bit parameter)
-injects the 42 mutations listed in `tests/mutants.py` (16–21: owner-capability checks; 27, 28, 39–41:
+injects the mutations listed in `tests/mutants.py` (55 since step 23) (16–21: owner-capability checks; 27, 28, 39–41:
 memory pressure and the retry slot, checked by `tests/test_mempress.py`).
 
 ## 10. Frontend (`omega/lang.py`)

@@ -10,6 +10,7 @@ Cases
   a few free slots, and the program is loaded there.  Without the mechanism the cell livelocks retrying
   rules it has no room for (v3 RTL: 7 of these 30 cases time out); with it all must finish.
 * near-overfull (step 22): treesum(9) 3x3 with 500 free slots in the corner, 8 elsewhere; needs the low-memory watermarks.
+* expansion order (step 23): treesum(9) on one cell with 130 / 250 free slots: needs +ilr=2 / +ilr=1 on the RTL.
 * keep 0/8 (step 21): no free node slot at all in (0,0); needs the full-cell pass-on (rule d).
 * capacity: programs whose one-cell peak exceeds a (small) cell, on 2x2 / 4x4.
 * the multi-tenant security fuzz case 265 (one cell needed 1217 vars in a 1024-slot cell on the v2 RTL).
@@ -48,6 +49,10 @@ GLOBAL19 = [("treesum", 9, 3, 3)]
 NEAR = [("treesum", 9, 3, 3)]
 NEAR_K, NEAR_FSEEDS, NEAR_RSEEDS = 500, (14,), (9,)
 OVERFULL = [("treesum", 9, 2, 2, 24), ("qsort", 30, 2, 2, 24)]
+# step 23: one 1x1 cell with K free node = var slots.  treesum(9) needs 120 on the RTL with +ilr=2 (root link deferred
+# and the model's child order), 235 with +ilr=1, 451-470 with +ilr=0 (step 22; results/s23/thr.log); the fabric model,
+# which always reduces in the +ilr=2 order, needs 115.  (name, N, K, ilr)
+ILR_CASES = [("treesum", 9, 130, 2), ("treesum", 9, 250, 1)]
 
 
 def ballast_img(book, W, H, slots, keep_n, keep_v, cells=((0, 0),)):
@@ -120,6 +125,35 @@ def run_near(use_rtl=True, mut=0, verbose=True):
     return n, fails, tag
 
 
+def run_ilr(use_rtl=True, mut=0, verbose=True):
+    """Step 23: an expansion's internal redexes before its root link (+ilr) lowers the one-cell peak."""
+    n = fails = 0; tag = None
+    for name, N, K, ilr in ILR_CASES:
+        book = progs.book(name, N); want = progs.expected(name, N); ref = semantic.result(book, fuel=10**8)
+        if mut == 0:
+            n += 1
+            try:
+                f = fabric.Fabric(book, 1, 1, img=ballast_img(book, 1, 1, 1024, K, K)).run()
+                ok = f.readback() == want and f.interactions == ref["interactions"]
+            except Exception:
+                ok = False
+            if not ok:
+                fails += 1; tag = f"ilr {name}({N}) 1x1 keep {K} fabric"
+                if verbose: print("FAIL", tag, flush=True)
+        if use_rtl:
+            from omega import rtl
+            n += 1
+            i0 = fabric.ILR; fabric.ILR = ilr
+            try:
+                r = rtl.run(book, 1, 1, img=ballast_img(book, 1, 1, 1024, K, K), mut=mut, maxcycles=400_000, timeout=600)
+            finally:
+                fabric.ILR = i0
+            if r["status"] != 0 or r["readback"] != want or r["interactions"] != ref["interactions"]:
+                fails += 1; tag = f"ilr {name}({N}) 1x1 keep {K} RTL +ilr={ilr}: status {r['status']}"
+                if verbose: print("FAIL", tag, flush=True)
+    return n, fails, tag
+
+
 def cases(quick=False):
     out = []
     for name, N in BALLAST:
@@ -169,6 +203,10 @@ def run_cases(use_rtl=True, mut=0, verbose=True, quick=False, security=True):
             if mut: return n, fails, tag
     if not quick:
         n2, f2, tag = run_near(use_rtl, mut, verbose)
+        n += n2; fails += f2
+        if mut and f2: return n, fails, tag
+    if not quick:
+        n2, f2, tag = run_ilr(use_rtl, mut, verbose)
         n += n2; fails += f2
         if mut and f2: return n, fails, tag
     if use_rtl and not quick and mut == 0:
