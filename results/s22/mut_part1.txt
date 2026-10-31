@@ -1,0 +1,39 @@
+mutant  0 CAUGHT  erase/copy rule: aux2 receives aux1 instead of the atom -- prog fib(8) on 2x2: got STATUS 3 err 0 / 1520 interactions / 2918 nodes, want #21 / 901 / 0
+mutant  1 CAUGHT  OPR: operand order ignores the flip bit -- prog fib(8) on 2x2: got #8 / 10 interactions / 0 nodes, want #21 / 901 / 0
+mutant  2 CAUGHT  OPR: flip bit not toggled when the operator is turned around -- prog sort(6) on 2x2: got #607 / 577 interactions / 0 nodes, want #982 / 632 / 0
+mutant  3 CAUGHT  SWI: predecessor not decremented -- prog list(6) on 2x2: got STATUS 3 err 0 / 34750 interactions / 2290 nodes, want #97 / 341 / 0
+mutant  4 CAUGHT  annihilation ignores DUP labels (commute rule never fires for different labels) -- prog list(6) on 2x2: got * / 327 interactions / 0 nodes, want #97 / 341 / 0
+mutant  5 CAUGHT  annihilation cross-wires aux1 with aux2 -- prog fib(8) on 2x2: got {1 x0 $(< #2 ?((@fib__a1 (* (x1 x1))) (x0 ^loop)))} / 2 interactions / 7 nodes, want #21 / 901 / 0
+mutant  6 CAUGHT  commutation: second copy of P has its aux ports swapped -- prog list(6) on 2x2: got STATUS 3 err 0 / 1797 interactions / 2763 nodes, want #97 / 341 / 0
+mutant  7 CAUGHT  SPAWN always expands locally (performance-only: no work distribution) -- treesum_direct(8) speedup 4x4/1x1 = 1.04 (bound >= 3.0)
+mutant  8 CAUGHT  ALU: '<' computed as '<=' -- prog fib(8) on 2x2: got #34 / 550 interactions / 0 nodes, want #21 / 901 / 0
+mutant  9 CAUGHT  SWI #0: built (* r) instead of (r *) (wrong branch) -- prog fib(8) on 2x2: got (x0 x0) / 9 interactions / 1 nodes, want #21 / 901 / 0
+mutant 10 CAUGHT  NODE migration: aux ports swapped when re-homed -- prog fib(8) on 2x2: got STATUS 3 err 0 / 1917 interactions / 2806 nodes, want #21 / 901 / 0
+mutant 11 CAUGHT  var exchange: substitution chain not followed (link dropped) -- prog fib(8) on 2x2: got x0 / 3 interactions / 6 nodes, want #21 / 901 / 0
+mutant 12 CAUGHT  eraser only reaches aux1 -- prog fib(8) on 2x2: got #21 / 835 interactions / 33 nodes, want #21 / 901 / 0
+mutant 13 CAUGHT  REF ~ DUP expands instead of copying the reference -- prog qsort(5) on 2x2: got #718 / 862 interactions / 0 nodes, want #718 / 852 / 0
+mutant 14 CAUGHT  commutation: two fresh wires share one var -- prog list(6) on 2x2: got STATUS 3 err 0 / 1598 interactions / 2746 nodes, want #97 / 341 / 0
+mutant 15 CAUGHT  quiescence detection ignores in-flight router flits -- prog fib(8) on 2x2: got x0 / 897 interactions / 3 nodes, want #21 / 901 / 0
+mutant 16 CAUGHT  security: var slot owner-tag check disabled (forged VAR pointers accepted) -- attack steal-result: write a forged result into the victim's root var on 2x2 fi=0: honest result / trap set differs (rtl traps [], semantic [(2, 9)])
+mutant 17 CAUGHT  security: cross-owner (T1) check disabled -- cross-owner fault injection @main = r & #7 ~ r & (x x) ~ (y y) on 2x2 fi=0: honest result / trap set differs (rtl traps [(2, 1)], semantic [(1, 1)])
+mutant 18 CAUGHT  security: out-of-bounds pointer check disabled -- attack out-of-bounds slot on 2x2 fi=0: honest result / trap set differs (rtl traps [(2, 9)], semantic [(3, 9)])
+mutant 19 CAUGHT  security: expansion does not stamp the tenant's owner (ROM owner 0 leaks into tenants) -- demo fib(12) || qsort(15) on 2x2 fi=0: honest result / trap set differs (rtl traps [(1, 0)], semantic [])
+mutant 20 CAUGHT  security: forged-var trap is recorded but the access is not blocked -- attack steal-result: write a forged result into the victim's root var on 2x2 fi=0: honest result / trap set differs (rtl traps [(2, 9)], semantic [(2, 9)])
+mutant 21 CAUGHT  security: node slot owner-tag check disabled -- attack erase the victim's result node on 2x2 fi=0: honest result / trap set differs (rtl traps [], semantic [(2, 9)])
+mutant 22 CAUGHT  v3 read-ahead: write bypass on node read port 1 disabled (stale node data) -- prog fib(8) on 2x2: got x0 / 16 interactions / 18 nodes, want #21 / 901 / 0
+mutant 23 CAUGHT  v4 S_WQ: second queued node write dropped (a commutation copy never written) -- prog list(6) on 2x2: got x0 / 270 interactions / 26 nodes, want #97 / 341 / 0
+mutant 24 CAUGHT  v3 S_WQ: owner tags of fresh commutation vars not written -- prog list(6) on 2x2: got x0 / 281 interactions / 30 nodes, want #97 / 341 / 0
+mutant 25 CAUGHT  v3 EXPAND allocation pops one node slot fewer than it maps (slot aliasing) -- prog fib(8) on 2x2: got STATUS 3 err 0 / 2401 interactions / 2591 nodes, want #21 / 901 / 0
+mutant 26 CAUGHT  v4 EXPAND: template word entry select wrong (entry i reads entry i xor 1) -- prog fib(8) on 2x2: got $(< (* (#8 x0)) x1) / 3 interactions / 7 nodes, want #21 / 901 / 0
+mutant 27 CAUGHT  memory pressure: roomy neighbours ignored (no PULL / NODE offload); run with bit 41 (no escalation) because since step 10 escalation alone also rescues every pressure case (alone: survives) -- ballast list(20) 2x2 keep 8/8: wrong result / timeout
+mutant 28 CAUGHT  memory pressure: hungry does not require roomy (a full cell still asks for work); since step 19 the full-cell pass-on tolerates it on the quick pressure set, so it runs on the full set and is caught by the step-19 global treesum(9) 3x3 case -- global treesum(9) 3x3 keep 8/8 in 8 cells: wrong result / timeout
+mutant 29 CAUGHT  cluster ROM: arbiter grants more requesters than it has read ports (they get another cell's data) -- prog fib(8) on 2x2: got STATUS 3 err 0 / 5797 interactions / 2525 nodes, want #21 / 901 / 0
+mutant 30 CAUGHT  cluster ROM: EXPAND does not wait for its template pair (proceeds on a missed grant) -- prog fib(8) on 2x2: got STATUS 3 err 0 / 2898 interactions / 2704 nodes, want #21 / 901 / 0
+mutant 31 CAUGHT  cluster ROM: buffered template word not dropped when a new expansion starts (stale definition) -- prog fib(8) on 2x2: got STATUS 3 err 0 / 7167 interactions / 2571 nodes, want #21 / 901 / 0
+mutant 32 CAUGHT  v4 read-ahead: write bypass ignores the second node write port (stale node data) -- prog qsort(5) on 2x2: got x0 / 238 interactions / 20 nodes, want #718 / 852 / 0
+mutant 33 CAUGHT  v4 EXPAND: second entry's var tag written to the first entry's var slot -- prog fib(8) on 2x2: got x0 / 3 interactions / 6 nodes, want #21 / 901 / 0
+mutant 34 CAUGHT  v4 EXPAND: advances by two entries when only one was written (entry skipped) -- prog fib(8) on 2x2: got x0 / 885 interactions / 13 nodes, want #21 / 901 / 0
+mutant 35 CAUGHT  VHU: no stall when the main engine's link names the same var slot (non-atomic exchange) -- prog fib(8) on 2x2: got x0 / 750 interactions / 55 nodes, want #21 / 901 / 0
+mutant 36 CAUGHT  VHU: hand-back link never taken by the main engine (redex lost / hang) -- prog fib(8) on 2x2: got STATUS 3 err 0 / 4 interactions / 5 nodes, want #21 / 901 / 0
+mutant 37 CAUGHT  VHU disabled (performance only: main engine follows every chain; caught by the cycle bound) -- fib(12) 1x1 cycles 17892 with the mutant vs 14849 (bound: > 1.1x)
+mutant 38 CAUGHT  VHU read-ahead: no bypass of the main engine's var write port 1 (stale var data) -- prog fib(8) on 2x2: got x0 / 750 interactions / 55 nodes, want #21 / 901 / 0

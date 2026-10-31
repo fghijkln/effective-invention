@@ -24,6 +24,10 @@ module omega_mesh #(
   input  logic [5:0]  rto_m1,              //   step 18: retry-slot timeout - 1
   input  logic [2:0]  rgrad,               //   step 19: room-distance gradient cap (0 = off)
   input  logic [2:0]  rsv,                 //   step 20: reserve with room downhill (step 19: 4)
+  input  logic [1:0]  lm_mode,             //   step 22: low-memory mode (0 = off, 1 = while no cell is ample, 2 = always)
+  input  logic [7:0]  lm_hi,               //     low-memory roomy watermarks (set / clear)
+  input  logic [7:0]  lm_lo,
+  input  logic [4:0]  lm_rsv,              //     reserve with room downhill in low-memory mode
   input  logic        link_local,          // step 12 local-first link orientation (configuration, SPEC 4)
   input  logic        dump,
   output logic        all_ready,
@@ -81,7 +85,7 @@ module omega_mesh #(
     for (genvar y = 0; y < H; y++) begin : gy
       omega_cell #(.X(x), .Y(y), .W(W), .H(H), .SLOTS(SLOTS), .QDEPTH(QDEPTH), .ROMSZ(ROMSZ),
                    .DIRSZ(DIRSZ), .DEPTH(DEPTH), .RDXSZ(RDXSZ), .MUT(MUT)) u_cell (
-        .clk, .rst, .seed, .jitter, .stall, .pmsg, .fi, .spawn_k, .spawn_hint, .spawn_k2, .spawn_kp, .gov_b, .fork_dq, .gov_nb, .gov_l0, .rto_m1, .rgrad, .rsv, .link_local,
+        .clk, .rst, .seed, .jitter, .stall, .pmsg, .fi, .spawn_k, .spawn_hint, .spawn_k2, .spawn_kp, .gov_b, .fork_dq, .gov_nb, .gov_l0, .rto_m1, .rgrad, .rsv, .lm_mode, .lm_hi, .lm_lo, .lm_rsv, .lowmem, .ample(campl[x][y]), .link_local,
         .in_v(iv[x][y]), .in_f(inf[x][y]), .in_rdy(irdy[x][y]),
         .out_v(ov[x][y]), .out_f(of[x][y]), .out_rdy(ordy[x][y]),
         .idle(cidle[x][y]), .hungry(chung[x][y]), .nbr_hungry(nhung[x][y]), .roomy(croom[x][y]), .nbr_roomy(nroom[x][y]), .rdist(crd[x][y]), .nbr_rdist(nrd[x][y]), .ready(crdy[x][y]), .err(cerr[x][y]), .dump,
@@ -125,6 +129,19 @@ module omega_mesh #(
         assign iv[x][y][3] = 1'b0; assign inf[x][y][3] = '0; assign ordy[x][y][3] = 1'b0;
       end
     end
+  end
+
+  // step 22: low-memory signal, an OR tree over the cells' ample bits (like the quiescence AND tree), registered
+  logic campl [W][H];
+  logic lowmem, any_ample;
+  always_comb begin
+    any_ample = 1'b0;
+    for (int x = 0; x < W; x++)
+      for (int y = 0; y < H; y++) any_ample |= campl[x][y];
+  end
+  always_ff @(posedge clk) begin
+    if (rst) lowmem <= 1'b0;
+    else lowmem <= !any_ample;
   end
 
   always_comb begin

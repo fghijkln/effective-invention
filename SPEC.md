@@ -310,6 +310,16 @@ Correctness argument (also checked by fuzzing):
   on the RTL at `rto` = 8 with and without the gradient, global treesum(7) 8×8). Without a downhill
   neighbour (no room within `rgrad` hops, or the whole fabric full) rules (a)–(c) are the step-10 rule. Default `rgrad` = 3 with `rto` = 8 (README step 19: the short
   timeout alone livelocked the fabric and the RTL under global pressure; the gradient removes that).
+* **Low-memory watermarks (step 22).** Run-time inputs `lm_mode` (2 bits), `lm_hi`, `lm_lo` (8 bits),
+  `lm_rsv` (5 bits) (`+lm` / `OMEGA_LM`, `+lmhi`, `+lmlo`, `+lmrsv`; defaults 2, 64, 32, 16). In low-memory
+  mode `roomy` is set at ≥ `lm_hi` free node and var slots and cleared below `lm_lo` (absolute, instead of
+  SLOTS/4 / SLOTS/8), and rule (c) above keeps `lm_rsv` slots instead of `rsv`. `lm_mode` = 0: never (step 21
+  cycle for cycle); 1: while no cell is *ample* (≥ SLOTS/2 free node and var slots, cleared below SLOTS/4; each
+  cell drives one `ample` bit, the mesh ORs them in a registered tree like the quiescence tree and returns
+  `lowmem`); 2 (default): always. Without pressure every cell stays above `lm_hi`, so `rdist` stays 0 and
+  nothing changes (the identity check is cycle-identical); under pressure a corner with a few hundred free slots
+  is room, the gradient points at it, and poor cells stop starting definitions of their own, so work collects
+  where the room is and runs depth first there (§7.1). Mutant 52 (the mode never engages).
   Mutants 49 (no downhill neighbour is ever found), 50 (rule (d) off) and 51 (the reserve applied without a
   downhill neighbour). At the default reserve 1 a cell reaches zero free node slots only where the reserve does
   not apply or never had one; the step-21 mempress cases (ballast leaves no free node slot in the program's home
@@ -492,6 +502,11 @@ proof.
    before the fabric fills (e.g. a global low-memory mode that stops giving work away and reduces depth first,
    bounding the peak by the sequential one) or spilling to off-fabric memory. Until then, running out of
    memory is detected (status 3 / "no progress"), never silently wrong.
+4. **Low-memory watermarks (step 22, §5).** With `lm` = 2 the counterexample above finishes on 20 / 20 seeds
+   (fabric model, corner 120–1024 free slots) and the RTL counterpart (corner 470–1024, 30 seeds, the RTL needs
+   451–470 free slots for treesum(9) on one cell) on 30 / 30; finished runs take about the 1×1 time. This is
+   the admission idea of (ii), not a guarantee: a program whose depth-first order on one cell needs more than
+   any cell has, or memory spread thinner than `lm_hi` slots per cell, can still stop (detected, status 3).
 
 ## 8. Termination detection
 

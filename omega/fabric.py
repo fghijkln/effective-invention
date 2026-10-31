@@ -66,14 +66,15 @@ PASSON = int(__import__('os').environ.get('OMEGA_PASSON', '1'))
 #   ADM bit 2: low-memory mode also defers growth: a cell pops shrinking / neutral tasks first from ADM_W
 ADM = int(__import__('os').environ.get('OMEGA_ADM', '0'))
 ADM_W = int(__import__('os').environ.get('OMEGA_ADM_W', '4'))
-#   ADM bit 3: global low-memory mode (1-bit OR tree): while no cell has SLOTS/4 free ("ample"), roomy uses the
-#              absolute watermarks LM_HI / LM_LO instead of SLOTS/4 / SLOTS/8, and an expansion with room downhill
-#              must leave LM_RSV slots free instead of RSV, so work collects in the cells that have room
-#   ADM bit 4 (with bit 3): low-memory mode always on (absolute watermarks and LM_RSV everywhere, no trigger)
+# step 22 low-memory watermarks, RTL +lm / OMEGA_LM: in low-memory mode roomy uses the absolute watermarks LM_HI / LM_LO
+#   instead of SLOTS/4 / SLOTS/8, and an expansion with room downhill must leave LM_RSV slots free instead of RSV, so
+#   work collects in the cells that have room.  LM = 0: off (= step 21), 1: only while no cell is "ample" (free >= SLOTS/2,
+#   cleared below SLOTS/4; a registered OR tree in the RTL), 2 (default): always.
+LM = int(__import__('os').environ.get('OMEGA_LM', '2'))
 LM_HI = int(__import__('os').environ.get('OMEGA_LM_HI', '64'))
 LM_LO = int(__import__('os').environ.get('OMEGA_LM_LO', '32'))
 LM_RSV = int(__import__('os').environ.get('OMEGA_LM_RSV', '16'))
-LM_AHI = int(__import__('os').environ.get('OMEGA_LM_AHI', '0'))  # > 0: "ample" (the mode trigger) = free >= LM_AHI, cleared below LM_AHI / 2 (0: SLOTS/4, SLOTS/8)
+LM_AHI = int(__import__('os').environ.get('OMEGA_LM_AHI', '0'))  # "ample" (the mode trigger) = free >= LM_AHI, cleared below LM_AHI / 2 (0: SLOTS/2 = RTL)
 LM_T = int(__import__('os').environ.get('OMEGA_LM_T', '0'))   # > 0: total-free threshold; -1: "no cell is roomy" (OR tree)  # step 21 diagnosis: 0 = full-cell pass-on (rule d) off = RTL mutant 50
 DIRS = ["N", "E", "S", "W"]
 DXY = {"N": (0, -1), "E": (1, 0), "S": (0, 1), "W": (-1, 0)}
@@ -559,12 +560,13 @@ class Cell:
         elif nf < self.room_lo or vf < self.room_lo:
             self._ample = False
         self._roomy = self._ample
-        if ADM & 8 and LM_AHI:
-            if nf >= LM_AHI and vf >= LM_AHI:
+        if LM == 1:
+            ahi = LM_AHI or self.fab.slots // 2            # RTL: SLOTS/2 set, SLOTS/4 clear ("ample")
+            if nf >= ahi and vf >= ahi:
                 self._trig = True
-            elif nf < LM_AHI // 2 or vf < LM_AHI // 2:
+            elif nf < ahi // 2 or vf < ahi // 2:
                 self._trig = False
-        if ADM & 8:
+        if LM:
             if nf >= LM_HI and vf >= LM_HI:
                 self._lroomy = True
             elif nf < LM_LO or vf < LM_LO:
@@ -718,7 +720,7 @@ class Cell:
         ref, o = label(refp), owner(refp)
         d = self.fab.book[ref]
         nn, nv = len(d.nodes), d.nvars
-        rsv = ((LM_RSV if ADM & 8 and self.fab.lm8 else RSV) if RGRAD and self.has_downhill() else 0)   # step 19: keep a reserve when room is downhill (step 22 probe: LM_RSV in low-memory mode)
+        rsv = ((LM_RSV if self.fab.lm8 else RSV) if RGRAD and self.has_downhill() else 0)   # step 19: keep a reserve when room is downhill (step 22: LM_RSV in low-memory mode)
         if rsv and ((RSVI and not self.queue and not self.eject) or self.rd < RSVD):
             rsv = 0                           # step 20 probes
         if len(self.nfree) < nn + rsv or len(self.vfree) < nv + rsv:
@@ -1107,7 +1109,7 @@ class Fabric:
         self.img = img or Image(book, W, H, slots, qdepth, main_cells=mc)
         self.slots = self.img.slots
         self.lowmem = False
-        self.lm8 = bool(ADM & 16)
+        self.lm8 = LM == 2
         self.cells = {(x, y): Cell(self, x, y, self.img) for x in range(W) for y in range(H)}
         self.interactions = 0
         self.msgs = [0, 0, 0, 0]
@@ -1161,8 +1163,8 @@ class Fabric:
         if ADM & 6 and LM_T > 0:
             self.lowmem = min(sum(len(c.nfree) for c in self.cells.values()),
                               sum(len(c.vfree) for c in self.cells.values())) < LM_T
-        if ADM & 8:                             # step 22: no cell ample -> low-memory mode (registered OR tree)
-            self.lm8 = bool(ADM & 16) or not any((c._trig if LM_AHI else c._ample) for c in self.cells.values())
+        if LM == 1:                             # step 22: no cell ample -> low-memory mode (registered OR tree)
+            self.lm8 = not any(c._trig for c in self.cells.values())
         if ADM & 6 and LM_T < 0:               # 1-bit OR tree: no cell anywhere is roomy (registered)
             self.lowmem = not any(c._roomy for c in self.cells.values())
         self.router_step()

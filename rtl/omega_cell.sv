@@ -61,6 +61,12 @@ module omega_cell #(
   input  logic [5:0]  rto_m1,              //   step 18: retry-slot timeout - 1 (cycles; step 10-18: 31, step 19 default: 7)
   input  logic [2:0]  rgrad,               //   step 19: room-distance gradient cap (0 = off = step 18)
   input  logic [2:0]  rsv,                 //   step 20: slots an expansion leaves free when room is downhill (step 19: 4)
+  input  logic [1:0]  lm_mode,             //   step 22: low-memory mode (0 = off = step 21, 1 = while no cell is ample, 2 = always)
+  input  logic [7:0]  lm_hi,               //     low-memory roomy watermarks (absolute free slots, set / clear)
+  input  logic [7:0]  lm_lo,
+  input  logic [4:0]  lm_rsv,              //     reserve with room downhill in low-memory mode
+  input  logic        lowmem,              //     from the mesh: registered OR tree says no cell is ample
+  output logic        ample,               //     to the mesh: free node and var slots >= SLOTS/2 (cleared below SLOTS/4)
   input  logic [3:0]  in_v,
   input  flit_t [3:0] in_f,
   output logic [3:0]  in_rdy,
@@ -230,6 +236,12 @@ module omega_cell #(
   // without a roomy neighbour goes downhill at once instead of parking; escalated retries go downhill
   // instead of round robin; with a downhill neighbour an expansion leaves rsv free slots (an input since step 20; step 19: 4)
   // (rgrad = 0: step 18 behaviour cycle for cycle).
+  // step 22: roomy = the step-4 watermark register (SLOTS/4, SLOTS/8), or in low-memory mode the absolute one
+  logic room_big, room_lm, lm_on;
+  logic [4:0] rsv_e;
+  assign lm_on = ((lm_mode == 2'd2) || (lm_mode == 2'd1 && lowmem)) && !MUT[52];   // mutant 52: the mode never engages
+  assign roomy = lm_on ? room_lm : room_big;
+  assign rsv_e = lm_on ? lm_rsv : 5'(rsv);
   logic       dh_found;
   logic [1:0] dh_dir;
   logic [2:0] rd_min;
@@ -518,7 +530,7 @@ module omega_cell #(
       st_traps <= '0; tr_addr <= '0; tr_reason <= '0; tr_owner <= '0; tr_mask <= '0;
       vh_v <= 1'b0; vh_ov <= 1'b0; st_vhu <= '0;
       wq_n <= '0; vq_n <= '0; bufok <= 1'b0; rom_v <= 1'b0; rsp <= 1'b0; rsx <= 1'b0; rfw <= 1'b0; ej_taken <= 1'b0;
-      roomy <= 1'b0; mrot <= 2'(X + Y + 1); rdist <= 3'd0;
+      room_big <= 1'b0; room_lm <= 1'b0; ample <= 1'b0; mrot <= 2'(X + Y + 1); rdist <= 3'd0;
       rs_v <= 1'b0; rs_e <= '0; rs_tm <= '0; rs_n <= '0; cur_rs <= 1'b0; cur_rsn <= '0; st_park <= '0;
       gv_lvl <= gov_l0; ep_i <= '0; ep_m <= '0; gv_pi <= '0;   // step 14: reset level 1
       fcnt <= '0; st_fgive <= '0;
@@ -549,8 +561,13 @@ module omega_cell #(
       if (state != S_INIT) cyc <= cyc + 1;
       // roomy with hysteresis: set above SLOTS/4 free node and var slots, cleared below SLOTS/8
       if (state != S_INIT) begin
-        if (nf_tot >= (SB+2)'(SLOTS / 4) && vf_tot >= (SB+2)'(SLOTS / 4)) roomy <= 1'b1;
-        else if (nf_tot < (SB+2)'(SLOTS / 8) || vf_tot < (SB+2)'(SLOTS / 8)) roomy <= 1'b0;
+        if (nf_tot >= (SB+2)'(SLOTS / 4) && vf_tot >= (SB+2)'(SLOTS / 4)) room_big <= 1'b1;
+        else if (nf_tot < (SB+2)'(SLOTS / 8) || vf_tot < (SB+2)'(SLOTS / 8)) room_big <= 1'b0;
+        // step 22 low-memory mode: absolute watermarks, and the "ample" bit the mesh ORs into lowmem
+        if (nf_tot >= (SB+2)'(lm_hi) && vf_tot >= (SB+2)'(lm_hi)) room_lm <= 1'b1;
+        else if (nf_tot < (SB+2)'(lm_lo) || vf_tot < (SB+2)'(lm_lo)) room_lm <= 1'b0;
+        if (nf_tot >= (SB+2)'(SLOTS / 2) && vf_tot >= (SB+2)'(SLOTS / 2)) ample <= 1'b1;
+        else if (nf_tot < (SB+2)'(SLOTS / 4) || vf_tot < (SB+2)'(SLOTS / 4)) ample <= 1'b0;
       end
       // step 19 room distance (registered): 0 when roomy, else 1 + the smallest neighbour distance, capped at rgrad
       if (rgrad == 3'd0 || roomy) rdist <= 3'd0;
@@ -818,7 +835,7 @@ module omega_cell #(
         if (!sp_local_only && sp_give) begin
           snd = 1'b1; sf = {M_SPAWN, dir_x(hv_dir), dir_y(hv_dir), 64'd0, 64'd0, sp_x_p, sp_ref_p};
           fin = 1'b1;
-        end else if ((SB+2)'(nn) + ((dh_found || (MUT[51] && rgrad != 3'd0)) ? (SB+2)'(rsv) : '0) <= nf_tot && (SB+2)'(nv) + ((dh_found || (MUT[51] && rgrad != 3'd0)) ? (SB+2)'(rsv) : '0) <= vf_tot
+        end else if ((SB+2)'(nn) + ((dh_found || (MUT[51] && rgrad != 3'd0)) ? (SB+2)'(rsv_e) : '0) <= nf_tot && (SB+2)'(nv) + ((dh_found || (MUT[51] && rgrad != 3'd0)) ? (SB+2)'(rsv_e) : '0) <= vf_tot
                      && (32'(tq_tot) + 32'(nr) + 1) < QDEPTH) begin
           // (step 19: with a cell closer to room next door, an expansion must leave rsv node and var slots free,
           //  so a poor cell on the way does not spend its last slots and then block on NODE / PULL arrivals)

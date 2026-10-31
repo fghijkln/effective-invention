@@ -9,6 +9,7 @@ Cases
 * ballast: cell (0,0) is pre-filled with unreachable nodes / vars of a foreign owner (14), leaving only
   a few free slots, and the program is loaded there.  Without the mechanism the cell livelocks retrying
   rules it has no room for (v3 RTL: 7 of these 30 cases time out); with it all must finish.
+* near-overfull (step 22): treesum(9) 3x3 with 500 free slots in the corner, 8 elsewhere; needs the low-memory watermarks.
 * keep 0/8 (step 21): no free node slot at all in (0,0); needs the full-cell pass-on (rule d).
 * capacity: programs whose one-cell peak exceeds a (small) cell, on 2x2 / 4x4.
 * the multi-tenant security fuzz case 265 (one cell needed 1217 vars in a 1024-slot cell on the v2 RTL).
@@ -41,6 +42,11 @@ GKEEP = (8, 8)
 # step 19: the near-overfull global case whose livelock at a short retry timeout led to the room-distance
 # gradient (kept out of GLOBAL so bench/rto18_rtl.py stays comparable with step 18)
 GLOBAL19 = [("treesum", 9, 3, 3)]
+# step 22: near-overfull global pressure: 8 cells keep 8/8 free slots, the corner keeps NEAR_K (treesum(9) needs 451-470
+# free slots on a 1x1 RTL cell, 115 on the fabric model's).  With the step-21 watermarks (+lm=0) these seeds stop
+# (fabric seed 14, RTL seed 9); with the step-22 low-memory watermarks (default +lm=2) they finish.
+NEAR = [("treesum", 9, 3, 3)]
+NEAR_K, NEAR_FSEEDS, NEAR_RSEEDS = 500, (14,), (9,)
 OVERFULL = [("treesum", 9, 2, 2, 24), ("qsort", 30, 2, 2, 24)]
 
 
@@ -75,6 +81,43 @@ def run_overfull(use_rtl=True, mut=0, verbose=True):
                       f"interactions {r['interactions']} msgs {r['msgs']} parks {park}" + ("  WRONG ANSWER" if bad else ""), flush=True)
             fails += bad
     return n, fails
+
+
+def near_img(book, W, H, K):
+    from omega.ports import mk, ERA, NONE
+    i = ballast_img(book, W, H, 1024, *GKEEP, tuple((x, y) for x in range(W) for y in range(H) if (x, y) != (W - 1, H - 1)))
+    c = (W - 1, H - 1)
+    fn = [t for t in range(1024) if i.nodes[c][t] is None]; fv = [t for t in range(1024) if i.vars[c][t] is None]
+    for t in fn[K:]: i.nodes[c][t] = [mk(ERA), mk(ERA)]; i.nown[c][t] = 14
+    for t in fv[K:]: i.vars[c][t] = mk(NONE); i.vown[c][t] = 14
+    return i
+
+
+def run_near(use_rtl=True, mut=0, verbose=True):
+    """Step 22: near-overfull global pressure must finish (semantic vs fabric vs RTL)."""
+    n = fails = 0; tag = None
+    for name, N, W, H in NEAR:
+        book = progs.book(name, N); want = progs.expected(name, N); ref = semantic.result(book, fuel=10**8)
+        if mut == 0:
+            for s in NEAR_FSEEDS:
+                n += 1
+                try:
+                    f = fabric.Fabric(book, W, H, seed=s, p_jitter=0.1, img=near_img(book, W, H, NEAR_K)).run()
+                    ok = f.readback() == want and f.interactions == ref["interactions"]
+                except Exception as e:
+                    ok = False
+                if not ok:
+                    fails += 1; tag = f"near {name}({N}) {W}x{H} corner {NEAR_K} fabric seed {s}"
+                    if verbose: print("FAIL", tag, flush=True)
+        if use_rtl:
+            from omega import rtl
+            for s in NEAR_RSEEDS:
+                n += 1
+                r = rtl.run(book, W, H, img=near_img(book, W, H, NEAR_K), seed=s, jitter=30, mut=mut, maxcycles=400_000, timeout=900)
+                if r["status"] != 0 or r["readback"] != want or r["interactions"] != ref["interactions"]:
+                    fails += 1; tag = f"near {name}({N}) {W}x{H} corner {NEAR_K} RTL seed {s}: status {r['status']}"
+                    if verbose: print("FAIL", tag, flush=True)
+    return n, fails, tag
 
 
 def cases(quick=False):
@@ -124,6 +167,10 @@ def run_cases(use_rtl=True, mut=0, verbose=True, quick=False, security=True):
             fails += 1
             if verbose: print(f"FAIL {tag}: " + "; ".join(errs), flush=True)
             if mut: return n, fails, tag
+    if not quick:
+        n2, f2, tag = run_near(use_rtl, mut, verbose)
+        n += n2; fails += f2
+        if mut and f2: return n, fails, tag
     if use_rtl and not quick and mut == 0:
         n2, f2 = run_overfull(use_rtl, mut, verbose)
         n += n2; fails += f2
