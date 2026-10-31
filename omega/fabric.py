@@ -56,6 +56,25 @@ RG1F = int(__import__('os').environ.get('OMEGA_RG1F', '0'))   # 1 = rule 1 (down
 RG1D = int(__import__('os').environ.get('OMEGA_RG1D', '0'))   # rule 1 only when own room distance >= RG1D
 RSVD = int(__import__('os').environ.get('OMEGA_RSVD', '0'))   # reserve only when own room distance >= RSVD
 RG2 = int(__import__('os').environ.get('OMEGA_RG2', '1'))     # 0 = escalated retries round robin (rule 2 off, diagnosis)
+PASSON = int(__import__('os').environ.get('OMEGA_PASSON', '1'))
+# step 22 prototypes (fabric only, default off): memory-aware admission
+#   ADM bit 0: shrink-first (HVM2-style): a cell that is not roomy pops, from the top ADM_W stack entries, the
+#              topmost task that frees memory (annihilation, erasure) before neutral ones and before growth
+#              (commutation, REF expansion / SPAWN); a roomy cell keeps plain LIFO
+#   ADM bit 1: global low-memory mode: while the fabric's total free (min of node / var) slots < LM_T, no cell
+#              advertises hunger and no work is given away (no SPAWN gives, no fork-deque gives)
+#   ADM bit 2: low-memory mode also defers growth: a cell pops shrinking / neutral tasks first from ADM_W
+ADM = int(__import__('os').environ.get('OMEGA_ADM', '0'))
+ADM_W = int(__import__('os').environ.get('OMEGA_ADM_W', '4'))
+#   ADM bit 3: global low-memory mode (1-bit OR tree): while no cell has SLOTS/4 free ("ample"), roomy uses the
+#              absolute watermarks LM_HI / LM_LO instead of SLOTS/4 / SLOTS/8, and an expansion with room downhill
+#              must leave LM_RSV slots free instead of RSV, so work collects in the cells that have room
+#   ADM bit 4 (with bit 3): low-memory mode always on (absolute watermarks and LM_RSV everywhere, no trigger)
+LM_HI = int(__import__('os').environ.get('OMEGA_LM_HI', '64'))
+LM_LO = int(__import__('os').environ.get('OMEGA_LM_LO', '32'))
+LM_RSV = int(__import__('os').environ.get('OMEGA_LM_RSV', '16'))
+LM_AHI = int(__import__('os').environ.get('OMEGA_LM_AHI', '0'))  # > 0: "ample" (the mode trigger) = free >= LM_AHI, cleared below LM_AHI / 2 (0: SLOTS/4, SLOTS/8)
+LM_T = int(__import__('os').environ.get('OMEGA_LM_T', '0'))   # > 0: total-free threshold; -1: "no cell is roomy" (OR tree)  # step 21 diagnosis: 0 = full-cell pass-on (rule d) off = RTL mutant 50
 DIRS = ["N", "E", "S", "W"]
 DXY = {"N": (0, -1), "E": (1, 0), "S": (0, 1), "W": (-1, 0)}
 OPP = {"N": "S", "S": "N", "E": "W", "W": "E"}
@@ -379,7 +398,7 @@ class Cell:
         self.spawn_targets = [None] + self.nbrs
         # memory pressure (SPEC 9): roomy = free node and var slots above a watermark, with hysteresis
         self.room_hi, self.room_lo = img.slots // 4, img.slots // 8
-        self._roomy = False
+        self._roomy = self._ample = self._lroomy = self._trig = False
         self.update_roomy()
         self.st = {"interactions": 0, "busy": 0, "tasks": 0, "msgs_in": 0, "requeue": 0, "max_q": len(self.queue),
                    "max_nodes": 0, "vhu": 0}
@@ -536,14 +555,29 @@ class Cell:
     def update_roomy(self):
         nf, vf = len(self.nfree), len(self.vfree)
         if nf >= self.room_hi and vf >= self.room_hi:
-            self._roomy = True
+            self._ample = True
         elif nf < self.room_lo or vf < self.room_lo:
-            self._roomy = False
+            self._ample = False
+        self._roomy = self._ample
+        if ADM & 8 and LM_AHI:
+            if nf >= LM_AHI and vf >= LM_AHI:
+                self._trig = True
+            elif nf < LM_AHI // 2 or vf < LM_AHI // 2:
+                self._trig = False
+        if ADM & 8:
+            if nf >= LM_HI and vf >= LM_HI:
+                self._lroomy = True
+            elif nf < LM_LO or vf < LM_LO:
+                self._lroomy = False
+            if self.fab.lm8:
+                self._roomy = self._lroomy
 
     def roomy(self):
         return self._roomy
 
     def hungry(self):
+        if ADM & 2 and self.fab.lowmem:
+            return False
         return self._roomy and not (self.busy or self.queue or self.eject or self.vh_busy or self.vh_out or self.rs)
 
     def escalated(self):
@@ -596,6 +630,8 @@ class Cell:
         linear recursion only while more than spawn_k tasks wait here; a non-recursive one (constructor,
         arm) while more than spawn_k2 wait.  K = -1: no threshold.  Without the hint every REF uses spawn_k."""
         q, fab = len(self.queue), self.fab
+        if ADM & 2 and fab.lowmem:
+            return False
         if not fab.spawn_hint:
             return q > fab.spawn_k
         if r in fab.img.fork:
@@ -682,7 +718,7 @@ class Cell:
         ref, o = label(refp), owner(refp)
         d = self.fab.book[ref]
         nn, nv = len(d.nodes), d.nvars
-        rsv = RSV if RGRAD and self.has_downhill() else 0   # step 19: keep a reserve when room is downhill
+        rsv = ((LM_RSV if ADM & 8 and self.fab.lm8 else RSV) if RGRAD and self.has_downhill() else 0)   # step 19: keep a reserve when room is downhill (step 22 probe: LM_RSV in low-memory mode)
         if rsv and ((RSVI and not self.queue and not self.eject) or self.rd < RSVD):
             rsv = 0                           # step 20 probes
         if len(self.nfree) < nn + rsv or len(self.vfree) < nv + rsv:
@@ -887,7 +923,7 @@ class Cell:
         if src != "m" and self.rs is not None and self.rs_tm == 0:
             src = "r"                          # the parked retry before the task stack (non-LIFO)
         if src is None:
-            if RGRAD and self.eject and self.eject[0][0] in (MSG_NODE, MSG_PULL) and not self.nfree and self.nbrs \
+            if RGRAD and PASSON and self.eject and self.eject[0][0] in (MSG_NODE, MSG_PULL) and not self.nfree and self.nbrs \
                     and self.can_send() and not self.busy:
                 # step 19 (RTL fwd_full): a NODE / PULL at the head of a cell with no free node slot and nothing
                 # else to do is passed on instead of blocking the LINKs queued behind it
@@ -928,7 +964,7 @@ class Cell:
                 (k, a, b), self.rs = self.rs, None
                 self.cur_rsn = self.rs_n
             else:
-                k, a, b = self.queue.pop()   # LIFO task stack (depth-first, bounded memory)
+                k, a, b = self.pop_task()    # LIFO task stack (depth-first, bounded memory)
             vh = None
             if k == T_LINK and not self.vh_busy and self.vh_out is None:
                 vh = self.vhu_chain(a, b)          # hand the var chain to the VHU (no-op if not a local var link)
@@ -975,6 +1011,38 @@ class Cell:
         self.st["max_nodes"] = max(self.st["max_nodes"], len(self.nodes) - len(self.nfree))
         self.st["max_vars"] = max(self.st.get("max_vars", 0), len(self.vars) - len(self.vfree))
         self.busy = max(0, cost - 1)
+
+    def task_score(self, t):
+        """Step 22: 0 = frees memory (annihilation, erasure), 1 = neutral, 2 = grows (commutation, expansion)."""
+        k, a, b = t
+        if k in (T_SPAWN, T_EXPAND):
+            return 2
+        if k != T_LINK or is_var(a) or is_var(b):
+            return 1
+        ta, tb = tag(a), tag(b)
+        if REF in (ta, tb):
+            return 1 if ERA in (ta, tb) else 2
+        na, nb = ta in NODE_TAGS, tb in NODE_TAGS
+        if na and nb:
+            return 0 if (ta == tb and label(a) == label(b) and ta in (CON, DUP)) else 2
+        return 0 if (na or nb) else 1
+
+    def pop_task(self):
+        q = self.queue
+        m = q.m if isinstance(q, TaskStack) else q
+        if ADM and m and len(m) > 1 and ((ADM & 1 and not self._roomy) or (ADM & 4 and self.fab.lowmem)):
+            best, bs = None, 3
+            for i in range(1, min(ADM_W, len(m)) + 1):
+                sc = self.task_score(m[-i])
+                if sc < bs:
+                    best, bs = i, sc
+                    if sc == 0:
+                        break
+            if best > 1:
+                t = m[-best]; del m[-best]
+                self.st["admpick"] = self.st.get("admpick", 0) + 1
+                return t
+        return q.pop()
 
     def idle(self):
         return not (self.busy or self.vh_busy or self.vh_out or self.queue or self.eject or self.rs or any(self.inq.values()))
@@ -1038,6 +1106,8 @@ class Fabric:
             mc = cl[i:] + cl[:i]
         self.img = img or Image(book, W, H, slots, qdepth, main_cells=mc)
         self.slots = self.img.slots
+        self.lowmem = False
+        self.lm8 = bool(ADM & 16)
         self.cells = {(x, y): Cell(self, x, y, self.img) for x in range(W) for y in range(H)}
         self.interactions = 0
         self.msgs = [0, 0, 0, 0]
@@ -1088,6 +1158,13 @@ class Fabric:
                 self.hops += 1
 
     def step(self):
+        if ADM & 6 and LM_T > 0:
+            self.lowmem = min(sum(len(c.nfree) for c in self.cells.values()),
+                              sum(len(c.vfree) for c in self.cells.values())) < LM_T
+        if ADM & 8:                             # step 22: no cell ample -> low-memory mode (registered OR tree)
+            self.lm8 = bool(ADM & 16) or not any((c._trig if LM_AHI else c._ample) for c in self.cells.values())
+        if ADM & 6 and LM_T < 0:               # 1-bit OR tree: no cell anywhere is roomy (registered)
+            self.lowmem = not any(c._roomy for c in self.cells.values())
         self.router_step()
         cells = list(self.cells.values())
         self.rng.shuffle(cells)

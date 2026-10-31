@@ -311,7 +311,9 @@ Correctness argument (also checked by fuzzing):
   neighbour (no room within `rgrad` hops, or the whole fabric full) rules (a)–(c) are the step-10 rule. Default `rgrad` = 3 with `rto` = 8 (README step 19: the short
   timeout alone livelocked the fabric and the RTL under global pressure; the gradient removes that).
   Mutants 49 (no downhill neighbour is ever found), 50 (rule (d) off) and 51 (the reserve applied without a
-  downhill neighbour).
+  downhill neighbour). At the default reserve 1 a cell reaches zero free node slots only where the reserve does
+  not apply or never had one; the step-21 mempress cases (ballast leaves no free node slot in the program's home
+  cell (0,0)) stop on every run without rule (d) and catch mutant 50 at the default configuration.
   None of these change the result or the interaction count (migration is not an interaction), only
   where a rule runs. `tests/test_mempress.py` pre-fills cell (0,0) with foreign "ballast" so that only
   4–30 slots are free there: without the mechanism the v3 RTL livelocks on 7 of 30 such cases.

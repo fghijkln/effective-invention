@@ -9,6 +9,7 @@ Cases
 * ballast: cell (0,0) is pre-filled with unreachable nodes / vars of a foreign owner (14), leaving only
   a few free slots, and the program is loaded there.  Without the mechanism the cell livelocks retrying
   rules it has no room for (v3 RTL: 7 of these 30 cases time out); with it all must finish.
+* keep 0/8 (step 21): no free node slot at all in (0,0); needs the full-cell pass-on (rule d).
 * capacity: programs whose one-cell peak exceeds a (small) cell, on 2x2 / 4x4.
 * the multi-tenant security fuzz case 265 (one cell needed 1217 vars in a 1024-slot cell on the v2 RTL).
 Each case: semantic model (golden) vs fabric model vs RTL: readback, interaction count.
@@ -22,7 +23,11 @@ from omega.ports import *
 
 BALLAST = [("fib", 12), ("qsort", 15), ("treesum", 6), ("list", 20), ("sort", 10)]
 BSHAPES = [(2, 2), (3, 2)]
-BKEEP = [(8, 8), (30, 30), (4, 200)]          # free (node, var) slots left in cell (0,0)
+BKEEP = [(8, 8), (30, 30), (4, 200), (0, 8)]  # free (node, var) slots left in cell (0,0)
+# (0, 8), step 21: zero free node slots in the program's home cell.  The first NODE that reaches (0,0) waits at
+# its ejection head; the cell has nothing else to do, so only the full-cell pass-on (rule d, SPEC 5) moves it on
+# and unblocks the LINKs queued behind it.  Without rule d (mutant 50) all 10 cases stop (status 3) at the
+# default +rsv=1 (results/s21: fabric 150/150 keep-0 runs stuck without the pass-on, 0 with it)
 CAPACITY = [("qsort", 24, 256, 2, 2), ("higher", 30, 256, 2, 2), ("sort", 30, 128, 2, 2), ("list", 120, 256, 4, 4),
             ("qsort", 40, 256, 4, 4)]
 

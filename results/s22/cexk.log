@@ -1,0 +1,16 @@
+== K=200 ADM=8
+{"K": 200, "rhi": null, "knobs": {"OMEGA_ADM": "8", "OMEGA_SPLIT": "400"}, "1x1": 109463, "stuck": [], "n": 20, "cycles": 109507}
+== K=200 ADM=0
+{"K": 200, "rhi": null, "knobs": {"OMEGA_ADM": "0", "OMEGA_SPLIT": "400"}, "1x1": 109463, "stuck": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20], "n": 20, "cycles": null}
+== K=150 ADM=8
+{"K": 150, "rhi": null, "knobs": {"OMEGA_ADM": "8", "OMEGA_SPLIT": "400"}, "1x1": 109463, "stuck": [], "n": 20, "cycles": 109507}
+== K=150 ADM=0
+{"K": 150, "rhi": null, "knobs": {"OMEGA_ADM": "0", "OMEGA_SPLIT": "400"}, "1x1": 109463, "stuck": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20], "n": 20, "cycles": null}
+== K=120 ADM=8
+{"K": 120, "rhi": null, "knobs": {"OMEGA_ADM": "8", "OMEGA_SPLIT": "400"}, "1x1": 109463, "stuck": [], "n": 20, "cycles": 109507}
+== K=120 ADM=0
+{"K": 120, "rhi": null, "knobs": {"OMEGA_ADM": "0", "OMEGA_SPLIT": "400"}, "1x1": 109463, "stuck": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20], "n": 20, "cycles": null}
+== K=300 ADM=8
+{"K": 300, "rhi": null, "knobs": {"OMEGA_ADM": "8", "OMEGA_SPLIT": "400"}, "1x1": 109463, "stuck": [4, 5, 8, 9, 14, 16, 17, 18, 20], "n": 20, "cycles": 109461}
+== K=300 ADM=0
+{"K": 300, "rhi": null, "knobs": {"OMEGA_ADM": "0", "OMEGA_SPLIT": "400"}, "1x1": 109463, "stuck": [4, 5, 8, 9, 14, 16, 17, 18, 20], "n": 20, "cycles": 109451}

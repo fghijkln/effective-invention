@@ -1,0 +1,9 @@
+K=200
+{"K": 200, "rhi": null, "knobs": {}, "1x1": 109463, "stuck": [], "n": 20, "cycles": 109507}
+K=300
+{"K": 300, "rhi": null, "knobs": {}, "1x1": 109463, "stuck": [], "n": 20, "cycles": 109507}
+K=600
+{"K": 600, "rhi": null, "knobs": {}, "1x1": 109463, "stuck": [], "n": 20, "cycles": 109507}
+K=150
+{"K": 150, "rhi": null, "knobs": {}, "1x1": 109463, "stuck": [], "n": 20, "cycles": 109507}
+{"K": 200, "rhi": null, "knobs": {"OMEGA_LM": "0"}, "1x1": 109463, "stuck": [1, 2, 3], "n": 3, "cycles": null}

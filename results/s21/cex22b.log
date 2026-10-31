@@ -1,0 +1,2 @@
+== OMEGA_ADM=2 OMEGA_LM_T=-1
+{"K": 200, "rhi": null, "knobs": {"OMEGA_SPLIT": "400", "OMEGA_ADM": "2", "OMEGA_LM_T": "-1"}, "1x1": 109463, "stuck": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20], "n": 20, "cycles": null}
