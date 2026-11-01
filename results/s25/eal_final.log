@@ -1,0 +1,3 @@
+  census: 18/24 in Ω-L; rejected: qsort.olm (affine); church (bang); ackermann (recursion); default_and_binder (affine); pair_columns (type); polymorphic_helper (type)
+  fuzz: 200 typed programs, 200 broken ones, 30 on the RTL; B / semantic peak: nodes median 3.6 (min 1.0, max 10.9), vars median 2.8 (min 1.0, max 8.2)
+Ω-L tests: 597/597 pass (182s) [checker + semantic + fabric + RTL]

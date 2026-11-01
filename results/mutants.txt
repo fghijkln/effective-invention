@@ -53,4 +53,4 @@ mutant 51 CAUGHT  step 20 slot reserve applied without a downhill neighbour (an 
 mutant 52 CAUGHT  step 22 low-memory watermarks never engage (roomy stays SLOTS/4, reserve stays rsv; caught by the near-overfull treesum(9) 3x3 case, corner 500 free slots, RTL seed 9, which stops with status 3) -- near treesum(9) 3x3 corner 500 RTL seed 9: status 3
 mutant 53 CAUGHT  step 23 +ilr: the root link of an expansion is still linked at once (step-22 order; caught by the mempress treesum(9) 1x1 cases with 250 / 130 free slots at +ilr=1 / 2) -- ilr treesum(9) 1x1 keep 250 RTL +ilr=1: status 2
 mutant 54 CAUGHT  step 23 +ilr=2: the fabric child order never applies (a rule continues with its first link; caught by treesum(9) 1x1 with 130 free slots, which then needs 235) -- ilr treesum(9) 1x1 keep 130 RTL +ilr=2: status 2
-mutants: 55/55 caught (run as three parts: 0-18, 19-36, 37-54; step 24)
+mutants: 55/55 caught (run as three parts: 0-18, 19-36, 37-54; step 25)

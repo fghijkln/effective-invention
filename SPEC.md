@@ -841,3 +841,7 @@ in a lazily expanded definition), the CROSS fault-injection cases with `fi` = 0 
 multi-tenant random fuzz (2–4 random tenants with random owners, half of the cases with an attacker
 carrying random forged redexes, random mesh, schedule knobs, scatter and `fi`). Mutants 16–21
 disable each check in turn.
+
+**Memory.** Isolation covers capabilities, not capacity: one tenant can still fill the shared memory. Step 25's
+admission control (§7.4, fabric model) closes that for Ω-L jobs: a job starts only while the sum of the running
+jobs' bounds fits every cell.
