@@ -53,6 +53,7 @@ python3 -m omega.eal --symbolic treesum  # the same bound as a closed form in N 
 python3 tests/test_s25.py --fuzz 40      # symbolic B(N), W_vars, admission control (step 25)
 python3 tests/test_s26.py                # admission control in the RTL vs the fabric model (step 26)
 python3 tests/test_s27.py                # quicksort in Ω-L: bounds, closed forms, RTL at exactly B (step 27)
+python3 tests/test_s28.py                # 16-bit slots: high-slot runs, benchmark sizes certified at B (step 28)
 python3 bench/bench.py --8x8             # results/bench.md
 bash tests/run_all.sh                    # everything except the benchmarks
 ```
@@ -89,7 +90,7 @@ def main = tsum(gen(N))
 
 ## Results
 
-### Verification (full regression on step 27 = step 26 + `programs/qsort_l.olm`, quicksort in Ω-L (new program and tests only); step 26 = step 25 + admission control in the RTL (`+adm`, default 0 = step 25 cycle for cycle; identity 128 / 128); step 25 = step 24 + symbolic B(N), W_vars and admission control (new modules only; no RTL / `fabric.Fabric` change; identity 128 / 128); step 24 = step 23 + the Ω-L checker and memory bound (no RTL / model change; identity 128 / 128); step 23 = step 22 + the expansion-order knob `+ilr` (default 0 = step 22 cycle for cycle; identity 128 / 128); step 22 = step 21 + low-memory watermarks (`+lm=2`, default; `+lm=0` = step 21 cycle for cycle); step 21 = step 20 + the keep-0 pressure cases (tests only); step 20 = step 19 with slot reserve 1 (`+rsv=1`), defaults `+rto=8 +rgrad=3 +rsv=1`; step 19 = step 18 + the room-distance gradient: v4 engine + retry slot + spawn threshold / fork hints + local-first link orientation + producer hint / message-budget governor + fork deque with the step-15 deque hint; default 2×2 cells per ROM, one port)
+### Verification (full regression on step 28 = step 27 + a 16-bit slot field (cells up to 65,536 slots; default SLOTS = 1,024 cycle for cycle; identity 128 / 128); step 27 = step 26 + `programs/qsort_l.olm`, quicksort in Ω-L (new program and tests only); step 26 = step 25 + admission control in the RTL (`+adm`, default 0 = step 25 cycle for cycle; identity 128 / 128); step 25 = step 24 + symbolic B(N), W_vars and admission control (new modules only; no RTL / `fabric.Fabric` change; identity 128 / 128); step 24 = step 23 + the Ω-L checker and memory bound (no RTL / model change; identity 128 / 128); step 23 = step 22 + the expansion-order knob `+ilr` (default 0 = step 22 cycle for cycle; identity 128 / 128); step 22 = step 21 + low-memory watermarks (`+lm=2`, default; `+lm=0` = step 21 cycle for cycle); step 21 = step 20 + the keep-0 pressure cases (tests only); step 20 = step 19 with slot reserve 1 (`+rsv=1`), defaults `+rto=8 +rgrad=3 +rsv=1`; step 19 = step 18 + the room-distance gradient: v4 engine + retry slot + spawn threshold / fork hints + local-first link orientation + producer hint / message-budget governor + fork deque with the step-15 deque hint; default 2×2 cells per ROM, one port)
 
 | suite | result | what it checks |
 |---|---|---|
@@ -107,6 +108,8 @@ def main = tsum(gen(N))
 | admission in the RTL (`tests/test_s26.py`, step 26) | **76 / 76** | 8 scenarios (floods of 180 / 300 jobs on 2×2 / 3×3 with W and B reservations, reject, queue, untyped, one cell, owners): RTL controller and fabric-model scheduler agree on the rejected set, the start order and the interaction count; every admitted job correct; zero violations of the per-cycle audit; no owner overlap; the same floods without admission stop |
 | step-26 mutants (`tests/test_s26.py --mutants`) | **5 / 5 caught** | admission ignoring running reservations, no reject check, two jobs of one owner at once, root var not reset, reservations never released |
 | quicksort in Ω-L (`tests/test_s27.py`, step 27) | **253 / 253** | `qsort_l` accepted / `qsort` rejected; qsort_l = qsort = `sorted` on 182 inputs (semantic), fabric 1×1 / 2×2 / 4×4, RTL 2×2; B ≥ semantic and fabric peaks, W between; exact closed forms (descending, ascending) with held-out N, decomposition exact on 263 inputs with its maximum equal to the descending form; RTL 1×1 with exactly B slots |
+| 16-bit slots, certified sizes (`tests/test_s28.py`, step 28) | **129 / 129** | encoding round trip over all 16 slot bits; forged slot bits [15:12] trap OOB (semantic, fabric, RTL); 7 runs with every allocation above slot 4,096 (up to 65,535) equal to the semantic reducer; 10 benchmark-size jobs on RTL 1×1 with exactly B free slots, 3 on 2×2 at slots_mesh; admission of 7 benchmark-size jobs on 2×2 × 20,000 slots = fabric-model scheduler; fib(20) / treesum_direct(14) flagged uncertifiable |
+| step-28 mutants (`tests/test_s28.py --mutants`) | **2 / 2 caught** | allocated slot addresses truncated to 12 bits, OOB check on slot bits [11:0] only |
 | mutation testing (`tests/mutants.py`) | **55 / 55 caught** | 15 functional mutants of the rule logic / protocol / quiescence + 1 performance mutant (no work distribution, caught by the speed-up bound) + 6 security mutants (each owner-capability check disabled, owner stamping missing, trap not blocking). Two mutants (eraser reaches only aux1; REF~DUP expands instead of copying) produce the *right* answer and are caught only by the node count / interaction count. That is why all three observables are compared. + 5 v3 engine mutants (read-ahead write bypass, write-queue drain, var owner-tag queue, allocation pop count, ROM read-ahead) + 2 memory-pressure mutants (caught by `tests/test_mempress.py`) + 3 cluster-ROM mutants (grant beyond the port count, EXPAND not waiting for its template word, stale buffered word) + 7 v4 mutants (second node write port not bypassed into the read-ahead, second EXPAND entry's var tag to the wrong slot, EXPAND skipping an entry, VHU without the same-slot stall, VHU hand-back never taken, VHU disabled = performance mutant caught by a fib(12) cycle bound, VHU read-ahead without bypass of write port 1) + 3 retry-slot mutants (39 parked retry never taken, 40 quiescence ignores the slot, 41 no escalation). Mutant 27 (roomy offload disabled) now survives on its own, because escalation also rescues every pressure case (roomy offload became a fast path); it is run together with 41 and caught. Mutant 28 (a full cell still asks for work) is tolerated by the step-19 full-cell pass-on on the quick pressure set, so since step 19 it runs on the full set and is caught by the global treesum(9) 3×3 case. + 3 step-11/12 performance mutants, each caught by its own bound: 42 spawn threshold ignored (qsort(20) 4×4 > 0.6 messages per interaction), 43 fork hint ignored (fib(12) 4×4 > 1.3× slower), 44 local-first link orientation disabled (treesum(7) 4×4 > 1.3× more LINKs) + 2 step-13 performance mutants: 45 producer hint ignored (qsort(30) 4×4 > 1.15× slower: 11,383 vs 9,118 cycles), 46 governor never tightens (qsort(30) 4×4 > 1.15× more messages per interaction: 0.529 vs 0.398) + 2 step-14 mutants: 47 oldest-fork give disabled (performance only: fib(16) 4×4 seed 1 > 1.05× slower, 8,254 vs 7,530 cycles; a treesum(7) bound let it survive at 1.04×, because the step-11 path still gives a fork task popped from an empty stack), 48 a fork task finding the deque full is dropped (caught by the program suite: fib(8) 2×2 loses work) + 2 step-19 mutants, each caught by the livelock / deadlock seeds that motivated the change at the new default: 49 room-distance gradient ignored (global treesum(9) 3×3 seeds 3 / 10 / 11 stop without progress), 50 full-cell pass-on off (since step 21 caught at the default `+rsv=1` by the ballast keep 0 / 8 cases fib(12) 2×2 and treesum(6) 3×2, which stop with status 3; step 19's global treesum(7) 8×8 seeds 16 / 18 stop only at `+rsv=4`) + 1 step-20 mutant: 51 slot reserve applied without a downhill neighbour (fib(10) on 1×1 with exactly the 93 free node / var slots its RTL run needs ends in status 2) + 1 step-22 mutant: 52 low-memory watermarks never engage (caught by the near-overfull treesum(9) 3×3 corner-500 case, RTL seed 9 stops with status 3) + 2 step-23 mutants: 53 the root is linked at once whatever `+ilr` says, 54 `+ilr=2` without the model's child order (both caught by the expansion-order pressure cases) |
 
 Strong confluence is the test oracle. Any schedule (arbitration, delays, stalls, task/message priority,
@@ -152,6 +155,58 @@ slower than one cell (sum(1000) on 1×1 needs a 4,096-slot cell: 29,018 cycles v
 step 12 the cost was qsort: on meshes it was 16–27% slower than with step 10's eager spreading,
 because its filter chains (lo/hi/app) stayed where they started; step 13 (next section) fixes that. treesum(9)
 on 8×8 varies ±20% with the arbitration seed; over seeds 1–4 the mean is 2,374 vs 2,470 for step 10.
+
+### Cells of up to 65,536 slots: the benchmark sizes certified (step 28)
+
+Steps 24–27 bound an Ω-L job's memory, but a bound only certifies a run if it fits a cell, and a slot address had
+12 bits: at most 4,096 slots per cell, so only small inputs were certified (sum ≤ 371, list ≤ 72, fib ≤ 11,
+treesum ≤ 6, qsort_l ≤ 10). Step 28 widens the slot field to payload bits [15:0]. Bits [15:12] were unused and had
+to be 0, so the port layout, flits and x / y fields do not change; `pslot` / `mkaddr`, the step-26 host port and the
+audit counters get wider (every RAM and stack was already sized by `$clog2(SLOTS)`), and the out-of-bounds check
+traps slot ≥ SLOTS instead of "bits [15:12] ≠ 0", which for SLOTS ≤ 4,096 is the same set of pointers. **Default
+(SLOTS = 1,024) cycle-identical: identity 128 / 128.** SPEC §2.1, §7.7.
+
+Largest N certified on one cell (max(B_nodes, B_vars) ≤ S; sort / qsort_l worst case over all inputs):
+
+| program | S = 1,024 (default) | 4,096 (max before) | **65,536 (step 28)** | benchmark size: B (nodes / vars) |
+|---|---:|---:|---:|---|
+| sum, fact | 92 | 371 | **5,957** | sum(1000): 11,007 / 8,006 |
+| list | 17 | 72 | **1,169** | list(120): 6,507 / 6,743 |
+| higher | 22 | 92 | **1,488** | higher(100): 4,342 / 4,443 |
+| sort | 6 | 14 | **64** | sort(20): 4,889 / 4,470 |
+| qsort_l | 4 | 10 | **43** | qsort_l(40): 13,212 / 11,947 (any input: 54,657 / 50,035) |
+| treesum | 4 | 6 | **10** | treesum(9): 18,921 / 16,365 |
+| fib | 8 | 11 | **17** | fib(20): 262,690 / 207,963: **not certifiable** |
+| treesum_direct | 6 | 8 | **12** | treesum_direct(14): 196,600 / 147,451: **not certifiable** |
+
+RTL runs with exactly B free slots (`tests/test_s28.py`; every run correct, status 0):
+
+| job | cell | cycles | peak (nodes, vars) | B / peak |
+|---|---|---:|---|---|
+| qsort_l(40) | 1×1, B = 13,212 / 11,947 | 34,649 | (292, 592) | 45× / 20× |
+| list(120) | 1×1, B = 6,507 / 6,743 | 19,024 | (1,210, 2,172) | 5× / 3× |
+| sum(1000) | 1×1, B = 11,007 / 8,006 | 29,018 | (1,007, 3,008) | 11× / 3× |
+| sort(20) | 1×1, B = 4,889 / 4,470 | 13,052 | (152, 248) | 32× / 18× |
+| higher(100) | 1×1, B = 4,342 / 4,443 | 12,257 | (716, 1,519) | 6× / 3× |
+| treesum(9) | 1×1, B = 18,921 / 16,365 | 49,199 | (281, 463) | 67× / 35× |
+| treesum(10) | 1×1, B = 37,865 / 32,749 | 98,657 | (538, 853) | 70× / 38× |
+| fib(17) | 1×1, B = 62,002 / 49,085 | 164,752 | (87, 128) | 713× / 383× |
+| treesum_direct(12) | 1×1, B = 49,144 / 36,859 | 130,549 | (42, 93) | 1,170× / 396× |
+| treesum(9) / qsort_l(40) / sum(1000) | 2×2, slots_mesh per cell (18,943 / 13,241 / 11,029) | 13,269 / 20,941 / 29,008 | | |
+
+Admission (step 26 controller) on 2×2 × 20,000-slot cells with its root pool above slot 4,096 (slots 20,000–20,015):
+treesum(9), qsort_l(40), list(120), sum(1000), sort(20), higher(100), fact(20) all admitted and correct, start order
+and 56,692 interactions identical to the fabric-model scheduler, 70,258 cycles, max reserved 7,166 / 18,690 of 19,971.
+Also: 7 high-slot runs with every allocation above slot 4,096 (up to slot 65,535, meshes 1×1–3×2) equal the
+semantic reducer on the RTL and the fabric model; forged pointers with slot bits [15:12] set still trap OOB on
+1,024-slot cells. Tests **129 / 129**; **mutants 65 (allocated addresses truncated to 12 bits) and 66 (OOB check on
+bits [11:0] only): 2 / 2 caught**.
+
+What it shows: the bound now certifies every suite benchmark size on one 65,536-slot cell except fib(20) and
+treesum_direct(14), whose B grows with the whole call tree. A wider address cannot fix those: the per-cell admission
+rule assumes one cell may receive the whole job, so a bigger mesh does not help either. And B is loose for the
+depth-first RTL (up to 1,170× the real peak on tree recursions), so certifying a size by B reserves far more memory
+than a run uses. Closing both needs a placement-aware or schedule-aware bound (or spilling), not more address bits.
 
 ### Quicksort in Ω-L (step 27)
 
@@ -1539,7 +1594,7 @@ What this says:
 4. **Limits on sizes.**
    * One definition may have at most 255 nodes, 255 vars and 255 redexes (8-bit counts), and the ROM
      holds 4096 entries.
-   * There are at most 16×16 cells and 4096 slots per cell.
+   * There are at most 16×16 cells and 65,536 slots per cell (4,096 before step 28).
    * NUM atoms are u32 only (no signed or float types).
 5. **Termination detection** is a combinational AND tree over all cells, fine for simulation. A large
    chip needs a pipelined tree or a token ring (SPEC §8).

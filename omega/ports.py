@@ -7,7 +7,7 @@ A *port* is a 64-bit word:
     [43:40] owner    owner capability id (security demo; 0 = default program)
     [39:32] reserved (0)
     [31:0]  payload  NUM: 32-bit unsigned value
-                     VAR / CON / DUP / OPR / SWI: address {x[23:20], y[19:16], slot[11:0]}
+                     VAR / CON / DUP / OPR / SWI: address {x[23:20], y[19:16], slot[15:0]} (step 28; [11:0] before)
 
 A *node* occupies one 128-bit slot = {aux2[127:64], aux1[63:0]}.  Its principal port is implicit:
 whoever holds a pointer port (CON/DUP/OPR/SWI + address) is connected to that node's principal.
@@ -78,7 +78,7 @@ def is_var(p):
 
 
 def addr(x, y, slot):
-    return ((x & 0xF) << 20) | ((y & 0xF) << 16) | (slot & 0xFFF)
+    return ((x & 0xF) << 20) | ((y & 0xF) << 16) | (slot & 0xFFFF)   # step 28: 16-bit slot
 
 
 def addr_xy(a):
@@ -86,7 +86,7 @@ def addr_xy(a):
 
 
 def addr_slot(a):
-    return a & 0xFFF
+    return a & 0xFFFF
 
 
 ERA_P = mk(ERA)

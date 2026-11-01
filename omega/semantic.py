@@ -52,7 +52,7 @@ class Net:
             return False
         W, H, S = self.geometry
         a = payload(p); x, y = addr_xy(a)
-        return x >= W or y >= H or addr_slot(a) >= S or (a & 0xFF00F000) != 0
+        return x >= W or y >= H or addr_slot(a) >= S or (a & 0xFF000000) != 0
 
     def cross(self, a, b):
         return is_cap(a) and is_cap(b) and owner(a) != owner(b)

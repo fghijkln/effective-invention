@@ -20,16 +20,16 @@ module omega_adm #(
 ) (
   input  logic        clk, rst, adm_on, ready, cells_idle,
   input  logic        mon_we, mon_we2,
-  input  logic [11:0] mon_wa, mon_wa2,
+  input  logic [15:0] mon_wa, mon_wa2,
   input  logic [63:0] mon_wd, mon_wd2,
   output logic        hq_v,
   output logic [63:0] hq_a, hq_b,
   input  logic        hq_ack,
   output logic        hw_v,
-  output logic [11:0] hw_a,
+  output logic [15:0] hw_a,
   output logic [67:0] hw_d,
   input  logic        hw_ack,
-  output logic [11:0] rbase,
+  output logic [15:0] rbase,
   input  logic [31:0] sum_free_n, sum_free_v, min_free,   // audit (simulation)
   output logic        adm_idle,
   output logic [3:0]  adm_err
@@ -80,7 +80,7 @@ module omega_adm #(
                                    : (32'(res_n) + 32'(hd_n) <= cfg[1] && 32'(res_v) + 32'(hd_v) <= cfg[2]));
     hs_found = 1'b0; hs = '0;
     for (int k = RR - 1; k >= 0; k--) if (!s_used[k]) begin hs_found = 1'b1; hs = KB'(k); end
-    rbase = 12'(cfg[3]);
+    rbase = 16'(cfg[3]);
     hq_v = adm_on && pend == 2'd2 && !hq_ack;
     hw_v = adm_on && pend == 2'd1 && !hw_ack;
     adm_idle = !adm_on || (adm_err != 0) || (32'(head) >= cfg[0] && pend == 2'd0 && s_run == '0 && !comp);
@@ -95,8 +95,8 @@ module omega_adm #(
     end else if (adm_on && ready && adm_err == 0) begin
       cyc <= cyc + 1;
       // shadow copies of the root slots (cell (0,0) var writes, registered there)
-      if (mon_we && mon_wa >= 12'(cfg[3]) && 32'(mon_wa) < cfg[3] + RR) rootw[KB'(32'(mon_wa) - cfg[3])] <= mon_wd;
-      if (mon_we2 && mon_wa2 >= 12'(cfg[3]) && 32'(mon_wa2) < cfg[3] + RR) rootw[KB'(32'(mon_wa2) - cfg[3])] <= mon_wd2;
+      if (mon_we && mon_wa >= 16'(cfg[3]) && 32'(mon_wa) < cfg[3] + RR) rootw[KB'(32'(mon_wa) - cfg[3])] <= mon_wd;
+      if (mon_we2 && mon_wa2 >= 16'(cfg[3]) && 32'(mon_wa2) < cfg[3] + RR) rootw[KB'(32'(mon_wa2) - cfg[3])] <= mon_wd2;
       idle_cnt <= (cells_idle && pend == 2'd0) ? ((idle_cnt == 2'd3) ? idle_cnt : idle_cnt + 2'd1) : 2'd0;
       if (pend == 2'd1) begin
         if (hw_ack) pend <= 2'd2;
@@ -130,8 +130,8 @@ module omega_adm #(
           s_used[hs] <= 1'b1; s_run[hs] <= 1'b1; s_job[hs] <= head; own_busy[hd_own] <= 1'b1;
           if (hd_typed) begin res_n <= res_n + hd_n; res_v <= res_v + hd_v; end
           else untyped_run <= untyped_run + 1;
-          hw_a <= 12'(cfg[3] + 32'(hs)); hw_d <= {hd_own, 64'd0};
-          hq_a <= jref[head[JB-2:0]]; hq_b <= mkpo(T_VAR, 16'd0, hd_own, mkaddr(4'd0, 4'd0, 12'(cfg[3] + 32'(hs))));
+          hw_a <= 16'(cfg[3] + 32'(hs)); hw_d <= {hd_own, 64'd0};
+          hq_a <= jref[head[JB-2:0]]; hq_b <= mkpo(T_VAR, 16'd0, hd_own, mkaddr(4'd0, 4'd0, 16'(cfg[3] + 32'(hs))));
           pend <= MUT[63] ? 2'd2 : 2'd1;                                               // mutant 63: no root reset
           head <= head + 1'b1;
         end else if (s_run == '0 && idle_cnt >= 2'd2) begin

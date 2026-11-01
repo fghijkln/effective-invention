@@ -101,18 +101,18 @@ module omega_cell #(
   // hq = one start task {REF @main, VAR root} taken as a SPAWN at the next pick; hw = one var-slot write
   // (the root var's reset) on var write port 1 when the engine does not use it; mon = var writes (registered)
   input  logic        adm_on,             //   step 26: admission on (root-var orientation rule below)
-  input  logic [11:0] adm_rb,             //   first slot of the root-var pool in cell (0,0)
+  input  logic [15:0] adm_rb,             //   first slot of the root-var pool in cell (0,0)
   input  logic        hq_v,
   input  logic [63:0] hq_a, hq_b,
   output logic        hq_ack,
   input  logic        hw_v,
-  input  logic [11:0] hw_a,
+  input  logic [15:0] hw_a,
   input  logic [67:0] hw_d,
   output logic        hw_ack,
   output logic        mon_we, mon_we2,
-  output logic [11:0] mon_wa, mon_wa2,
+  output logic [15:0] mon_wa, mon_wa2,
   output logic [63:0] mon_wd, mon_wd2,
-  output logic [12:0] free_n, free_v      // free node / var slots (audit)
+  output logic [16:0] free_n, free_v      // free node / var slots (audit)
 );
   `include "omega_funcs.svh"
   localparam int SB = $clog2(SLOTS);
@@ -194,7 +194,7 @@ module omega_cell #(
     vf_tot = (SB+2)'(vcnt) + (SB+2)'(vsp) + (SB+2)'(vpend);
     tq_tot = (QB+2)'(qcnt) + (QB+2)'(qsp) + (QB+2)'(qpend);
     tq_all = tq_tot + (QB+2)'(fcnt);
-    free_n = 13'(nf_tot); free_v = 13'(vf_tot);
+    free_n = 17'(nf_tot); free_v = 17'(vf_tot);
   end
 
   flit_t [DEPTH-1:0] ob;                // outbox (router local input)
@@ -337,11 +337,11 @@ module omega_cell #(
     local_p = px(p) == 4'(X) && py(p) == 4'(Y);
   endfunction
   function automatic logic [31:0] here(input logic [SB-1:0] s);
-    here = mkaddr(4'(X), 4'(Y), 12'(s));
+    here = mkaddr(4'(X), 4'(Y), MUT[65] ? 16'(12'(s)) : 16'(s));   // mutant 65: slot address truncated to 12 bits
   endfunction
   // T3: pointer outside the fabric (or malformed address bits)
   function automatic logic oob(input logic [63:0] p);
-    oob = !MUT[18] && (32'(px(p)) >= W || 32'(py(p)) >= H || 32'(pslot(p)) >= SLOTS || p[31:24] != 8'd0 || p[15:12] != 4'd0);
+    oob = !MUT[18] && (32'(px(p)) >= W || 32'(py(p)) >= H || 32'(MUT[66] ? (pslot(p) & 16'h0FFF) : pslot(p)) >= SLOTS || p[31:24] != 8'd0);   // step 28: slot is [15:0]; mutant 66: bits [11:0] only
   endfunction
   function automatic logic leaves(input logic [63:0] p);   // pointer is remote or out of bounds
     leaves = oob(p) || !local_p(p);
@@ -368,7 +368,7 @@ module omega_cell #(
   // slots adm_rb .. adm_rb + 15): the other var takes the root instead, so a root only ever receives the job's value
   // (the controller reads it from its shadow copy).  adm_on = 0: never (step 25 orientation).
   function automatic logic rootv(input logic [63:0] p);
-    rootv = adm_on && is_var(p) && px(p) == 4'd0 && py(p) == 4'd0 && pslot(p) >= adm_rb && pslot(p) < adm_rb + 12'd16;
+    rootv = adm_on && is_var(p) && px(p) == 4'd0 && py(p) == 4'd0 && pslot(p) >= adm_rb && pslot(p) < adm_rb + 16'd16;
   endfunction
   function automatic logic rflip(input logic [63:0] x, input logic [63:0] y);   // swap so that the root is B
     rflip = is_var(x) && is_var(y) && ((rootv(x) && !rootv(y)) ? 1'b1 : (rootv(y) && !rootv(x)) ? 1'b0 : lflip(x, y));
@@ -1122,8 +1122,8 @@ module omega_cell #(
       // ---- step 26: host var write (root reset) on port 1 when the engine leaves it free ----
       if (hw_v && !hw_ack && !v_we) begin v_we = 1'b1; v_wa = SB'(hw_a); v_wd = hw_d; hw_take = 1'b1; end
       hq_ack <= hq_take; hw_ack <= hw_take;
-      mon_we <= v_we; mon_wa <= 12'(v_wa); mon_wd <= v_wd[63:0];
-      mon_we2 <= v_we2; mon_wa2 <= 12'(v_wa2); mon_wd2 <= v_wd2[63:0];
+      mon_we <= v_we; mon_wa <= 16'(v_wa); mon_wd <= v_wd[63:0];
+      mon_we2 <= v_we2; mon_wa2 <= 16'(v_wa2); mon_wd2 <= v_wd2[63:0];
 
       // ---- memory writes: one write port per array ----
       if (n_we) node_mem[n_wa] <= n_wd;

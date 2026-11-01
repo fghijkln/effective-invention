@@ -5,7 +5,7 @@ function automatic logic [15:0] plab(input logic [63:0] p);  plab = p[59:44]; en
 function automatic logic [31:0] pval(input logic [63:0] p);  pval = p[31:0];  endfunction
 function automatic logic [3:0]  px(input logic [63:0] p);    px = p[23:20]; endfunction
 function automatic logic [3:0]  py(input logic [63:0] p);    py = p[19:16]; endfunction
-function automatic logic [11:0] pslot(input logic [63:0] p); pslot = p[11:0];  endfunction
+function automatic logic [15:0] pslot(input logic [63:0] p); pslot = p[15:0];  endfunction   // step 28: 16-bit slot (was [11:0])
 function automatic logic [3:0]  pown(input logic [63:0] p);  pown = p[43:40]; endfunction
 function automatic logic is_var(input logic [63:0] p);  is_var = p[63:60] == T_VAR; endfunction
 function automatic logic is_node(input logic [63:0] p);
@@ -27,8 +27,8 @@ endfunction
 function automatic logic [63:0] withpay(input logic [63:0] p, input logic [31:0] v);
   withpay = {p[63:32], v};
 endfunction
-function automatic logic [31:0] mkaddr(input logic [3:0] x, input logic [3:0] y, input logic [11:0] s);
-  mkaddr = {8'd0, x, y, 4'd0, s};
+function automatic logic [31:0] mkaddr(input logic [3:0] x, input logic [3:0] y, input logic [15:0] s);
+  mkaddr = {8'd0, x, y, s};
 endfunction
 function automatic logic [31:0] alu(input logic [3:0] op, input logic [31:0] a, input logic [31:0] b);
   case (op)

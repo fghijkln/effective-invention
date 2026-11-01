@@ -59,9 +59,12 @@ serialisation is what turns HVM2's atomic swap into a plain local read-modify-wr
 [43:40] owner   owner capability id of the tenant the port belongs to (0..14; §12)
 [39]    ABS     template-only flag: absolute (forged) pointer, not relocated on expansion (§12)
 [38:32] 0
-[31:0]  payload NUM: value.  VAR / node tags: address {x[23:20], y[19:16], slot[11:0]}
+[31:0]  payload NUM: value.  VAR / node tags: address {x[23:20], y[19:16], slot[15:0]}
 ```
-Up to 16×16 cells and 4096 slots per cell. The RTL default is SLOTS = 1024.
+Up to 16×16 cells and 65,536 slots per cell (step 28; before it the slot was [11:0], bits [15:12] had to be 0 and
+cells held at most 4,096 slots). The RTL default is SLOTS = 1024. A pointer whose slot is ≥ SLOTS, whose cell is
+outside the mesh or whose bits [31:24] are not 0 is out of bounds (TRAP_OOB, §12); with SLOTS ≤ 4,096 this traps
+exactly the pointers the step-27 check trapped, so default behaviour is unchanged.
 
 ### 2.2 Node slot (128 bit) and shadow tag
 `node_mem[slot] = {aux2[127:64], aux1[63:0]}`. One shadow tag bit per slot, `nalloc`, marks a live
@@ -830,6 +833,42 @@ causal) is 3.6–6.9× below B_nodes and 2.0–2.5× below B_vars at N = 2..12, 
 **Cost.** qsort_l does fewer interactions than qsort (0.78× at N = 40: one pass per partition instead of two
 filters) but is slower on a mesh (RTL 2×2: +36% cycles at N = 12, +32% at N = 30), because `part` returns its pair
 only after the whole list was walked and `app` waits for the left half, so less work overlaps.
+
+### 7.7 Cells of up to 65,536 slots: certifying the benchmark sizes (step 28)
+
+The bounds of §7.2–§7.6 certify a job on a cell only if B (or W_nodes, B_vars for admission) fits its slots, and
+before step 28 a slot address had 12 bits (≤ 4,096 slots per cell), which certified only small inputs (one cell of
+4,096: sum ≤ 371, list ≤ 72, higher ≤ 92, fib ≤ 11, treesum ≤ 6, treesum_direct ≤ 8, sort ≤ 14, qsort_l ≤ 10, worst
+case over inputs). Step 28 widens the slot field to payload bits [15:0] (§2.1): bits [15:12] were unused and required
+to be 0, so the port layout, the flit, x / y and every other field are unchanged. `pslot`, `mkaddr`, the admission
+host port (`adm_rb`, `hw_a`, `mon_wa*`) and the audit outputs (`free_n` / `free_v`, 17 bits) are widened; every RAM,
+stack and counter was already sized by `$clog2(SLOTS)`. The out-of-bounds check (§12) drops its "bits [15:12] = 0"
+term: a slot ≥ SLOTS traps. With SLOTS ≤ 4,096 a pointer with any of bits [15:12] set has slot ≥ SLOTS, so it traps
+exactly as before, with the same reason and address: **the default (SLOTS = 1,024) is cycle-identical** (identity
+128 / 128). The Python models (`ports.addr` / `addr_slot`, the semantic and fabric OOB checks) change the same way.
+
+Largest N with max(B_nodes(N), B_vars(N)) ≤ S on one cell (closed forms of §7.3 / §7.6; sort and qsort_l worst case
+over all inputs):
+
+| program | B_nodes(N) | S = 1,024 | S = 4,096 | S = 65,536 |
+|---|---|---:|---:|---:|
+| sum, fact | 11·N + 7 | 92 | 371 | 5,957 |
+| list | 54·N + 27 (vars 56·N + 23) | 17 | 72 | 1,169 |
+| higher | 43·N + 42 (vars 44·N + 43) | 22 | 92 | 1,488 |
+| fib | 24·F(N+1) − 14 | 8 | 11 | 17 |
+| treesum | 37·2^N − 23 | 4 | 6 | 10 |
+| treesum_direct | 12·2^N − 8 | 6 | 8 | 12 |
+| sort | ≤ 29/2·N² + 139/2·N + 24 | 6 | 14 | 64 |
+| qsort_l | 32·N² + 86·N + 17 (vars 59/2·N² + 141/2·N + 15) | 4 | 10 | 43 |
+
+So with 65,536-slot cells every benchmark input of the suite is certified on one cell (sum(1000), list(120),
+higher(100), sort(20), treesum(9), qsort_l(40) for its benchmark input and for any input of length 40) except fib(20)
+(B = 262,690 / 207,963) and treesum_direct(14) (196,600 / 147,451): B grows like the call tree, and the per-cell rule
+(§7.4: any one cell may receive the whole job) does not get smaller on a mesh. Certifying them needs a placement-aware
+bound or a spill path, not a wider address. Tests: `tests/test_s28.py` (high-slot runs with every allocation above
+slot 4,096, forged pointers, RTL 1×1 at exactly B and 2×2 at slots_mesh for the benchmark sizes, admission on
+2×2 × 20,000-slot cells with the root pool above slot 4,096 vs the fabric-model scheduler); mutants 65 (allocated
+addresses truncated to 12 bits) and 66 (OOB check on bits [11:0] only).
 
 ## 8. Termination detection
 

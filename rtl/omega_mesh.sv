@@ -62,12 +62,12 @@ module omega_mesh #(
   logic [511:0] rdr [W][H];
   // step 26 admission controller wiring (host port of cell (0,0))
   logic        c_hq_ack [W][H], c_hw_ack [W][H], c_mwe [W][H], c_mwe2 [W][H];
-  logic [11:0] c_mwa [W][H], c_mwa2 [W][H];
+  logic [15:0] c_mwa [W][H], c_mwa2 [W][H];
   logic [63:0] c_mwd [W][H], c_mwd2 [W][H];
-  logic [12:0] c_fn [W][H], c_fv [W][H];
+  logic [16:0] c_fn [W][H], c_fv [W][H];
   logic        a_hq_v, a_hw_v, adm_idle, cells_idle;
   logic [63:0] a_hq_a, a_hq_b;
-  logic [11:0] a_hw_a, a_rb;
+  logic [15:0] a_hw_a, a_rb;
   logic [67:0] a_hw_d;
   logic [3:0]  adm_err;
   logic [31:0] sum_fn, sum_fv, min_f;

@@ -1,0 +1,27 @@
+step 28: 16-bit slot field, certified benchmark sizes
+  encoding: addr / addr_slot round trip over all 16 slot bits
+  forged pointers with slot bits >= 4096 on 1024-slot cells: OOB in semantic, fabric and RTL
+  high slots fib(10) 2x2 x 8192 (only the top 600 slots free; allocation in slots 7592..8191): RTL status 0, 1783 cycles, #55
+  high slots treesum(6) 2x2 x 8192 (only the top 1500 slots free; allocation in slots 6692..8191): RTL status 0, 2053 cycles, #64
+  high slots qsort(15) 2x2 x 16384 (only the top 800 slots free; allocation in slots 15584..16383): RTL status 0, 5497 cycles, #6108
+  high slots list(20) 3x2 x 8192 (only the top 600 slots free; allocation in slots 7592..8191): RTL status 0, 1642 cycles, #2890
+  high slots sort(10) 2x2 x 65536 (only the top 1200 slots free; allocation in slots 64336..65535): RTL status 0, 3023 cycles, #2794
+  high slots treesum_direct(7) 2x2 x 8192 (only the top 600 slots free; allocation in slots 7592..8191): RTL status 0, 1330 cycles, #128
+  high slots higher(12) 1x1 x 65536 (only the top 2000 slots free; allocation in slots 63536..65535): RTL status 0, 1565 cycles, #186
+  certified qsort_l(40) on RTL 1x1 with exactly B = (13212, 11947) free slots: status 0, peak (292, 592) = B / (45, 20), task stack 168, 34649 cycles (30s)
+  certified list(120) on RTL 1x1 with exactly B = (6507, 6743) free slots: status 0, peak (1210, 2172) = B / (5, 3), task stack 601, 19024 cycles (41s)
+  certified sum(1000) on RTL 1x1 with exactly B = (11007, 8006) free slots: status 0, peak (1007, 3008) = B / (11, 3), task stack 1005, 29018 cycles (38s)
+  certified sort(20) on RTL 1x1 with exactly B = (4889, 4470) free slots: status 0, peak (152, 248) = B / (32, 18), task stack 100, 13052 cycles (36s)
+  certified higher(100) on RTL 1x1 with exactly B = (4342, 4443) free slots: status 0, peak (716, 1519) = B / (6, 3), task stack 501, 12257 cycles (42s)
+  certified treesum(9) on RTL 1x1 with exactly B = (18921, 16365) free slots: status 0, peak (281, 463) = B / (67, 35), task stack 38, 49199 cycles (33s)
+  certified fact(20) on RTL 1x1 with exactly B = (227, 166) free slots: status 0, peak (27, 68) = B / (8, 2), task stack 25, 598 cycles (38s)
+  certified fib(17) on RTL 1x1 with exactly B = (62002, 49085) free slots: status 0, peak (87, 128) = B / (713, 383), task stack 34, 164752 cycles (41s)
+  certified treesum_direct(12) on RTL 1x1 with exactly B = (49144, 36859) free slots: status 0, peak (42, 93) = B / (1170, 396), task stack 30, 130549 cycles (48s)
+  certified treesum(10) on RTL 1x1 with exactly B = (37865, 32749) free slots: status 0, peak (538, 853) = B / (70, 38), task stack 42, 98657 cycles (38s)
+  certified treesum(9) on RTL 2x2 with slots_mesh = 18943 free slots in every cell: status 0, 13269 cycles (38s)
+  certified qsort_l(40) on RTL 2x2 with slots_mesh = 13241 free slots in every cell: status 0, 20941 cycles (51s)
+  certified sum(1000) on RTL 2x2 with slots_mesh = 11029 free slots in every cell: status 0, 29008 cycles (51s)
+  fib(20): B = (262690, 207963) > 65,536: not certifiable on one cell
+  treesum_direct(14): B = (196600, 147451) > 65,536: not certifiable on one cell
+  admission with 2x2 x 20000 cells (root pool at slots 20000..20015): 7/7 jobs correct, start order [0, 1, 2, 3, 4, 5, 6] = model, 56692 interactions, 70258 cycles (model 113272), max reserved (7166, 18690) of (19971, 19971), peak live (1007, 1045) (46s)
+step 28 tests: 129/129 pass (886s)

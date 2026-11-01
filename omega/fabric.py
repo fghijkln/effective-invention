@@ -455,7 +455,7 @@ class Cell:
 
     def oob(self, p):
         a = payload(p); x, y = addr_xy(a)
-        return x >= self.fab.W or y >= self.fab.H or addr_slot(a) >= self.fab.slots or (a & 0xFF00F000) != 0
+        return x >= self.fab.W or y >= self.fab.H or addr_slot(a) >= self.fab.slots or (a & 0xFF000000) != 0
 
     def cross(self, a, b, remote=False):
         """T1.  With fault injection fi_nosend the sender skips it, so the receiver must catch it."""
