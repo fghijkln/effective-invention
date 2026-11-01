@@ -1,0 +1,4 @@
+B_nodes(N) = 24 + 84·N + 29·I + -21·nil   exact on N = 1..45: True
+  over all inputs of length N (I <= N(N-1)/2, nil <= N): B_nodes(N) <= 29/2·N^2 + 139/2·N + 24   >= counted on 1..45: True;  bound / counted max 2.08, at N = 45: 2.04
+B_vars(N) = 20 + 74·N + 27·I + -18·nil   exact on N = 1..45: True
+  over all inputs of length N (I <= N(N-1)/2, nil <= N): B_vars(N) <= 27/2·N^2 + 121/2·N + 20   >= counted on 1..45: True;  bound / counted max 2.10, at N = 45: 2.05

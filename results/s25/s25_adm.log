@@ -1,0 +1,6 @@
+admission control (fabric model)
+  flood 180 jobs, 2x2 x 280: without admission stall after 49141 cycles (0 finished); with admission (W) ok, 180/180 admitted jobs correct, 0 rejected (bound > budget), 176707 cycles, peak live (68, 96), max reserved (129, 246) of (252, 252)
+  flood 180 jobs, 2x2 x 280: without admission stall after 49141 cycles (0 finished); with admission (B) ok, 120/120 admitted jobs correct, 60 rejected (bound > budget), 100202 cycles, peak live (64, 83), max reserved (227, 219) of (252, 252)
+  flood 300 jobs, 3x3 x 280: without admission stall after 62895 cycles (0 finished, peak live (1679, 2515)); with admission ok, 300/300 correct, 281480 cycles
+  reject / queue / untyped / 1x1: ok, ok, ok, ok
+step 25 tests: 12/12 pass (49s)

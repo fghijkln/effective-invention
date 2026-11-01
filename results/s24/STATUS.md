@@ -16,3 +16,4 @@
 - 14:00: sandbox restarted (toolchain + builds lost); resumed reg.sh (setup again) and mutc.sh (resumes after mutant 38).
 - 14:35: reg ALLDONE: id 128/128, units 42/42, programs 315/315, s14 90/90, fuzz 600/600, big 200/200, security 420/420, mempress 60/60, mutants 0-18 19/19, 37-54 18/18; 19-36 running (mutb.sh).
 - 14:55: all done: mutants 55/55 (19+18+18). Final commit + push next.
+- 15:05: pushed 7187b58, CI 41278773734 success. Step 24 done.

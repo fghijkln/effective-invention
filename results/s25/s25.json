@@ -1,0 +1,678 @@
+{
+ "symbolic": {
+  "fib": {
+   "range": [
+    0,
+    20
+   ],
+   "nodes": {
+    "formula": "24\u00b7F(N+1) - 14",
+    "start": 0,
+    "exact": true,
+    "checked": [
+     0,
+     22
+    ],
+    "max_ratio": 1.0,
+    "mean_ratio": 1.0,
+    "legend": "F = Fibonacci (F(0) = 0, F(1) = 1)"
+   },
+   "vars": {
+    "formula": "19\u00b7F(N+1) - 11",
+    "start": 0,
+    "exact": true,
+    "checked": [
+     0,
+     22
+    ],
+    "max_ratio": 1.0,
+    "mean_ratio": 1.0,
+    "legend": "F = Fibonacci (F(0) = 0, F(1) = 1)"
+   }
+  },
+  "sum": {
+   "range": [
+    0,
+    40
+   ],
+   "nodes": {
+    "formula": "11\u00b7N + 7",
+    "start": 0,
+    "exact": true,
+    "checked": [
+     0,
+     44
+    ],
+    "max_ratio": 1.0,
+    "mean_ratio": 1.0,
+    "legend": ""
+   },
+   "vars": {
+    "formula": "8\u00b7N + 6",
+    "start": 0,
+    "exact": true,
+    "checked": [
+     0,
+     44
+    ],
+    "max_ratio": 1.0,
+    "mean_ratio": 1.0,
+    "legend": ""
+   }
+  },
+  "fact": {
+   "range": [
+    0,
+    40
+   ],
+   "nodes": {
+    "formula": "11\u00b7N + 7",
+    "start": 0,
+    "exact": true,
+    "checked": [
+     0,
+     44
+    ],
+    "max_ratio": 1.0,
+    "mean_ratio": 1.0,
+    "legend": ""
+   },
+   "vars": {
+    "formula": "8\u00b7N + 6",
+    "start": 0,
+    "exact": true,
+    "checked": [
+     0,
+     44
+    ],
+    "max_ratio": 1.0,
+    "mean_ratio": 1.0,
+    "legend": ""
+   }
+  },
+  "list": {
+   "range": [
+    0,
+    40
+   ],
+   "nodes": {
+    "formula": "54\u00b7N + 27",
+    "start": 0,
+    "exact": true,
+    "checked": [
+     0,
+     44
+    ],
+    "max_ratio": 1.0,
+    "mean_ratio": 1.0,
+    "legend": ""
+   },
+   "vars": {
+    "formula": "56\u00b7N + 23",
+    "start": 0,
+    "exact": true,
+    "checked": [
+     0,
+     44
+    ],
+    "max_ratio": 1.0,
+    "mean_ratio": 1.0,
+    "legend": ""
+   }
+  },
+  "higher": {
+   "range": [
+    0,
+    40
+   ],
+   "nodes": {
+    "formula": "43\u00b7N + 42",
+    "start": 0,
+    "exact": true,
+    "checked": [
+     0,
+     44
+    ],
+    "max_ratio": 1.0,
+    "mean_ratio": 1.0,
+    "legend": ""
+   },
+   "vars": {
+    "formula": "44\u00b7N + 43",
+    "start": 0,
+    "exact": true,
+    "checked": [
+     0,
+     44
+    ],
+    "max_ratio": 1.0,
+    "mean_ratio": 1.0,
+    "legend": ""
+   }
+  },
+  "treesum": {
+   "range": [
+    0,
+    12
+   ],
+   "nodes": {
+    "formula": "37\u00b72^N - 23",
+    "start": 0,
+    "exact": true,
+    "checked": [
+     0,
+     13
+    ],
+    "max_ratio": 1.0,
+    "mean_ratio": 1.0,
+    "legend": ""
+   },
+   "vars": {
+    "formula": "32\u00b72^N - 19",
+    "start": 0,
+    "exact": true,
+    "checked": [
+     0,
+     13
+    ],
+    "max_ratio": 1.0,
+    "mean_ratio": 1.0,
+    "legend": ""
+   }
+  },
+  "treesum_direct": {
+   "range": [
+    0,
+    14
+   ],
+   "nodes": {
+    "formula": "12\u00b72^N - 8",
+    "start": 0,
+    "exact": true,
+    "checked": [
+     0,
+     16
+    ],
+    "max_ratio": 1.0,
+    "mean_ratio": 1.0,
+    "legend": ""
+   },
+   "vars": {
+    "formula": "9\u00b72^N - 5",
+    "start": 0,
+    "exact": true,
+    "checked": [
+     0,
+     16
+    ],
+    "max_ratio": 1.0,
+    "mean_ratio": 1.0,
+    "legend": ""
+   }
+  },
+  "sort": {
+   "range": [
+    0,
+    40
+   ],
+   "nodes": {
+    "formula": "183/19\u00b7N^2 + 1125/19\u00b7N + 24",
+    "start": 0,
+    "exact": false,
+    "checked": [
+     0,
+     40
+    ],
+    "max_ratio": 1.359,
+    "mean_ratio": 1.181,
+    "legend": ""
+   },
+   "vars": {
+    "formula": "4419/494\u00b7N^2 + 25603/494\u00b7N + 20",
+    "start": 0,
+    "exact": false,
+    "checked": [
+     0,
+     40
+    ],
+    "max_ratio": 1.366,
+    "mean_ratio": 1.185,
+    "legend": ""
+   }
+  },
+  "sort_desc": {
+   "range": [
+    0,
+    40
+   ],
+   "nodes": {
+    "formula": "29/2\u00b7N^2 + 97/2\u00b7N + 24",
+    "start": 0,
+    "exact": true,
+    "checked": [
+     0,
+     43
+    ],
+    "max_ratio": 1.0,
+    "mean_ratio": 1.0,
+    "legend": ""
+   },
+   "vars": {
+    "formula": "27/2\u00b7N^2 + 85/2\u00b7N + 20",
+    "start": 0,
+    "exact": true,
+    "checked": [
+     0,
+     43
+    ],
+    "max_ratio": 1.0,
+    "mean_ratio": 1.0,
+    "legend": ""
+   }
+  },
+  "sort_asc": {
+   "range": [
+    0,
+    40
+   ],
+   "nodes": {
+    "formula": "84\u00b7N + 3",
+    "start": 1,
+    "exact": true,
+    "checked": [
+     0,
+     43
+    ],
+    "max_ratio": 1.0,
+    "mean_ratio": 1.0,
+    "legend": ""
+   },
+   "vars": {
+    "formula": "74\u00b7N + 2",
+    "start": 1,
+    "exact": true,
+    "checked": [
+     0,
+     43
+    ],
+    "max_ratio": 1.0,
+    "mean_ratio": 1.0,
+    "legend": ""
+   }
+  }
+ },
+ "fuzz": {
+  "exact": 38,
+  "envelope": 2,
+  "none": 0,
+  "programs": 40,
+  "by_size_arg": {
+   "gen": {
+    "exact": 16,
+    "envelope": 2
+   },
+   "nlin": {
+    "exact": 5
+   },
+   "tgen": {
+    "exact": 12
+   },
+   "nrec": {
+    "exact": 5
+   }
+  }
+ },
+ "wvars": {
+  "fib(8)": {
+   "B_vars": 635,
+   "W_vars": 476,
+   "max_random_peak_vars": 286,
+   "B_nodes": 802,
+   "W_nodes": 478,
+   "frees_with_causal_max": [
+    514,
+    634
+   ]
+  },
+  "sum(40)": {
+   "B_vars": 326,
+   "W_vars": 247,
+   "max_random_peak_vars": 52,
+   "B_nodes": 447,
+   "W_nodes": 169,
+   "frees_with_causal_max": [
+    205,
+    324
+   ]
+  },
+  "fact(12)": {
+   "B_vars": 102,
+   "W_vars": 79,
+   "max_random_peak_vars": 27,
+   "B_nodes": 139,
+   "W_nodes": 57,
+   "frees_with_causal_max": [
+    65,
+    100
+   ]
+  },
+  "list(12)": {
+   "B_vars": 695,
+   "W_vars": 450,
+   "max_random_peak_vars": 112,
+   "B_nodes": 675,
+   "W_nodes": 263,
+   "frees_with_causal_max": [
+    305,
+    692
+   ]
+  },
+  "sort(10)": {
+   "B_vars": 1237,
+   "W_vars": 536,
+   "max_random_peak_vars": 108,
+   "B_nodes": 1373,
+   "W_nodes": 202,
+   "frees_with_causal_max": [
+    777,
+    1234
+   ]
+  },
+  "higher(12)": {
+   "B_vars": 571,
+   "W_vars": 386,
+   "max_random_peak_vars": 114,
+   "B_nodes": 558,
+   "W_nodes": 206,
+   "frees_with_causal_max": [
+    273,
+    570
+   ]
+  },
+  "treesum(5)": {
+   "B_vars": 1005,
+   "W_vars": 661,
+   "max_random_peak_vars": 363,
+   "B_nodes": 1161,
+   "W_nodes": 446,
+   "frees_with_causal_max": [
+    566,
+    1002
+   ]
+  },
+  "treesum_direct(6)": {
+   "B_vars": 571,
+   "W_vars": 508,
+   "max_random_peak_vars": 446,
+   "B_nodes": 760,
+   "W_nodes": 415,
+   "frees_with_causal_max": [
+    381,
+    570
+   ]
+  }
+ },
+ "admission": {
+  "flood_no_admission": {
+   "status": "stall",
+   "error": null,
+   "violation": null,
+   "cycles": 49141,
+   "interactions": 1592,
+   "peak_live": [
+    889,
+    1120
+   ],
+   "max_reserved": [
+    0,
+    0
+   ],
+   "budget": [
+    252,
+    252
+   ],
+   "correct": 0,
+   "wrong": 0,
+   "secs": 3.6,
+   "n": 180,
+   "states": {
+    "done": 0,
+    "running": 180,
+    "rejected": 0,
+    "new": 0
+   }
+  },
+  "flood_admission_W": {
+   "status": "ok",
+   "error": null,
+   "violation": null,
+   "cycles": 176707,
+   "interactions": 46620,
+   "peak_live": [
+    68,
+    96
+   ],
+   "max_reserved": [
+    129,
+    246
+   ],
+   "budget": [
+    252,
+    252
+   ],
+   "correct": 180,
+   "wrong": 0,
+   "secs": 5.8,
+   "n": 180,
+   "states": {
+    "done": 180,
+    "running": 0,
+    "rejected": 0,
+    "new": 0
+   }
+  },
+  "flood_admission_B": {
+   "status": "ok",
+   "error": null,
+   "violation": null,
+   "cycles": 100202,
+   "interactions": 26700,
+   "peak_live": [
+    64,
+    83
+   ],
+   "max_reserved": [
+    227,
+    219
+   ],
+   "budget": [
+    252,
+    252
+   ],
+   "correct": 120,
+   "wrong": 0,
+   "secs": 2.5,
+   "n": 180,
+   "states": {
+    "done": 120,
+    "running": 0,
+    "rejected": 60,
+    "new": 0
+   }
+  },
+  "flood3_no_admission": {
+   "status": "stall",
+   "error": null,
+   "violation": null,
+   "cycles": 62895,
+   "interactions": 7768,
+   "peak_live": [
+    1679,
+    2515
+   ],
+   "max_reserved": [
+    0,
+    0
+   ],
+   "budget": [
+    252,
+    252
+   ],
+   "correct": 0,
+   "wrong": 0,
+   "secs": 8.5,
+   "n": 300,
+   "states": {
+    "done": 0,
+    "running": 300,
+    "rejected": 0,
+    "new": 0
+   }
+  },
+  "flood3_admission_W": {
+   "status": "ok",
+   "error": null,
+   "violation": null,
+   "cycles": 281480,
+   "interactions": 77700,
+   "peak_live": [
+    89,
+    105
+   ],
+   "max_reserved": [
+    129,
+    246
+   ],
+   "budget": [
+    252,
+    252
+   ],
+   "correct": 300,
+   "wrong": 0,
+   "secs": 11.0,
+   "n": 300,
+   "states": {
+    "done": 300,
+    "running": 0,
+    "rejected": 0,
+    "new": 0
+   }
+  },
+  "reject": {
+   "status": "ok",
+   "error": null,
+   "violation": null,
+   "cycles": 7816,
+   "interactions": 2877,
+   "peak_live": [
+    50,
+    79
+   ],
+   "max_reserved": [
+    117,
+    170
+   ],
+   "budget": [
+    176,
+    176
+   ],
+   "correct": 18,
+   "wrong": 0,
+   "secs": 0.2,
+   "n": 19,
+   "states": {
+    "done": 18,
+    "running": 0,
+    "rejected": 1,
+    "new": 0
+   }
+  },
+  "queue": {
+   "status": "ok",
+   "error": null,
+   "violation": null,
+   "cycles": 9112,
+   "interactions": 5792,
+   "peak_live": [
+    165,
+    284
+   ],
+   "max_reserved": [
+    644,
+    1068
+   ],
+   "budget": [
+    1072,
+    1072
+   ],
+   "correct": 19,
+   "wrong": 0,
+   "secs": 0.5,
+   "n": 19,
+   "states": {
+    "done": 19,
+    "running": 0,
+    "rejected": 0,
+    "new": 0
+   }
+  },
+  "untyped": {
+   "status": "ok",
+   "error": null,
+   "violation": null,
+   "cycles": 13336,
+   "interactions": 4812,
+   "peak_live": [
+    171,
+    253
+   ],
+   "max_reserved": [
+    129,
+    246
+   ],
+   "budget": [
+    249,
+    249
+   ],
+   "correct": 13,
+   "wrong": 0,
+   "secs": 0.4,
+   "n": 13,
+   "states": {
+    "done": 13,
+    "running": 0,
+    "rejected": 0,
+    "new": 0
+   }
+  },
+  "one_cell": {
+   "status": "ok",
+   "error": null,
+   "violation": null,
+   "cycles": 21356,
+   "interactions": 3836,
+   "peak_live": [
+    35,
+    57
+   ],
+   "max_reserved": [
+    110,
+    141
+   ],
+   "budget": [
+    150,
+    150
+   ],
+   "correct": 24,
+   "wrong": 0,
+   "secs": 0.3,
+   "n": 24,
+   "states": {
+    "done": 24,
+    "running": 0,
+    "rejected": 0,
+    "new": 0
+   }
+  }
+ }
+}

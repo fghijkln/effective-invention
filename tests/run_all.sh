@@ -1,6 +1,6 @@
 #!/bin/bash
 # Full regression: unit (semantic+fabric+RTL), programs (+150 random program cases), RTL fuzz
-# (600 small + 200 big random nets), owner-capability security (+300 multi-tenant fuzz), memory pressure, Ω-L (step 24), mutants.  Logs in results/.
+# (600 small + 200 big random nets), owner-capability security (+300 multi-tenant fuzz), memory pressure, Ω-L (step 24), symbolic bound + admission (step 25), mutants.  Logs in results/.
 cd "$(dirname "$0")/.." && export PYTHONPATH=.:tests
 set -o pipefail
 python3 tests/test_units.py --rtl            2>&1 | tee results/units_rtl.log
@@ -13,5 +13,7 @@ python3 tests/test_security.py --fuzz 300    2>&1 | tee results/security.log
 python3 tests/test_mempress.py               2>&1 | tee results/mempress.log
 python3 tests/test_eal.py --fuzz 200 --rtl-fuzz 30 2>&1 | tee results/eal.log
 python3 tests/test_eal.py --mutants          2>&1 | tee results/eal_mutants.log
+python3 tests/test_s25.py --fuzz 40          2>&1 | tee results/s25_tests.log   # step 25: symbolic B(N), W_vars, admission
+python3 tests/test_s25.py --mutants          2>&1 | tee results/s25_mutants.log
 python3 tests/mutants.py                      2>&1 | tee results/mutants.txt
 echo ALLDONE

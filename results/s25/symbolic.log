@@ -1,0 +1,87 @@
+fib: Ω-L, symbolic bound in N (counted and certified on N = 0..21)
+  recursion fib: numeric on parameter 1, ≤ 2^value unfolds
+  B_nodes(N) = 24·F(N+1) - 14   [exact]
+    F = Fibonacci (F(0) = 0, F(1) = 1)
+    growth 1.618^N (R allows <= 2^N); B_sym / counted: max 1.000, mean 1.000; sound on the range: True
+  B_vars(N) = 19·F(N+1) - 11   [exact]
+    F = Fibonacci (F(0) = 0, F(1) = 1)
+    growth 1.618^N (R allows <= 2^N); B_sym / counted: max 1.000, mean 1.000; sound on the range: True
+
+sum: Ω-L, symbolic bound in N (counted and certified on N = 0..60)
+  recursion sum: numeric on parameter 1, linear in its value
+  B_nodes(N) = 11·N + 7   [exact]
+    growth 1^N (R allows <= 1^N); B_sym / counted: max 1.000, mean 1.000; sound on the range: True
+  B_vars(N) = 8·N + 6   [exact]
+    growth 1^N (R allows <= 1^N); B_sym / counted: max 1.000, mean 1.000; sound on the range: True
+
+fact: Ω-L, symbolic bound in N (counted and certified on N = 0..60)
+  recursion fact: numeric on parameter 1, linear in its value
+  B_nodes(N) = 11·N + 7   [exact]
+    growth 1^N (R allows <= 1^N); B_sym / counted: max 1.000, mean 1.000; sound on the range: True
+  B_vars(N) = 8·N + 6   [exact]
+    growth 1^N (R allows <= 1^N); B_sym / counted: max 1.000, mean 1.000; sound on the range: True
+
+list: Ω-L, symbolic bound in N (counted and certified on N = 0..60)
+  recursion range: numeric on parameter 1, linear in its value
+  recursion map: structural on parameter 2, linear in its size
+  recursion lsum: structural on parameter 1, linear in its size
+  B_nodes(N) = 54·N + 27   [exact]
+    growth 1^N (R allows <= 1^N); B_sym / counted: max 1.000, mean 1.000; sound on the range: True
+  B_vars(N) = 56·N + 23   [exact]
+    growth 1^N (R allows <= 1^N); B_sym / counted: max 1.000, mean 1.000; sound on the range: True
+
+higher: Ω-L, symbolic bound in N (counted and certified on N = 0..60)
+  recursion range: numeric on parameter 1, linear in its value
+  recursion foldr: structural on parameter 3, linear in its size
+  B_nodes(N) = 43·N + 42   [exact]
+    growth 1^N (R allows <= 1^N); B_sym / counted: max 1.000, mean 1.000; sound on the range: True
+  B_vars(N) = 44·N + 43   [exact]
+    growth 1^N (R allows <= 1^N); B_sym / counted: max 1.000, mean 1.000; sound on the range: True
+
+treesum: Ω-L, symbolic bound in N (counted and certified on N = 0..13)
+  recursion gen: numeric on parameter 1, ≤ 2^value unfolds
+  recursion tsum: structural on parameter 1, linear in its size
+  B_nodes(N) = 37·2^N - 23   [exact]
+    growth 2^N (R allows <= 2^N); B_sym / counted: max 1.000, mean 1.000; sound on the range: True
+  B_vars(N) = 32·2^N - 19   [exact]
+    growth 2^N (R allows <= 2^N); B_sym / counted: max 1.000, mean 1.000; sound on the range: True
+
+treesum_direct: Ω-L, symbolic bound in N (counted and certified on N = 0..15)
+  recursion tsum: numeric on parameter 1, ≤ 2^value unfolds
+  B_nodes(N) = 12·2^N - 8   [exact]
+    growth 2^N (R allows <= 2^N); B_sym / counted: max 1.000, mean 1.000; sound on the range: True
+  B_vars(N) = 9·2^N - 5   [exact]
+    growth 2^N (R allows <= 2^N); B_sym / counted: max 1.000, mean 1.000; sound on the range: True
+
+sort: Ω-L, symbolic bound in N (counted and certified on N = 0..45)
+  recursion rnd: numeric on parameter 1, linear in its value
+  recursion insert: structural on parameter 2, linear in its size
+  recursion sort: structural on parameter 1, linear in its size
+  recursion check: structural on parameter 1, linear in its size
+  B_nodes(N) = 164/65·N^2 + 46942/195·N + 24   [upper envelope (degree 2, fitted on the whole range: no claim beyond it)]
+    growth 1^N (R allows <= 1^N); B_sym / counted: max 3.072, mean 1.492; sound on the range: True
+  B_vars(N) = 917/390·N^2 + 28599/130·N + 20   [upper envelope (degree 2, fitted on the whole range: no claim beyond it)]
+    growth 1^N (R allows <= 1^N); B_sym / counted: max 3.189, mean 1.508; sound on the range: True
+
+results/s25/sort_desc.olm: Ω-L, symbolic bound in N (counted and certified on N = 0..45)
+  recursion rnd: numeric on parameter 1, linear in its value
+  recursion insert: structural on parameter 2, linear in its size
+  recursion sort: structural on parameter 1, linear in its size
+  recursion check: structural on parameter 1, linear in its size
+  B_nodes(N) = 29/2·N^2 + 97/2·N + 24   [exact]
+    growth 1^N (R allows <= 1^N); B_sym / counted: max 1.000, mean 1.000; sound on the range: True
+  B_vars(N) = 27/2·N^2 + 85/2·N + 20   [exact]
+    growth 1^N (R allows <= 1^N); B_sym / counted: max 1.000, mean 1.000; sound on the range: True
+
+results/s25/sort_asc.olm: Ω-L, symbolic bound in N (counted and certified on N = 0..45)
+  recursion rnd: numeric on parameter 1, linear in its value
+  recursion insert: structural on parameter 2, linear in its size
+  recursion sort: structural on parameter 1, linear in its size
+  recursion check: structural on parameter 1, linear in its size
+  B_nodes(N) = 84·N + 3 for N >= 1   [exact]
+    below: B(0) = 24
+    growth 1^N (R allows <= 1^N); B_sym / counted: max 1.000, mean 1.000; sound on the range: True
+  B_vars(N) = 74·N + 2 for N >= 1   [exact]
+    below: B(0) = 20
+    growth 1^N (R allows <= 1^N); B_sym / counted: max 1.000, mean 1.000; sound on the range: True
+

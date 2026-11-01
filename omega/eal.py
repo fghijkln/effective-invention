@@ -28,6 +28,7 @@ count is n0 plus the deltas of the interactions done so far, and live vars ≤ v
 peak ≤ B on the semantic reducer, the fabric model and the RTL alike.
 
 usage:  python3 -m omega.eal FILE.olm [--N n]      python3 -m omega.eal PROGRAM N   (programs/*.olm)
+        python3 -m omega.eal --symbolic PROGRAM|FILE.olm [NMAX]   (step 25: B(N) in closed form, omega/symbolic.py)
 """
 import os, sys
 from . import lang, typecheck as tc, semantic
@@ -458,6 +459,9 @@ def analyse(src, with_bound=True):
 def main(argv):
     if not argv:
         print(__doc__); return 2
+    if argv[0] == "--symbolic":                     # step 25: B as a closed form in N (omega/symbolic.py)
+        from . import symbolic
+        return symbolic.main(argv[1:])
     if os.path.exists(argv[0]):
         src = open(argv[0]).read()
         if "--N" in argv:

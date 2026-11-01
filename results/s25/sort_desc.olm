@@ -1,0 +1,9 @@
+// step 25: sort.olm with a descending input of the same template shape (seed N, s -> s - 1): every insert walks to Nil (worst case)
+data List = Nil | Cons(h, t)
+def rnd(n, s) = switch n { 0 => Nil; p => Cons(s % 100, rnd(p, (s * 1 + 2147483647) % 2147483648)) }
+def insert(x, xs) = match xs {
+  Nil => Cons(x, Nil);
+  Cons(h, t) => if x <= h then Cons(x, Cons(h, t)) else Cons(h, insert(x, t)) }
+def sort(xs) = match xs { Nil => Nil; Cons(h, t) => insert(h, sort(t)) }
+def check(xs, i) = match xs { Nil => 0; Cons(h, t) => i * h + check(t, i + 1) }
+def main = check(sort(rnd(N, N)), 1)

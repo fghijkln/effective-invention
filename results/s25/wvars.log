@@ -1,0 +1,8 @@
+fib(10): W_nodes 1256 (B 2122), W_vars 1254 (B 1680), frees with a causal maximum (1360, 1679)
+sum(100): W_nodes 409 (B 1107), W_vars 607 (B 806), frees with a causal maximum (505, 804)
+fact(12): W_nodes 57 (B 139), W_vars 79 (B 102), frees with a causal maximum (65, 100)
+list(25): W_nodes 523 (B 1377), W_vars 918 (B 1423), frees with a causal maximum (617, 1420)
+sort(15): W_nodes 292 (B 2679), W_vars 1010 (B 2435), frees with a causal maximum (1537, 2432)
+higher(30): W_nodes 458 (B 1332), W_vars 908 (B 1363), frees with a causal maximum (651, 1362)
+treesum(6): W_nodes 894 (B 2345), W_vars 1333 (B 2029), frees with a causal maximum (1142, 2026)
+treesum_direct(8): W_nodes 1663 (B 3064), W_vars 2044 (B 2299), frees with a causal maximum (1533, 2298)
