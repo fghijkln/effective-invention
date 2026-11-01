@@ -1,0 +1,2 @@
+mutant  7 CAUGHT  SPAWN always expands locally (performance-only: no work distribution) -- treesum_direct(8) speedup 4x4/1x1 = 1.04 (bound >= 3.0)
+mutants: 1/1 caught

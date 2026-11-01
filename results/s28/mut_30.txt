@@ -1,0 +1,2 @@
+mutant 30 CAUGHT  cluster ROM: EXPAND does not wait for its template pair (proceeds on a missed grant) -- prog fib(8) on 2x2: got STATUS 3 err 0 / 2898 interactions / 2704 nodes, want #21 / 901 / 0
+mutants: 1/1 caught

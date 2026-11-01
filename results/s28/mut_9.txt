@@ -1,0 +1,2 @@
+mutant  9 CAUGHT  SWI #0: built (* r) instead of (r *) (wrong branch) -- prog fib(8) on 2x2: got (x0 x0) / 9 interactions / 1 nodes, want #21 / 901 / 0
+mutants: 1/1 caught

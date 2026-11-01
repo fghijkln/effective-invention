@@ -1,0 +1,2 @@
+mutant 47 CAUGHT  step 14 oldest-fork give disabled (fork tasks leave the deque only when the stack is empty; performance only: caught by the fib(16) 4x4 cycle bound) -- fib(16) 4x4 cycles 8254 with the mutant vs 7530 (bound: > 1.05x)
+mutants: 1/1 caught

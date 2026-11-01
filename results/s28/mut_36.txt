@@ -1,0 +1,2 @@
+mutant 36 CAUGHT  VHU: hand-back link never taken by the main engine (redex lost / hang) -- prog fib(8) on 2x2: got STATUS 3 err 0 / 4 interactions / 5 nodes, want #21 / 901 / 0
+mutants: 1/1 caught

@@ -1,0 +1,2 @@
+mutant  3 CAUGHT  SWI: predecessor not decremented -- prog list(6) on 2x2: got STATUS 3 err 0 / 34750 interactions / 2290 nodes, want #97 / 341 / 0
+mutants: 1/1 caught

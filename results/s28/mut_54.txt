@@ -1,0 +1,2 @@
+mutant 54 CAUGHT  step 23 +ilr=2: the fabric child order never applies (a rule continues with its first link; caught by treesum(9) 1x1 with 130 free slots, which then needs 235) -- ilr treesum(9) 1x1 keep 130 RTL +ilr=2: status 2
+mutants: 1/1 caught

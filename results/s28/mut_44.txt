@@ -1,0 +1,2 @@
+mutant 44 CAUGHT  local-first link orientation disabled (a remote var ~ local var link is always sent away; performance only: caught by the LINK bound) -- treesum(7) 4x4 LINK messages 1769 with the mutant vs 777 (bound: > 1.3x)
+mutants: 1/1 caught

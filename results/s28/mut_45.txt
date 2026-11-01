@@ -1,0 +1,2 @@
+mutant 45 CAUGHT  step 13 producer hint ignored (producer recursions held back by spawn_k like strict ones; performance only: caught by the qsort speed bound) -- qsort(30) 4x4 cycles 11383 with the mutant vs 9118 (bound: > 1.15x)
+mutants: 1/1 caught

@@ -1,0 +1,2 @@
+mutant 49 CAUGHT  step 19 room-distance gradient ignored (no downhill neighbour is ever found: a SPAWN without room parks and escalates round robin as in step 18; caught by the global treesum(9) 3x3 livelock seeds at the short timeout) -- global treesum(9) 3x3 seeds 3/10/11: 3 stop without progress with the mutant
+mutants: 1/1 caught

@@ -1,0 +1,2 @@
+mutant 41 CAUGHT  retry slot: no escalation (a parked retry never falls back to round-robin SPAWN / NODE / PULL moves) -- global fib(12) 3x3 keep 8/8 in 8 cells: wrong result / timeout
+mutants: 1/1 caught

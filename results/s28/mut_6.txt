@@ -1,0 +1,2 @@
+mutant  6 CAUGHT  commutation: second copy of P has its aux ports swapped -- prog list(6) on 2x2: got STATUS 3 err 0 / 1797 interactions / 2763 nodes, want #97 / 341 / 0
+mutants: 1/1 caught

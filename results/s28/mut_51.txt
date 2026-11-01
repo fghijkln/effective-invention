@@ -1,0 +1,2 @@
+mutant 51 CAUGHT  step 20 slot reserve applied without a downhill neighbour (an expansion always leaves rsv slots free while rgrad != 0; caught by fib(10) on 1x1 with exactly the 93 free node / var slots its RTL run needs) -- fib(10) 1x1 with 93 free slots: status 0 correct design, 2 mutant
+mutants: 1/1 caught

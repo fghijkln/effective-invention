@@ -1,0 +1,2 @@
+mutant 53 CAUGHT  step 23 +ilr: the root link of an expansion is still linked at once (step-22 order; caught by the mempress treesum(9) 1x1 cases with 250 / 130 free slots at +ilr=1 / 2) -- ilr treesum(9) 1x1 keep 250 RTL +ilr=1: status 2
+mutants: 1/1 caught

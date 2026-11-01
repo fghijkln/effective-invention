@@ -1,0 +1,2 @@
+mutant 24 CAUGHT  v3 S_WQ: owner tags of fresh commutation vars not written -- prog list(6) on 2x2: got x0 / 281 interactions / 30 nodes, want #97 / 341 / 0
+mutants: 1/1 caught

@@ -1,0 +1,7 @@
+  mutant 8 (find_exact skips the held-out terms): caught
+  mutant 9 (envelope skips its feasibility checks): caught
+  mutant 10 (W_vars frees a var at the first event of F_v): caught
+  mutant 11 (admission ignores the running jobs): caught
+  mutant 12 (reservations never released): caught
+  mutant 13 (reserve the depth-first peak instead of a bound): caught
+s25 mutants: 6/6 caught

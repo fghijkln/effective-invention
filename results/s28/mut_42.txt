@@ -1,0 +1,2 @@
+mutant 42 CAUGHT  spawn policy: threshold ignored (every REF to a hungry neighbour, the step-10 policy; performance only: caught by the message bound) -- qsort(20) 4x4 1.21 msgs/interaction with the mutant (bound <= 0.6)
+mutants: 1/1 caught

@@ -1,0 +1,8 @@
+eal mutant 1 (affinity check off (data may be duplicated)): caught (14 failures)
+eal mutant 2 (any closure may be passed to a !-parameter): caught (5 failures)
+eal mutant 3 (termination (measure) check off): caught (12 failures)
+eal mutant 4 (bound: commutation node deltas not counted): caught (12 failures)
+eal mutant 5 (constructor fields typed freshly per use (functions can hide in data)): caught (6 failures)
+eal mutant 6 (numeric guards (`if n < c`) ignored): caught (16 failures)
+eal mutant 7 (bound: commutation var allocations not counted): caught (13 failures)
+Ω-L mutants: 7/7 caught

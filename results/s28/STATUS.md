@@ -3,3 +3,9 @@
 - 04:45: worktree patch + tests/test_s28.py applied onto main repo (master 02e7d0c, steps 26+27 pushed). Quick rerun: results/s28/quick2.log.
 - 04:55: s28 quick 100/100 (quick2.log). Docs/CI hooks (ci_quick --ci, run_all). Full regression lanes started: results/s28/reg_A.sh / reg_B.sh (status files reg_A.status / reg_B.status; resumable).
 - 05:20: s28 full 129/129 (s28_full.log, s28.json). cert_table.py (closed-form N_max per cell size). SPEC §7.7 + README step-28 section written. Lanes running.
+- 05:35: wip 5a9555c pushed, CI 41350725346 success. s28 mutants 2/2. Lanes A (id8) / B (mutants) running.
+- 05:45: lane A identity 128/128, units 42/42, programs 315/315, s14 90/90, fuzz 600/600; lane B mutants through 12 caught.
+- 06:00: lane A + security 420/420, bigfuzz 200/200; mempress running. Lane C (reg_C.sh) takes lane B's tail in reverse after A.
+- 06:15: sandbox restarted ~05:57 (lane B at mutant 29, lane C in s27); lanes B and C relaunched (B rebuilds toolchain, C waits for it). Lane A ALLDONE: + mempress 60/60.
+- 06:35: s27 253/253, s26 mutants 5/5, RTL mutants through 43 caught; s26 + mutants 44+ running.
+- 06:50: full regression green: identity 128/128, units 42/42, programs 315/315, s14 90/90, fuzz 600/600, bigfuzz 200/200, security 420/420, mempress 60/60, mutants 55/55, s28 129/129 + 2/2, eal 597/597 + 7/7, s25 2749/2749 + 6/6, s26 76/76 + 5/5, s27 253/253. Committing step 28.

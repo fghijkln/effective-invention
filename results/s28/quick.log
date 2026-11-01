@@ -1,0 +1,8 @@
+step 28: 16-bit slot field, certified benchmark sizes
+  encoding: addr / addr_slot round trip over all 16 slot bits
+  forged pointers with slot bits >= 4096 on 1024-slot cells: OOB in semantic, fabric and RTL
+  high slots fib(10) 2x2 x 8192 (only the top 600 slots free; allocation in slots 7592..8191): RTL status 0, 1783 cycles, #55
+  high slots treesum(6) 2x2 x 8192 (only the top 1500 slots free; allocation in slots 6692..8191): RTL status 0, 2053 cycles, #64
+  high slots qsort(15) 2x2 x 16384 (only the top 800 slots free; allocation in slots 15584..16383): RTL status 0, 5497 cycles, #6108
+  high slots list(20) 3x2 x 8192 (only the top 600 slots free; allocation in slots 7592..8191): RTL status 0, 1642 cycles, #2890
+  certified qsort_l(40) on RTL 1x1 with exactly B = (13212, 11947) free slots: status 0, peak (292, 592) = B / (45, 20), task stack 168, 34649 cycles (36s)

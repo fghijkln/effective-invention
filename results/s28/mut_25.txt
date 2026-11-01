@@ -1,0 +1,2 @@
+mutant 25 CAUGHT  v3 EXPAND allocation pops one node slot fewer than it maps (slot aliasing) -- prog fib(8) on 2x2: got STATUS 3 err 0 / 2401 interactions / 2591 nodes, want #21 / 901 / 0
+mutants: 1/1 caught

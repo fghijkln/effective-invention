@@ -1,0 +1,2 @@
+mutant 40 CAUGHT  retry slot: quiescence ignores a parked retry (premature termination) -- ballast fib(12) 2x2 keep 4/200: wrong result / timeout
+mutants: 1/1 caught

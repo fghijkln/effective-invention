@@ -1,0 +1,2 @@
+mutant 35 CAUGHT  VHU: no stall when the main engine's link names the same var slot (non-atomic exchange) -- prog fib(8) on 2x2: got x0 / 750 interactions / 55 nodes, want #21 / 901 / 0
+mutants: 1/1 caught
