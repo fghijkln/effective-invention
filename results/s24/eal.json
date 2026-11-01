@@ -1,0 +1,754 @@
+[
+ {
+  "prog": "fib",
+  "N": 6,
+  "B_nodes": 298,
+  "B_vars": 236,
+  "lifo": [
+   58,
+   67
+  ],
+  "fifo": [
+   96,
+   113
+  ],
+  "random": [
+   76,
+   98
+  ],
+  "slots_mesh": 322,
+  "interactions": 334
+ },
+ {
+  "prog": "fib",
+  "N": 10,
+  "B_nodes": 2122,
+  "B_vars": 1680,
+  "lifo": [
+   94,
+   111
+  ],
+  "fifo": [
+   604,
+   681
+  ],
+  "random": [
+   432,
+   562
+  ],
+  "slots_mesh": 2146,
+  "interactions": 2386,
+  "rtl_1x1": [
+   53,
+   94,
+   5714
+  ],
+  "rtl_at_bound": [
+   53,
+   94,
+   5714,
+   0
+  ]
+ },
+ {
+  "prog": "fib",
+  "N": 12,
+  "B_nodes": 5578,
+  "B_vars": 4416,
+  "lifo": [
+   112,
+   133
+  ],
+  "fifo": [
+   1528,
+   1784
+  ],
+  "random": [
+   971,
+   1300
+  ],
+  "slots_mesh": 5602,
+  "interactions": 6274,
+  "fabric_1x1": [
+   48,
+   67,
+   48,
+   67
+  ],
+  "fabric_2x2": [
+   139,
+   207,
+   68,
+   92
+  ],
+  "fabric_4x4": [
+   331,
+   525,
+   75,
+   91
+  ]
+ },
+ {
+  "prog": "sum",
+  "N": 0,
+  "B_nodes": 7,
+  "B_vars": 6,
+  "lifo": [
+   7,
+   6
+  ],
+  "fifo": [
+   7,
+   6
+  ],
+  "random": [
+   7,
+   6
+  ],
+  "slots_mesh": 29,
+  "interactions": 8
+ },
+ {
+  "prog": "sum",
+  "N": 30,
+  "B_nodes": 337,
+  "B_vars": 246,
+  "lifo": [
+   71,
+   42
+  ],
+  "fifo": [
+   39,
+   41
+  ],
+  "random": [
+   41,
+   42
+  ],
+  "slots_mesh": 359,
+  "interactions": 398
+ },
+ {
+  "prog": "sum",
+  "N": 100,
+  "B_nodes": 1107,
+  "B_vars": 806,
+  "lifo": [
+   211,
+   112
+  ],
+  "fifo": [
+   109,
+   111
+  ],
+  "random": [
+   111,
+   111
+  ],
+  "slots_mesh": 1129,
+  "interactions": 1308,
+  "fabric_1x1": [
+   211,
+   409,
+   211,
+   409
+  ],
+  "fabric_2x2": [
+   115,
+   130,
+   43,
+   52
+  ],
+  "fabric_4x4": [
+   115,
+   130,
+   33,
+   43
+  ],
+  "rtl_1x1": [
+   107,
+   308,
+   2918
+  ],
+  "rtl_at_bound": [
+   107,
+   308,
+   2918,
+   0
+  ]
+ },
+ {
+  "prog": "fact",
+  "N": 12,
+  "B_nodes": 139,
+  "B_vars": 102,
+  "lifo": [
+   35,
+   24
+  ],
+  "fifo": [
+   21,
+   23
+  ],
+  "random": [
+   24,
+   24
+  ],
+  "slots_mesh": 161,
+  "interactions": 164,
+  "fabric_1x1": [
+   35,
+   57,
+   35,
+   57
+  ],
+  "fabric_2x2": [
+   27,
+   42,
+   25,
+   36
+  ],
+  "fabric_4x4": [
+   27,
+   42,
+   25,
+   36
+  ],
+  "rtl_1x1": [
+   19,
+   44,
+   366
+  ],
+  "rtl_at_bound": [
+   19,
+   44,
+   366,
+   0
+  ]
+ },
+ {
+  "prog": "list",
+  "N": 0,
+  "B_nodes": 27,
+  "B_vars": 23,
+  "lifo": [
+   15,
+   16
+  ],
+  "fifo": [
+   23,
+   21
+  ],
+  "random": [
+   21,
+   20
+  ],
+  "slots_mesh": 52,
+  "interactions": 29
+ },
+ {
+  "prog": "list",
+  "N": 10,
+  "B_nodes": 567,
+  "B_vars": 583,
+  "lifo": [
+   71,
+   98
+  ],
+  "fifo": [
+   62,
+   72
+  ],
+  "random": [
+   65,
+   86
+  ],
+  "slots_mesh": 608,
+  "interactions": 549
+ },
+ {
+  "prog": "list",
+  "N": 25,
+  "B_nodes": 1377,
+  "B_vars": 1423,
+  "lifo": [
+   146,
+   203
+  ],
+  "fifo": [
+   77,
+   87
+  ],
+  "random": [
+   93,
+   134
+  ],
+  "slots_mesh": 1448,
+  "interactions": 1329,
+  "fabric_1x1": [
+   201,
+   356,
+   201,
+   356
+  ],
+  "fabric_2x2": [
+   109,
+   179,
+   61,
+   90
+  ],
+  "fabric_4x4": [
+   90,
+   174,
+   33,
+   51
+  ],
+  "rtl_1x1": [
+   260,
+   462,
+   4014
+  ],
+  "rtl_at_bound": [
+   260,
+   462,
+   4014,
+   0
+  ]
+ },
+ {
+  "prog": "treesum",
+  "N": 0,
+  "B_nodes": 14,
+  "B_vars": 13,
+  "lifo": [
+   8,
+   9
+  ],
+  "fifo": [
+   9,
+   9
+  ],
+  "random": [
+   9,
+   9
+  ],
+  "slots_mesh": 36,
+  "interactions": 14
+ },
+ {
+  "prog": "treesum",
+  "N": 3,
+  "B_nodes": 273,
+  "B_vars": 237,
+  "lifo": [
+   31,
+   43
+  ],
+  "fifo": [
+   83,
+   90
+  ],
+  "random": [
+   70,
+   84
+  ],
+  "slots_mesh": 295,
+  "interactions": 266
+ },
+ {
+  "prog": "treesum",
+  "N": 5,
+  "B_nodes": 1161,
+  "B_vars": 1005,
+  "lifo": [
+   43,
+   61
+  ],
+  "fifo": [
+   335,
+   363
+  ],
+  "random": [
+   202,
+   266
+  ],
+  "slots_mesh": 1183,
+  "interactions": 1130
+ },
+ {
+  "prog": "treesum",
+  "N": 7,
+  "B_nodes": 4713,
+  "B_vars": 4077,
+  "lifo": [
+   55,
+   79
+  ],
+  "fifo": [
+   1343,
+   1455
+  ],
+  "random": [
+   709,
+   980
+  ],
+  "slots_mesh": 4735,
+  "interactions": 4586,
+  "fabric_1x1": [
+   63,
+   98,
+   63,
+   98
+  ],
+  "fabric_2x2": [
+   175,
+   275,
+   52,
+   83
+  ],
+  "fabric_4x4": [
+   430,
+   698,
+   56,
+   77
+  ]
+ },
+ {
+  "prog": "treesum_direct",
+  "N": 5,
+  "B_nodes": 376,
+  "B_vars": 283,
+  "lifo": [
+   22,
+   31
+  ],
+  "fifo": [
+   175,
+   222
+  ],
+  "random": [
+   95,
+   142
+  ],
+  "slots_mesh": 397,
+  "interactions": 470
+ },
+ {
+  "prog": "treesum_direct",
+  "N": 9,
+  "B_nodes": 6136,
+  "B_vars": 4603,
+  "lifo": [
+   34,
+   51
+  ],
+  "fifo": [
+   2815,
+   3582
+  ],
+  "random": [
+   1093,
+   1806
+  ],
+  "slots_mesh": 6157,
+  "interactions": 7670,
+  "fabric_1x1": [
+   43,
+   85,
+   43,
+   85
+  ],
+  "fabric_2x2": [
+   120,
+   202,
+   35,
+   60
+  ],
+  "fabric_4x4": [
+   333,
+   563,
+   33,
+   52
+  ]
+ },
+ {
+  "prog": "sort",
+  "N": 0,
+  "B_nodes": 24,
+  "B_vars": 20,
+  "lifo": [
+   14,
+   14
+  ],
+  "fifo": [
+   20,
+   18
+  ],
+  "random": [
+   18,
+   16
+  ],
+  "slots_mesh": 51,
+  "interactions": 23
+ },
+ {
+  "prog": "sort",
+  "N": 8,
+  "B_nodes": 1105,
+  "B_vars": 999,
+  "lifo": [
+   56,
+   81
+  ],
+  "fifo": [
+   83,
+   94
+  ],
+  "random": [
+   59,
+   88
+  ],
+  "slots_mesh": 1132,
+  "interactions": 955
+ },
+ {
+  "prog": "sort",
+  "N": 15,
+  "B_nodes": 2679,
+  "B_vars": 2435,
+  "lifo": [
+   84,
+   142
+  ],
+  "fifo": [
+   108,
+   148
+  ],
+  "random": [
+   91,
+   145
+  ],
+  "slots_mesh": 2706,
+  "interactions": 2289,
+  "fabric_1x1": [
+   84,
+   144,
+   84,
+   144
+  ],
+  "fabric_2x2": [
+   95,
+   153,
+   47,
+   73
+  ],
+  "fabric_4x4": [
+   88,
+   156,
+   43,
+   67
+  ],
+  "rtl_1x1": [
+   117,
+   188,
+   7141
+  ],
+  "rtl_at_bound": [
+   117,
+   188,
+   7141,
+   0
+  ]
+ },
+ {
+  "prog": "higher",
+  "N": 0,
+  "B_nodes": 42,
+  "B_vars": 43,
+  "lifo": [
+   21,
+   22
+  ],
+  "fifo": [
+   31,
+   35
+  ],
+  "random": [
+   30,
+   37
+  ],
+  "slots_mesh": 71,
+  "interactions": 41
+ },
+ {
+  "prog": "higher",
+  "N": 9,
+  "B_nodes": 429,
+  "B_vars": 439,
+  "lifo": [
+   65,
+   93
+  ],
+  "fifo": [
+   52,
+   75
+  ],
+  "random": [
+   59,
+   86
+  ],
+  "slots_mesh": 467,
+  "interactions": 383
+ },
+ {
+  "prog": "higher",
+  "N": 30,
+  "B_nodes": 1332,
+  "B_vars": 1363,
+  "lifo": [
+   170,
+   240
+  ],
+  "fifo": [
+   82,
+   132
+  ],
+  "random": [
+   97,
+   157
+  ],
+  "slots_mesh": 1391,
+  "interactions": 1181,
+  "fabric_1x1": [
+   173,
+   385,
+   173,
+   385
+  ],
+  "fabric_2x2": [
+   102,
+   219,
+   54,
+   88
+  ],
+  "fabric_4x4": [
+   85,
+   223,
+   39,
+   53
+  ],
+  "rtl_1x1": [
+   226,
+   469,
+   3752
+  ],
+  "rtl_at_bound": [
+   226,
+   469,
+   3752,
+   0
+  ]
+ },
+ {
+  "prog": "treesum",
+  "N": 6,
+  "B_nodes": 2345,
+  "B_vars": 2029,
+  "lifo": [
+   49,
+   70
+  ],
+  "fifo": [
+   671,
+   727
+  ],
+  "random": [
+   366,
+   495
+  ],
+  "slots_mesh": 2367,
+  "interactions": 2282,
+  "rtl_1x1": [
+   60,
+   109,
+   6050
+  ],
+  "rtl_at_bound": [
+   60,
+   109,
+   6050,
+   0
+  ]
+ },
+ {
+  "prog": "treesum_direct",
+  "N": 8,
+  "B_nodes": 3064,
+  "B_vars": 2299,
+  "lifo": [
+   31,
+   46
+  ],
+  "fifo": [
+   1407,
+   1790
+  ],
+  "random": [
+   561,
+   939
+  ],
+  "slots_mesh": 3085,
+  "interactions": 3830,
+  "rtl_1x1": [
+   30,
+   65,
+   8207
+  ],
+  "rtl_at_bound": [
+   30,
+   65,
+   8207,
+   0
+  ]
+ },
+ {
+  "prog": "fib",
+  "N": 8,
+  "mesh_2x2_at_slots_mesh": [
+   826,
+   0
+  ]
+ },
+ {
+  "prog": "list",
+  "N": 20,
+  "mesh_2x2_at_slots_mesh": [
+   1168,
+   0
+  ]
+ },
+ {
+  "prog": "treesum",
+  "N": 5,
+  "mesh_2x2_at_slots_mesh": [
+   1183,
+   0
+  ]
+ },
+ {
+  "prog": "sort",
+  "N": 10,
+  "mesh_2x2_at_slots_mesh": [
+   1400,
+   0
+  ]
+ },
+ {
+  "prog": "higher",
+  "N": 30,
+  "mesh_2x2_at_slots_mesh": [
+   1391,
+   0
+  ]
+ }
+]

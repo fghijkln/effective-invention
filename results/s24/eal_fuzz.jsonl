@@ -1,0 +1,200 @@
+{"i": 0, "used": ["filt", "foldr", "gen", "isort"], "B": [292, 254], "sem_peak": [56, 67], "fab": [4, 4, 64, 77], "inter": 267, "rtl": [33, 52, 786, 0]}
+{"i": 1, "used": ["foldr", "gen", "nlin"], "B": [648, 611], "sem_peak": [106, 149], "fab": [2, 2, 104, 185], "inter": 621, "rtl": [65, 111, 1825, 0]}
+{"i": 2, "used": ["chk", "filt", "gen"], "B": [274, 234], "sem_peak": [57, 65], "fab": [2, 2, 43, 57], "inter": 257, "rtl": [52, 73, 772, 0]}
+{"i": 3, "used": [], "B": [0, 1], "sem_peak": [0, 1], "fab": [1, 1, 0, 1], "inter": 0, "rtl": [0, 1, 0, 0]}
+{"i": 4, "used": ["nrec"], "B": [755, 653], "sem_peak": [277, 276], "fab": [4, 4, 232, 290], "inter": 774, "rtl": [53, 77, 2294, 0]}
+{"i": 5, "used": ["nlin", "tgen", "tsum", "twice"], "B": [479, 421], "sem_peak": [71, 64], "fab": [1, 1, 132, 189], "inter": 474, "rtl": [49, 52, 1279, 0]}
+{"i": 6, "used": ["nrec", "twice"], "B": [1259, 1100], "sem_peak": [455, 468], "fab": [3, 2, 141, 220], "inter": 1293, "rtl": [67, 98, 3869, 0]}
+{"i": 7, "used": ["tgen", "tsum"], "B": [169, 153], "sem_peak": [65, 67], "fab": [4, 4, 54, 74], "inter": 152, "rtl": [24, 36, 448, 0]}
+{"i": 8, "used": ["nlin", "tgen", "tsum"], "B": [378, 327], "sem_peak": [80, 96], "fab": [1, 1, 77, 130], "inter": 360, "rtl": [60, 117, 1063, 0]}
+{"i": 9, "used": [], "B": [0, 1], "sem_peak": [0, 1], "fab": [3, 2, 0, 1], "inter": 0, "rtl": [0, 1, 0, 0]}
+{"i": 10, "used": ["chk", "gen", "nrec"], "B": [351, 305], "sem_peak": [67, 75], "fab": [1, 1, 47, 50], "inter": 337, "rtl": [72, 105, 1025, 0]}
+{"i": 11, "used": ["tgen", "tmap", "tsum"], "B": [1356, 1309], "sem_peak": [335, 445], "fab": [3, 2, 186, 307], "inter": 1171, "rtl": [59, 105, 3628, 0]}
+{"i": 12, "used": ["chk", "gen", "nrec", "twice"], "B": [596, 524], "sem_peak": [126, 153], "fab": [3, 2, 118, 141], "inter": 581, "rtl": [92, 138, 1799, 0]}
+{"i": 13, "used": ["mir", "tgen", "tmap", "tsum"], "B": [845, 821], "sem_peak": [171, 246], "fab": [2, 2, 125, 220], "inter": 742, "rtl": [60, 116, 2327, 0]}
+{"i": 14, "used": ["nrec"], "B": [200, 173], "sem_peak": [78, 87], "fab": [4, 4, 70, 77], "inter": 204, "rtl": [32, 44, 623, 0]}
+{"i": 15, "used": ["nlin"], "B": [155, 130], "sem_peak": [36, 44], "fab": [3, 2, 56, 76], "inter": 154, "rtl": [21, 38, 404, 0]}
+{"i": 16, "used": [], "B": [0, 1], "sem_peak": [0, 1], "fab": [2, 2, 0, 1], "inter": 0, "rtl": [0, 1, 0, 0]}
+{"i": 17, "used": ["foldr", "gen", "nlin"], "B": [598, 598], "sem_peak": [94, 132], "fab": [4, 4, 96, 164], "inter": 560, "rtl": [81, 167, 1769, 0]}
+{"i": 18, "used": ["chk", "gen", "isort", "rev"], "B": [34, 29], "sem_peak": [28, 26], "fab": [1, 1, 18, 20], "inter": 31, "rtl": [18, 20, 91, 0]}
+{"i": 19, "used": ["chk", "gen", "isort", "nrec"], "B": [943, 822], "sem_peak": [196, 222], "fab": [4, 4, 170, 233], "inter": 907, "rtl": [47, 74, 2718, 0]}
+{"i": 20, "used": ["nrec"], "B": [15, 13], "sem_peak": [14, 13], "fab": [1, 1, 14, 13], "inter": 14, "rtl": [14, 13, 41, 0]}
+{"i": 21, "used": ["nrec"], "B": [163, 141], "sem_peak": [78, 77], "fab": [1, 1, 20, 28], "inter": 166, "rtl": [32, 44, 505, 0]}
+{"i": 22, "used": ["foldr", "gen", "isort", "twice"], "B": [532, 513], "sem_peak": [61, 82], "fab": [1, 1, 58, 74], "inter": 462, "rtl": [52, 94, 1447, 0]}
+{"i": 23, "used": [], "B": [0, 1], "sem_peak": [0, 1], "fab": [4, 4, 0, 1], "inter": 0, "rtl": [0, 1, 0, 0]}
+{"i": 24, "used": ["tgen", "tsum", "twice"], "B": [392, 364], "sem_peak": [137, 148], "fab": [2, 2, 89, 136], "inter": 357, "rtl": [43, 71, 1058, 0]}
+{"i": 25, "used": ["chk", "gen", "tgen", "tmap", "tsum"], "B": [690, 676], "sem_peak": [172, 231], "fab": [3, 2, 138, 219], "inter": 617, "rtl": [54, 99, 1894, 0]}
+{"i": 26, "used": ["nlin", "tgen", "tsum", "twice"], "B": [308, 280], "sem_peak": [61, 74], "fab": [2, 2, 63, 95], "inter": 310, "rtl": [41, 68, 822, 0]}
+{"i": 27, "used": [], "B": [0, 1], "sem_peak": [0, 1], "fab": [1, 1, 0, 1], "inter": 0, "rtl": [0, 1, 0, 0]}
+{"i": 28, "used": ["chk", "gen", "isort"], "B": [631, 563], "sem_peak": [58, 72], "fab": [1, 1, 48, 68], "inter": 553, "rtl": [54, 80, 1691, 0]}
+{"i": 29, "used": ["chk", "gen"], "B": [107, 91], "sem_peak": [44, 48], "fab": [4, 4, 37, 40], "inter": 104, "rtl": [23, 29, 294, 0]}
+{"i": 30, "used": ["tgen", "tmap", "tsum"], "B": [55, 52], "sem_peak": [32, 32], "fab": [2, 2, 26, 33], "inter": 45}
+{"i": 31, "used": ["mir", "tgen", "tsum", "twice"], "B": [1157, 1054], "sem_peak": [270, 301], "fab": [3, 2, 165, 272], "inter": 1019}
+{"i": 32, "used": ["app", "foldr", "gen"], "B": [996, 998], "sem_peak": [126, 174], "fab": [3, 2, 113, 178], "inter": 857}
+{"i": 33, "used": ["nrec"], "B": [52, 45], "sem_peak": [40, 39], "fab": [4, 4, 38, 38], "inter": 52}
+{"i": 34, "used": ["tgen", "tmap", "tsum"], "B": [130, 129], "sem_peak": [43, 62], "fab": [2, 2, 43, 53], "inter": 116}
+{"i": 35, "used": ["chk", "gen", "nlin"], "B": [861, 736], "sem_peak": [105, 148], "fab": [3, 2, 124, 192], "inter": 833}
+{"i": 36, "used": ["twice"], "B": [19, 24], "sem_peak": [16, 23], "fab": [2, 2, 14, 18], "inter": 19}
+{"i": 37, "used": ["nrec"], "B": [459, 397], "sem_peak": [172, 180], "fab": [1, 1, 23, 36], "inter": 470}
+{"i": 38, "used": ["foldr", "gen", "nlin", "twice"], "B": [391, 343], "sem_peak": [54, 89], "fab": [2, 2, 57, 83], "inter": 381}
+{"i": 39, "used": ["nrec"], "B": [459, 397], "sem_peak": [172, 180], "fab": [4, 4, 140, 169], "inter": 470}
+{"i": 40, "used": ["tgen", "tsum"], "B": [169, 153], "sem_peak": [65, 67], "fab": [1, 1, 36, 52], "inter": 152}
+{"i": 41, "used": ["chk", "rev", "tflat", "tgen"], "B": [85, 78], "sem_peak": [30, 32], "fab": [1, 1, 23, 33], "inter": 72}
+{"i": 42, "used": ["chk", "gen", "isort", "map"], "B": [137, 128], "sem_peak": [48, 54], "fab": [1, 1, 40, 43], "inter": 131}
+{"i": 43, "used": ["filt", "foldr", "tflat", "tgen"], "B": [186, 176], "sem_peak": [48, 54], "fab": [1, 1, 36, 48], "inter": 164}
+{"i": 44, "used": ["chk", "gen", "twice"], "B": [172, 158], "sem_peak": [51, 64], "fab": [4, 4, 47, 62], "inter": 168}
+{"i": 45, "used": ["chk", "gen", "nlin"], "B": [1156, 989], "sem_peak": [121, 172], "fab": [2, 2, 149, 238], "inter": 1122}
+{"i": 46, "used": ["foldr", "gen", "rev"], "B": [696, 700], "sem_peak": [87, 123], "fab": [1, 1, 94, 142], "inter": 612}
+{"i": 47, "used": ["foldr", "gen", "isort", "map"], "B": [142, 137], "sem_peak": [41, 45], "fab": [3, 2, 49, 52], "inter": 127}
+{"i": 48, "used": [], "B": [0, 1], "sem_peak": [0, 1], "fab": [2, 2, 0, 1], "inter": 0}
+{"i": 49, "used": ["chk", "nlin", "tflat", "tgen"], "B": [265, 225], "sem_peak": [42, 52], "fab": [1, 1, 71, 120], "inter": 258}
+{"i": 50, "used": [], "B": [0, 1], "sem_peak": [0, 1], "fab": [2, 2, 0, 1], "inter": 0}
+{"i": 51, "used": ["chk", "filt", "gen", "isort"], "B": [119, 99], "sem_peak": [43, 46], "fab": [2, 2, 49, 53], "inter": 116}
+{"i": 52, "used": [], "B": [0, 1], "sem_peak": [0, 1], "fab": [1, 1, 0, 1], "inter": 0}
+{"i": 53, "used": ["tgen", "tmap", "tsum"], "B": [37, 35], "sem_peak": [22, 22], "fab": [4, 4, 21, 22], "inter": 31}
+{"i": 54, "used": ["chk", "foldr", "gen", "isort", "twice"], "B": [843, 807], "sem_peak": [101, 142], "fab": [2, 2, 89, 136], "inter": 780}
+{"i": 55, "used": ["filt", "foldr", "gen"], "B": [186, 167], "sem_peak": [50, 58], "fab": [1, 1, 37, 47], "inter": 171}
+{"i": 56, "used": ["foldr", "gen", "rev"], "B": [675, 689], "sem_peak": [100, 131], "fab": [1, 1, 76, 124], "inter": 591}
+{"i": 57, "used": ["nrec"], "B": [15, 13], "sem_peak": [14, 13], "fab": [1, 1, 14, 13], "inter": 14}
+{"i": 58, "used": ["foldr", "gen"], "B": [81, 83], "sem_peak": [35, 38], "fab": [3, 2, 38, 43], "inter": 79}
+{"i": 59, "used": ["tgen", "tmap", "tsum"], "B": [300, 289], "sem_peak": [83, 110], "fab": [1, 1, 44, 71], "inter": 259}
+{"i": 60, "used": [], "B": [0, 1], "sem_peak": [0, 1], "fab": [3, 2, 0, 1], "inter": 0}
+{"i": 61, "used": ["nrec"], "B": [15, 13], "sem_peak": [14, 13], "fab": [4, 4, 14, 13], "inter": 14}
+{"i": 62, "used": ["foldr", "isort", "tflat", "tgen"], "B": [1128, 1078], "sem_peak": [147, 155], "fab": [4, 4, 141, 176], "inter": 937}
+{"i": 63, "used": ["nrec"], "B": [1236, 1069], "sem_peak": [449, 456], "fab": [1, 1, 35, 47], "inter": 1268}
+{"i": 64, "used": ["nrec"], "B": [200, 173], "sem_peak": [78, 87], "fab": [1, 1, 20, 32], "inter": 204}
+{"i": 65, "used": ["filt", "foldr", "gen", "map"], "B": [703, 677], "sem_peak": [89, 123], "fab": [3, 2, 71, 100], "inter": 633}
+{"i": 66, "used": [], "B": [0, 1], "sem_peak": [0, 1], "fab": [4, 4, 0, 1], "inter": 0}
+{"i": 67, "used": ["tgen", "tsum"], "B": [369, 333], "sem_peak": [131, 136], "fab": [2, 2, 77, 113], "inter": 332}
+{"i": 68, "used": ["foldr", "gen"], "B": [134, 130], "sem_peak": [52, 57], "fab": [1, 1, 41, 47], "inter": 122}
+{"i": 69, "used": ["tgen", "tsum"], "B": [769, 693], "sem_peak": [263, 273], "fab": [3, 2, 177, 254], "inter": 692}
+{"i": 70, "used": ["app", "chk", "filt", "gen"], "B": [447, 386], "sem_peak": [61, 81], "fab": [1, 1, 33, 48], "inter": 406}
+{"i": 71, "used": ["chk", "gen", "map", "tgen", "tsum"], "B": [240, 230], "sem_peak": [79, 88], "fab": [1, 1, 44, 56], "inter": 228}
+{"i": 72, "used": ["mir", "tgen", "tsum"], "B": [1509, 1371], "sem_peak": [273, 329], "fab": [2, 2, 175, 271], "inter": 1310}
+{"i": 73, "used": [], "B": [0, 1], "sem_peak": [0, 1], "fab": [1, 1, 0, 1], "inter": 0}
+{"i": 74, "used": ["nlin", "twice"], "B": [183, 177], "sem_peak": [43, 58], "fab": [1, 1, 51, 80], "inter": 186}
+{"i": 75, "used": ["app", "chk", "gen", "rev"], "B": [934, 830], "sem_peak": [116, 150], "fab": [3, 2, 103, 152], "inter": 831}
+{"i": 76, "used": ["nlin", "tgen", "tsum"], "B": [1050, 927], "sem_peak": [279, 300], "fab": [3, 2, 190, 301], "inter": 972}
+{"i": 77, "used": [], "B": [0, 1], "sem_peak": [0, 1], "fab": [2, 2, 0, 1], "inter": 0}
+{"i": 78, "used": ["chk", "filt", "gen"], "B": [403, 340], "sem_peak": [67, 84], "fab": [1, 1, 77, 89], "inter": 386}
+{"i": 79, "used": [], "B": [0, 1], "sem_peak": [0, 1], "fab": [2, 2, 0, 1], "inter": 0}
+{"i": 80, "used": ["app", "chk", "gen", "twice"], "B": [529, 473], "sem_peak": [96, 119], "fab": [2, 2, 93, 130], "inter": 485}
+{"i": 81, "used": ["nrec"], "B": [459, 397], "sem_peak": [165, 171], "fab": [2, 2, 84, 117], "inter": 470}
+{"i": 82, "used": ["foldr", "gen", "twice"], "B": [49, 51], "sem_peak": [40, 46], "fab": [4, 4, 33, 36], "inter": 50}
+{"i": 83, "used": ["nrec"], "B": [681, 589], "sem_peak": [210, 230], "fab": [2, 2, 96, 127], "inter": 698}
+{"i": 84, "used": ["nrec"], "B": [461, 399], "sem_peak": [174, 181], "fab": [3, 2, 99, 135], "inter": 473}
+{"i": 85, "used": ["filt", "foldr", "gen", "isort"], "B": [359, 306], "sem_peak": [63, 81], "fab": [3, 2, 71, 82], "inter": 343}
+{"i": 86, "used": ["twice"], "B": [20, 27], "sem_peak": [18, 24], "fab": [4, 4, 14, 17], "inter": 22}
+{"i": 87, "used": ["app", "foldr", "gen"], "B": [879, 891], "sem_peak": [135, 175], "fab": [2, 2, 114, 162], "inter": 807}
+{"i": 88, "used": ["nlin", "tgen", "tsum"], "B": [67, 58], "sem_peak": [31, 38], "fab": [4, 4, 32, 37], "inter": 65}
+{"i": 89, "used": ["nlin", "nrec"], "B": [814, 682], "sem_peak": [99, 183], "fab": [3, 2, 86, 184], "inter": 814}
+{"i": 90, "used": ["tgen", "tsum"], "B": [169, 153], "sem_peak": [65, 67], "fab": [1, 1, 36, 52], "inter": 152}
+{"i": 91, "used": [], "B": [0, 1], "sem_peak": [0, 1], "fab": [4, 4, 0, 1], "inter": 0}
+{"i": 92, "used": ["foldr", "gen", "map", "twice"], "B": [290, 308], "sem_peak": [68, 83], "fab": [1, 1, 51, 71], "inter": 271}
+{"i": 93, "used": ["tgen", "tsum"], "B": [19, 18], "sem_peak": [12, 13], "fab": [1, 1, 11, 13], "inter": 17}
+{"i": 94, "used": [], "B": [0, 1], "sem_peak": [0, 1], "fab": [4, 4, 0, 1], "inter": 0}
+{"i": 95, "used": ["tgen", "tmap", "tsum"], "B": [37, 35], "sem_peak": [22, 22], "fab": [3, 2, 21, 22], "inter": 31}
+{"i": 96, "used": ["foldr", "gen"], "B": [134, 130], "sem_peak": [52, 57], "fab": [3, 2, 45, 62], "inter": 122}
+{"i": 97, "used": ["chk", "gen"], "B": [98, 85], "sem_peak": [40, 44], "fab": [4, 4, 36, 41], "inter": 93}
+{"i": 98, "used": ["nrec", "tgen", "tsum", "twice"], "B": [445, 407], "sem_peak": [149, 160], "fab": [2, 2, 86, 136], "inter": 413}
+{"i": 99, "used": ["nrec"], "B": [2013, 1741], "sem_peak": [681, 711], "fab": [2, 2, 121, 195], "inter": 2066}
+{"i": 100, "used": [], "B": [0, 1], "sem_peak": [0, 1], "fab": [3, 2, 0, 1], "inter": 0}
+{"i": 101, "used": ["tgen", "tsum"], "B": [69, 63], "sem_peak": [32, 33], "fab": [2, 2, 33, 40], "inter": 62}
+{"i": 102, "used": ["foldr", "gen", "map", "rev"], "B": [637, 667], "sem_peak": [93, 123], "fab": [3, 2, 124, 176], "inter": 575}
+{"i": 103, "used": [], "B": [0, 1], "sem_peak": [0, 1], "fab": [2, 2, 0, 1], "inter": 0}
+{"i": 104, "used": ["nrec"], "B": [15, 13], "sem_peak": [14, 13], "fab": [2, 2, 14, 13], "inter": 14}
+{"i": 105, "used": ["nrec", "twice"], "B": [127, 125], "sem_peak": [66, 73], "fab": [2, 2, 45, 58], "inter": 130}
+{"i": 106, "used": ["chk", "gen", "map", "nlin"], "B": [759, 695], "sem_peak": [104, 167], "fab": [4, 4, 129, 185], "inter": 717}
+{"i": 107, "used": ["mir", "tgen", "tmap", "tsum"], "B": [161, 155], "sem_peak": [44, 59], "fab": [1, 1, 36, 57], "inter": 142}
+{"i": 108, "used": [], "B": [0, 1], "sem_peak": [0, 1], "fab": [3, 2, 0, 1], "inter": 0}
+{"i": 109, "used": ["app", "foldr", "gen"], "B": [438, 433], "sem_peak": [70, 97], "fab": [3, 2, 80, 125], "inter": 373}
+{"i": 110, "used": ["tgen", "tsum"], "B": [19, 18], "sem_peak": [12, 13], "fab": [2, 2, 12, 13], "inter": 17}
+{"i": 111, "used": [], "B": [0, 1], "sem_peak": [0, 1], "fab": [4, 4, 0, 1], "inter": 0}
+{"i": 112, "used": ["chk", "gen"], "B": [213, 185], "sem_peak": [52, 68], "fab": [4, 4, 33, 38], "inter": 202}
+{"i": 113, "used": ["foldr", "gen", "map"], "B": [346, 361], "sem_peak": [77, 98], "fab": [4, 4, 80, 106], "inter": 317}
+{"i": 114, "used": ["chk", "gen", "isort", "nlin"], "B": [1122, 961], "sem_peak": [125, 264], "fab": [3, 2, 142, 241], "inter": 1064}
+{"i": 115, "used": [], "B": [0, 1], "sem_peak": [0, 1], "fab": [3, 2, 0, 1], "inter": 0}
+{"i": 116, "used": ["chk", "gen", "nlin"], "B": [469, 394], "sem_peak": [60, 84], "fab": [1, 1, 116, 210], "inter": 463}
+{"i": 117, "used": ["foldr", "gen", "map"], "B": [115, 115], "sem_peak": [40, 45], "fab": [3, 2, 44, 52], "inter": 107}
+{"i": 118, "used": [], "B": [0, 1], "sem_peak": [0, 1], "fab": [2, 2, 0, 1], "inter": 0}
+{"i": 119, "used": ["app", "foldr", "gen", "map"], "B": [705, 736], "sem_peak": [100, 144], "fab": [4, 4, 106, 145], "inter": 645}
+{"i": 120, "used": ["nrec"], "B": [89, 77], "sem_peak": [48, 53], "fab": [2, 2, 39, 43], "inter": 90}
+{"i": 121, "used": ["nlin", "twice"], "B": [430, 371], "sem_peak": [64, 85], "fab": [2, 2, 57, 83], "inter": 431}
+{"i": 122, "used": ["tgen", "tsum"], "B": [369, 333], "sem_peak": [131, 136], "fab": [1, 1, 57, 76], "inter": 332}
+{"i": 123, "used": ["tgen", "tsum"], "B": [19, 18], "sem_peak": [12, 13], "fab": [4, 4, 12, 14], "inter": 17}
+{"i": 124, "used": ["foldr", "gen"], "B": [359, 367], "sem_peak": [68, 95], "fab": [2, 2, 65, 93], "inter": 340}
+{"i": 125, "used": ["tgen", "tsum"], "B": [172, 156], "sem_peak": [66, 68], "fab": [3, 2, 63, 77], "inter": 157}
+{"i": 126, "used": [], "B": [0, 1], "sem_peak": [0, 1], "fab": [1, 1, 0, 1], "inter": 0}
+{"i": 127, "used": ["foldr", "gen", "map"], "B": [40, 35], "sem_peak": [36, 33], "fab": [2, 2, 35, 33], "inter": 40}
+{"i": 128, "used": ["chk", "gen", "rev"], "B": [551, 484], "sem_peak": [103, 111], "fab": [3, 2, 73, 101], "inter": 490}
+{"i": 129, "used": ["mir", "tgen", "tsum"], "B": [1139, 1032], "sem_peak": [269, 298], "fab": [1, 1, 74, 114], "inter": 1001}
+{"i": 130, "used": ["nlin", "twice"], "B": [441, 380], "sem_peak": [72, 94], "fab": [4, 4, 36, 85], "inter": 441}
+{"i": 131, "used": ["mir", "tgen", "tsum", "twice"], "B": [49, 53], "sem_peak": [30, 36], "fab": [1, 1, 18, 21], "inter": 48}
+{"i": 132, "used": ["tgen", "tsum"], "B": [769, 693], "sem_peak": [263, 273], "fab": [4, 4, 203, 290], "inter": 692}
+{"i": 133, "used": ["nrec"], "B": [163, 141], "sem_peak": [78, 77], "fab": [4, 4, 68, 78], "inter": 166}
+{"i": 134, "used": ["filt", "foldr", "gen"], "B": [487, 429], "sem_peak": [73, 96], "fab": [3, 2, 70, 93], "inter": 458}
+{"i": 135, "used": ["foldr", "gen", "isort"], "B": [226, 223], "sem_peak": [53, 57], "fab": [4, 4, 59, 65], "inter": 210}
+{"i": 136, "used": ["tgen", "tsum", "twice"], "B": [789, 719], "sem_peak": [267, 281], "fab": [1, 1, 68, 94], "inter": 714}
+{"i": 137, "used": ["foldr", "gen"], "B": [182, 188], "sem_peak": [51, 64], "fab": [3, 2, 53, 75], "inter": 169}
+{"i": 138, "used": ["nlin"], "B": [443, 370], "sem_peak": [68, 91], "fab": [1, 1, 136, 250], "inter": 442}
+{"i": 139, "used": [], "B": [1, 2], "sem_peak": [1, 2], "fab": [2, 2, 0, 2], "inter": 1}
+{"i": 140, "used": ["chk", "filt", "tflat", "tgen"], "B": [665, 596], "sem_peak": [142, 148], "fab": [1, 1, 60, 82], "inter": 576}
+{"i": 141, "used": ["foldr", "gen", "mir", "tgen", "tsum"], "B": [776, 766], "sem_peak": [109, 122], "fab": [1, 1, 96, 138], "inter": 719}
+{"i": 142, "used": ["nlin"], "B": [445, 372], "sem_peak": [70, 47], "fab": [4, 4, 60, 103], "inter": 446}
+{"i": 143, "used": ["nrec"], "B": [734, 634], "sem_peak": [277, 275], "fab": [4, 4, 233, 291], "inter": 752}
+{"i": 144, "used": ["chk", "tflat", "tgen", "tsum", "twice"], "B": [175, 167], "sem_peak": [50, 59], "fab": [4, 4, 54, 68], "inter": 159}
+{"i": 145, "used": [], "B": [0, 1], "sem_peak": [0, 1], "fab": [4, 4, 0, 1], "inter": 0}
+{"i": 146, "used": ["mir", "tgen", "tsum"], "B": [103, 94], "sem_peak": [34, 42], "fab": [3, 2, 35, 41], "inter": 91}
+{"i": 147, "used": ["foldr", "mir", "tflat", "tgen"], "B": [86, 88], "sem_peak": [34, 39], "fab": [2, 2, 28, 37], "inter": 77}
+{"i": 148, "used": ["foldr", "gen"], "B": [338, 353], "sem_peak": [62, 92], "fab": [2, 2, 63, 88], "inter": 313}
+{"i": 149, "used": ["chk", "gen", "rev"], "B": [580, 512], "sem_peak": [84, 111], "fab": [3, 2, 86, 133], "inter": 514}
+{"i": 150, "used": ["chk", "gen", "map", "twice"], "B": [703, 703], "sem_peak": [93, 127], "fab": [2, 2, 95, 153], "inter": 687}
+{"i": 151, "used": ["foldr", "gen"], "B": [125, 124], "sem_peak": [49, 55], "fab": [3, 2, 46, 52], "inter": 111}
+{"i": 152, "used": ["tgen", "tmap", "tsum", "twice"], "B": [1441, 1462], "sem_peak": [357, 489], "fab": [2, 2, 193, 342], "inter": 1289}
+{"i": 153, "used": ["nlin"], "B": [463, 387], "sem_peak": [71, 47], "fab": [2, 2, 58, 86], "inter": 463}
+{"i": 154, "used": ["chk", "gen", "map"], "B": [31, 26], "sem_peak": [27, 24], "fab": [1, 1, 17, 18], "inter": 31}
+{"i": 155, "used": ["chk", "tflat", "tgen", "tmap"], "B": [75, 69], "sem_peak": [33, 32], "fab": [2, 2, 28, 30], "inter": 66}
+{"i": 156, "used": [], "B": [0, 1], "sem_peak": [0, 1], "fab": [1, 1, 0, 1], "inter": 0}
+{"i": 157, "used": ["chk", "gen", "map", "mir", "tgen", "tsum"], "B": [353, 344], "sem_peak": [74, 96], "fab": [3, 2, 82, 104], "inter": 343}
+{"i": 158, "used": ["chk", "gen"], "B": [21, 17], "sem_peak": [19, 16], "fab": [4, 4, 18, 16], "inter": 20}
+{"i": 159, "used": ["nlin", "tgen", "tsum"], "B": [498, 427], "sem_peak": [84, 106], "fab": [3, 2, 89, 118], "inter": 480}
+{"i": 160, "used": ["chk", "tflat", "tgen"], "B": [609, 555], "sem_peak": [140, 145], "fab": [1, 1, 58, 79], "inter": 526}
+{"i": 161, "used": ["foldr", "gen", "isort"], "B": [587, 574], "sem_peak": [64, 83], "fab": [4, 4, 62, 88], "inter": 518}
+{"i": 162, "used": ["foldr", "tflat", "tgen"], "B": [1441, 1459], "sem_peak": [282, 293], "fab": [3, 2, 195, 279], "inter": 1238}
+{"i": 163, "used": ["filt", "foldr", "gen"], "B": [145, 133], "sem_peak": [49, 49], "fab": [2, 2, 45, 48], "inter": 134}
+{"i": 164, "used": ["filt", "foldr", "gen", "map"], "B": [152, 145], "sem_peak": [56, 54], "fab": [4, 4, 50, 53], "inter": 142}
+{"i": 165, "used": [], "B": [0, 1], "sem_peak": [0, 1], "fab": [4, 4, 0, 1], "inter": 0}
+{"i": 166, "used": [], "B": [1, 2], "sem_peak": [1, 2], "fab": [4, 4, 1, 2], "inter": 1}
+{"i": 167, "used": ["app", "chk", "gen"], "B": [496, 430], "sem_peak": [103, 123], "fab": [3, 2, 79, 114], "inter": 455}
+{"i": 168, "used": ["foldr", "gen"], "B": [245, 249], "sem_peak": [59, 72], "fab": [1, 1, 55, 72], "inter": 228}
+{"i": 169, "used": ["nrec"], "B": [274, 237], "sem_peak": [121, 122], "fab": [3, 2, 89, 107], "inter": 280}
+{"i": 170, "used": ["nrec", "twice"], "B": [186, 172], "sem_peak": [84, 89], "fab": [1, 1, 26, 42], "inter": 191}
+{"i": 171, "used": ["tgen", "tmap", "tsum", "twice"], "B": [58, 62], "sem_peak": [37, 41], "fab": [2, 2, 30, 37], "inter": 55}
+{"i": 172, "used": ["mir", "tgen", "tmap", "tsum"], "B": [860, 850], "sem_peak": [203, 261], "fab": [1, 1, 86, 158], "inter": 757}
+{"i": 173, "used": ["nlin", "tgen", "tsum", "twice"], "B": [581, 508], "sem_peak": [90, 110], "fab": [4, 4, 94, 121], "inter": 565}
+{"i": 174, "used": ["chk", "gen"], "B": [399, 341], "sem_peak": [70, 84], "fab": [3, 2, 56, 72], "inter": 380}
+{"i": 175, "used": ["foldr", "tflat", "tgen"], "B": [1441, 1459], "sem_peak": [282, 293], "fab": [3, 2, 167, 239], "inter": 1238}
+{"i": 176, "used": ["nrec"], "B": [1236, 1069], "sem_peak": [449, 456], "fab": [1, 1, 35, 47], "inter": 1268}
+{"i": 177, "used": ["chk", "gen", "isort"], "B": [369, 326], "sem_peak": [49, 59], "fab": [2, 2, 51, 67], "inter": 327}
+{"i": 178, "used": ["tgen", "tsum"], "B": [369, 333], "sem_peak": [131, 136], "fab": [4, 4, 127, 151], "inter": 332}
+{"i": 179, "used": ["chk", "gen", "map", "nrec"], "B": [832, 769], "sem_peak": [201, 222], "fab": [2, 2, 99, 146], "inter": 829}
+{"i": 180, "used": [], "B": [0, 1], "sem_peak": [0, 1], "fab": [2, 2, 0, 1], "inter": 0}
+{"i": 181, "used": ["mir", "tgen", "tmap", "tsum"], "B": [860, 850], "sem_peak": [203, 261], "fab": [4, 4, 160, 241], "inter": 757}
+{"i": 182, "used": [], "B": [0, 1], "sem_peak": [0, 1], "fab": [4, 4, 0, 1], "inter": 0}
+{"i": 183, "used": ["nrec"], "B": [755, 653], "sem_peak": [277, 276], "fab": [2, 2, 113, 162], "inter": 774}
+{"i": 184, "used": [], "B": [0, 1], "sem_peak": [0, 1], "fab": [3, 2, 0, 1], "inter": 0}
+{"i": 185, "used": ["chk", "filt", "gen", "rev"], "B": [163, 136], "sem_peak": [46, 50], "fab": [3, 2, 49, 56], "inter": 154}
+{"i": 186, "used": ["nlin", "nrec", "tgen", "tsum"], "B": [922, 820], "sem_peak": [280, 295], "fab": [4, 4, 230, 340], "inter": 844}
+{"i": 187, "used": ["chk", "gen", "map"], "B": [438, 459], "sem_peak": [85, 112], "fab": [2, 2, 87, 129], "inter": 423}
+{"i": 188, "used": ["nrec"], "B": [163, 141], "sem_peak": [78, 77], "fab": [4, 4, 65, 75], "inter": 166}
+{"i": 189, "used": [], "B": [1, 2], "sem_peak": [1, 2], "fab": [1, 1, 0, 2], "inter": 1}
+{"i": 190, "used": ["nrec"], "B": [15, 13], "sem_peak": [14, 13], "fab": [1, 1, 14, 13], "inter": 14}
+{"i": 191, "used": ["nrec"], "B": [15, 13], "sem_peak": [14, 13], "fab": [4, 4, 14, 13], "inter": 14}
+{"i": 192, "used": ["foldr", "gen", "nlin"], "B": [471, 393], "sem_peak": [68, 91], "fab": [1, 1, 136, 250], "inter": 468}
+{"i": 193, "used": ["chk", "gen", "rev"], "B": [275, 242], "sem_peak": [62, 74], "fab": [4, 4, 58, 76], "inter": 244}
+{"i": 194, "used": ["nlin", "tgen", "tsum"], "B": [473, 421], "sem_peak": [142, 145], "fab": [3, 2, 119, 178], "inter": 435}
+{"i": 195, "used": ["nrec"], "B": [89, 77], "sem_peak": [48, 53], "fab": [3, 2, 39, 43], "inter": 90}
+{"i": 196, "used": ["foldr", "gen", "nrec"], "B": [476, 492], "sem_peak": [79, 92], "fab": [2, 2, 70, 102], "inter": 464}
+{"i": 197, "used": [], "B": [0, 1], "sem_peak": [0, 1], "fab": [1, 1, 0, 1], "inter": 0}
+{"i": 198, "used": ["chk", "gen", "nlin"], "B": [510, 429], "sem_peak": [80, 95], "fab": [1, 1, 101, 180], "inter": 504}
+{"i": 199, "used": ["foldr", "gen"], "B": [175, 175], "sem_peak": [53, 64], "fab": [3, 2, 54, 73], "inter": 155}

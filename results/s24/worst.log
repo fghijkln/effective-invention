@@ -1,0 +1,13 @@
+fib(10): B_nodes 2122  exact worst case 1256  fifo peak 604  lifo peak 94  B/worst 1.69  worst/lifo 13.4
+fib(12): B_nodes 5578  exact worst case 3293  fifo peak 1528  lifo peak 112  B/worst 1.69  worst/lifo 29.4
+sum(100): B_nodes 1107  exact worst case 409  fifo peak 109  lifo peak 211  B/worst 2.71  worst/lifo 1.9
+fact(12): B_nodes 139  exact worst case 57  fifo peak 21  lifo peak 35  B/worst 2.44  worst/lifo 1.6
+list(25): B_nodes 1377  exact worst case 523  fifo peak 77  lifo peak 146  B/worst 2.63  worst/lifo 3.6
+treesum(5): B_nodes 1161  exact worst case 446  fifo peak 335  lifo peak 43  B/worst 2.60  worst/lifo 10.4
+treesum(7): B_nodes 4713  exact worst case 1790  fifo peak 1343  lifo peak 55  B/worst 2.63  worst/lifo 32.5
+treesum_direct(8): B_nodes 3064  exact worst case 1663  fifo peak 1407  lifo peak 31  B/worst 1.84  worst/lifo 53.6
+sort(15): B_nodes 2679  exact worst case 292  fifo peak 108  lifo peak 84  B/worst 9.17  worst/lifo 3.5
+higher(30): B_nodes 1332  exact worst case 458  fifo peak 82  lifo peak 170  B/worst 2.91  worst/lifo 2.7
+sum(1000): B_nodes 11007  exact worst case 4009  fifo peak 1009  lifo peak 2011  B/worst 2.75  worst/lifo 2.0
+list(120): B_nodes 6507  exact worst case 2423  fifo peak 172  lifo peak 621  B/worst 2.69  worst/lifo 3.9
+treesum(9): B_nodes 18921  exact worst case 7166  fifo peak 5375  lifo peak 67  B/worst 2.64  worst/lifo 107.0

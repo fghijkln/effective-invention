@@ -46,7 +46,9 @@ python3 tests/test_programs.py --fuzz 150
 python3 tests/fuzz_rtl.py 0 600          # random nets, random meshes, random schedules
 python3 tests/fuzz_rtl.py 0 200 --big
 python3 tests/test_security.py --fuzz 300   # owner-capability isolation (multi-tenant)
-python3 tests/mutants.py                 # 22 RTL mutants
+python3 tests/mutants.py                 # 55 RTL mutants
+python3 tests/test_eal.py --fuzz 200 --rtl-fuzz 30   # Ω-L checker + compile-time memory bound (step 24)
+python3 -m omega.eal treesum 9           # is a program in Ω-L, and how many slots can it ever need?
 python3 bench/bench.py --8x8             # results/bench.md
 bash tests/run_all.sh                    # everything except the benchmarks
 ```
@@ -68,6 +70,7 @@ def main = tsum(gen(N))
 | `omega/semantic.py` | **golden model (a)**: any-order reducer (random / LIFO / FIFO), readback |
 | `omega/fabric.py` | **golden model (b)**: cycle-level fabric (cells, routers, LINK/NODE/SPAWN), loader `Image` (+ hex image for the RTL), dump readback |
 | `omega/lang.py` | Ω-lang frontend (λ, numbers, `let`, `if`, `switch`, `match`, Scott `data`, recursion; arm lifting) |
+| `omega/eal.py` | Ω-L (step 24): light-affine typed subset checker and compile-time peak-memory bound (`python3 -m omega.eal`) |
 | `omega/randnet.py` | random interaction-net generator |
 | `omega/rtl.py` | Verilator build/run harness |
 | `rtl/omega_defs.svh` `omega_router.sv` `omega_cell.sv` `omega_rom.sv` `omega_mesh.sv` | RTL: encodings; 5-port XY router; cell (RAMs, owner tags, free stacks, task stack, directory, rewrite FSM); cluster definition ROM with round-robin arbiter; W×H mesh |
@@ -78,7 +81,7 @@ def main = tsum(gen(N))
 
 ## Results
 
-### Verification (full regression on step 23 = step 22 + the expansion-order knob `+ilr` (default 0 = step 22 cycle for cycle; identity 128 / 128); step 22 = step 21 + low-memory watermarks (`+lm=2`, default; `+lm=0` = step 21 cycle for cycle); step 21 = step 20 + the keep-0 pressure cases (tests only); step 20 = step 19 with slot reserve 1 (`+rsv=1`), defaults `+rto=8 +rgrad=3 +rsv=1`; step 19 = step 18 + the room-distance gradient: v4 engine + retry slot + spawn threshold / fork hints + local-first link orientation + producer hint / message-budget governor + fork deque with the step-15 deque hint; default 2×2 cells per ROM, one port)
+### Verification (full regression on step 24 = step 23 + the Ω-L checker and memory bound (no RTL / model change; identity 128 / 128); step 23 = step 22 + the expansion-order knob `+ilr` (default 0 = step 22 cycle for cycle; identity 128 / 128); step 22 = step 21 + low-memory watermarks (`+lm=2`, default; `+lm=0` = step 21 cycle for cycle); step 21 = step 20 + the keep-0 pressure cases (tests only); step 20 = step 19 with slot reserve 1 (`+rsv=1`), defaults `+rto=8 +rgrad=3 +rsv=1`; step 19 = step 18 + the room-distance gradient: v4 engine + retry slot + spawn threshold / fork hints + local-first link orientation + producer hint / message-budget governor + fork deque with the step-15 deque hint; default 2×2 cells per ROM, one port)
 
 | suite | result | what it checks |
 |---|---|---|
@@ -89,6 +92,8 @@ def main = tsum(gen(N))
 | RTL differential fuzz, big nets (`--big`) | **200 / 200** | 3–8 definitions, 20–60 nodes each, deeper trees, more references; only nets with ≥ 30 interactions are kept (avg 375, max 16,239 interactions; 4,088 candidates rejected as diverging or trivial) |
 | owner-capability isolation (`tests/test_security.py --fuzz 300`) | **420 / 420** | 2- and 4-tenant program demos (fib ∥ qsort; treesum ∥ list ∥ sort ∥ higher-order) on 1×1/2×2/4×4/3×2, each tenant gets its known answer with zero traps; 10 attack programs (overwrite / capture the victim's result through a forged root-var pointer, out-of-bounds slot and cell, forged node pointers to the victim's result node, an attack hidden in a lazily expanded definition) and 3 cross-owner fault injections, each with the sender-side check on and off (`fi`); 300 random multi-tenant cases (2–4 random tenants, random owners, half with an attacker carrying random forged redexes); link orientation (step 12) varies with the seed. Semantic model, fabric model and RTL must agree on every honest tenant's result and node count, on the trap set and on the interaction count (SPEC §12) |
 | memory pressure (`tests/test_mempress.py`) | **60 / 60** | cell (0,0) pre-filled with foreign ballast so only 4–30 slots are free (30 cases) **or no node slot at all (keep 0 / 8, step 21, 10 cases: needs the full-cell pass-on)**, small-cell capacity cases (5), **global pressure (step 10, 5 cases): every cell except the far corner holds ballast (8 free node / 8 free var slots), so the room is up to 6 hops away** (fib(12) 3×3, treesum(6) 3×3, list(20) 3×2, qsort(15) 4×4, sort(10) 3×3) + **the near-overfull global treesum(9) 3×3 (step 19)** + **near-overfull treesum(9) 3×3 with 500 free slots in the corner (step 22: fabric seed 14, RTL seed 9 stop at `+lm=0`)** + **treesum(9) on one cell with 130 / 250 free slots at `+ilr=2` / `+ilr=1` (step 23, fabric model and RTL; the step-22 order needs 460)**, security fuzz case 265 — semantic model, fabric model and RTL must agree; **2 overfull cases** (the whole 2×2 fabric too small) must end in status 3 without a wrong answer |
+| Ω-L checker and bound (`tests/test_eal.py --fuzz 200 --rtl-fuzz 30`, step 24) | **597 / 597** | 15 programs the checker must accept and 17 it must reject (each for its rule), the census of the 9 suite programs and 15 frontend unit programs (18 in Ω-L), and for 8 programs × 1–4 sizes: B identical from 5 reduction orders and from an independent recount, every semantic / fabric (1×1, 2×2, 4×4) / RTL 1×1 peak ≤ B, RTL 1×1 with exactly B node / var slots and 2×2 with `slots_mesh` per cell finish correctly; 200 random Ω-L programs (30 also on RTL 1×1 with exactly B slots) and 200 rule-breaking variants that must be rejected |
+| Ω-L mutants (`tests/test_eal.py --mutants`) | **7 / 7 caught** | affinity off, any closure duplicable, termination check off, commutation node deltas / var allocations not counted, constructor fields typed per use, numeric guards ignored |
 | mutation testing (`tests/mutants.py`) | **55 / 55 caught** | 15 functional mutants of the rule logic / protocol / quiescence + 1 performance mutant (no work distribution, caught by the speed-up bound) + 6 security mutants (each owner-capability check disabled, owner stamping missing, trap not blocking). Two mutants (eraser reaches only aux1; REF~DUP expands instead of copying) produce the *right* answer and are caught only by the node count / interaction count. That is why all three observables are compared. + 5 v3 engine mutants (read-ahead write bypass, write-queue drain, var owner-tag queue, allocation pop count, ROM read-ahead) + 2 memory-pressure mutants (caught by `tests/test_mempress.py`) + 3 cluster-ROM mutants (grant beyond the port count, EXPAND not waiting for its template word, stale buffered word) + 7 v4 mutants (second node write port not bypassed into the read-ahead, second EXPAND entry's var tag to the wrong slot, EXPAND skipping an entry, VHU without the same-slot stall, VHU hand-back never taken, VHU disabled = performance mutant caught by a fib(12) cycle bound, VHU read-ahead without bypass of write port 1) + 3 retry-slot mutants (39 parked retry never taken, 40 quiescence ignores the slot, 41 no escalation). Mutant 27 (roomy offload disabled) now survives on its own, because escalation also rescues every pressure case (roomy offload became a fast path); it is run together with 41 and caught. Mutant 28 (a full cell still asks for work) is tolerated by the step-19 full-cell pass-on on the quick pressure set, so since step 19 it runs on the full set and is caught by the global treesum(9) 3×3 case. + 3 step-11/12 performance mutants, each caught by its own bound: 42 spawn threshold ignored (qsort(20) 4×4 > 0.6 messages per interaction), 43 fork hint ignored (fib(12) 4×4 > 1.3× slower), 44 local-first link orientation disabled (treesum(7) 4×4 > 1.3× more LINKs) + 2 step-13 performance mutants: 45 producer hint ignored (qsort(30) 4×4 > 1.15× slower: 11,383 vs 9,118 cycles), 46 governor never tightens (qsort(30) 4×4 > 1.15× more messages per interaction: 0.529 vs 0.398) + 2 step-14 mutants: 47 oldest-fork give disabled (performance only: fib(16) 4×4 seed 1 > 1.05× slower, 8,254 vs 7,530 cycles; a treesum(7) bound let it survive at 1.04×, because the step-11 path still gives a fork task popped from an empty stack), 48 a fork task finding the deque full is dropped (caught by the program suite: fib(8) 2×2 loses work) + 2 step-19 mutants, each caught by the livelock / deadlock seeds that motivated the change at the new default: 49 room-distance gradient ignored (global treesum(9) 3×3 seeds 3 / 10 / 11 stop without progress), 50 full-cell pass-on off (since step 21 caught at the default `+rsv=1` by the ballast keep 0 / 8 cases fib(12) 2×2 and treesum(6) 3×2, which stop with status 3; step 19's global treesum(7) 8×8 seeds 16 / 18 stop only at `+rsv=4`) + 1 step-20 mutant: 51 slot reserve applied without a downhill neighbour (fib(10) on 1×1 with exactly the 93 free node / var slots its RTL run needs ends in status 2) + 1 step-22 mutant: 52 low-memory watermarks never engage (caught by the near-overfull treesum(9) 3×3 corner-500 case, RTL seed 9 stops with status 3) + 2 step-23 mutants: 53 the root is linked at once whatever `+ilr` says, 54 `+ilr=2` without the model's child order (both caught by the expansion-order pressure cases) |
 
 Strong confluence is the test oracle. Any schedule (arbitration, delays, stalls, task/message priority,
@@ -134,6 +139,87 @@ slower than one cell (sum(1000) on 1×1 needs a 4,096-slot cell: 29,018 cycles v
 step 12 the cost was qsort: on meshes it was 16–27% slower than with step 10's eager spreading,
 because its filter chains (lo/hi/app) stayed where they started; step 13 (next section) fixes that. treesum(9)
 on 8×8 varies ±20% with the arbitration seed; over seeds 1–4 the mean is 2,374 vs 2,470 for step 10.
+
+### Ω-L: a typed subset with a compile-time peak-memory bound (step 24)
+
+SPEC §7.1 (step 20) showed that no local mechanism can guarantee completion: the peak live graph depends on the
+schedule, and the fabric picks the schedule. Step 24 bounds that peak at compile time for a typed subset of Ω-lang,
+**Ω-L** (`omega/eal.py`, SPEC §7.2), so that a fabric with enough slots per cell provably never reaches the memory
+stall (status 3). No RTL or model change: the step adds a checker, a bound, a CLI and tests.
+
+* **Subset.** Light affine and stratified (box depth 1), in the spirit of EAL / LAL: (T) Hindley–Milner with *one*
+  first-order type per constructor field; (A) a non-number binder is used at most once in every net template the
+  compiler emits (counted after arm lifting, exactly as the compiler counts DUPs), so data is never duplicated;
+  (!) a function may be duplicated only as a parameter that every call site feeds an inert closure (a λ literal
+  over its own variables, numbers and operators, a definition name, or the caller's own !-parameter); (R) every
+  recursive call decreases a structural sub-term or a guarded numeric predecessor of its callee. Together these
+  make every Ω-L program terminate.
+* **Bound.** Strong confluence makes the multiset of interactions the same for every schedule, and each rule has a
+  fixed node delta and var allocation count, so **B_nodes = n0 + Σ max(0, Δnodes)** and **B_vars = v0 + Σ vars
+  allocated** bound the live nodes and vars of *every* schedule on the semantic reducer, the fabric model and the
+  RTL. Because the program terminates, the compiler reads B off one counting reduction of the closed program
+  (`eal.bound`; 1.7 s for treesum_direct(14)'s 245,750 interactions). One cell needs max(B_nodes, B_vars) slots; a
+  mesh needs that + the largest template + the 16-slot low-memory reserve in every cell (`slots_mesh`). The
+  generic stratification bound (fan-out^depth unfolds per recursion, printed as a growth class) is sound but far
+  looser (fib(20): ≈ 3.1·10^7 nodes against B_nodes = 262,690), so it is not used for slot counts.
+* **CLI.** `python3 -m omega.eal programs/treesum.olm --N 9` (or `python3 -m omega.eal treesum 9`) prints the
+  verdict (or the rule a program breaks), the recursion classes, the !-parameters, B and the slot counts.
+
+**Which programs are in Ω-L** (`tests/test_eal.py`, census): 8 of the 9 suite programs (fib, sum, fact, list,
+treesum, treesum_direct, sort, higher; all their N, since N only changes `main`'s literal) and 10 of the 15
+frontend unit programs. Rejected: **qsort** (A: the list tail `t` goes to both `lo(h, t)` and `hi(h, t)`; `qs(lo(h, t))`
+is not structural either), Church `two(two)` (a closure that duplicates is duplicated: box depth 2, which full EAL
+would accept), Ackermann (lexicographic measure), a default binder that aliases the matched value (A), a pair holding
+a number in one place and a constructor in another (T), a list of functions (T). Of the 315 program-suite cases, 281 run a
+program in Ω-L; the other 34 are qsort's (6 semantic N, 3 hint checks, 1 fabric, 8 RTL, the qsort(20) message
+bound and 15 of the 150 random draws).
+
+**Tightness** (`results/s24/table.md` from `tests/test_eal.py --json results/s24/eal.json` and
+`results/s24/table.py`; peaks are node / var slots; fabric seeds 0 / 9, RTL seed 2 at the default
+configuration; the semantic breadth-first order is FIFO over the redex list):
+
+| program | B nodes / vars | causal W (nodes) | semantic depth first | semantic breadth first | fabric 1×1 | fabric 4×4 (whole mesh) | RTL 1×1 | B / RTL 1×1 peak (nodes, vars) | RTL 1×1 with exactly B slots |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| fib(10) | 2,122 / 1,680 | 1,256 | 94 / 111 | 604 / 681 | 30 / 47 | 228 / 344 | 53 / 94 | 40×, 17.9× | status 0 (5,714 cycles, peak 53 / 94) |
+| sum(100) | 1,107 / 806 | 409 | 211 / 112 | 109 / 111 | 211 / 409 | 115 / 130 | 107 / 308 | 10×, 2.6× | status 0 (2,918 cycles, peak 107 / 308) |
+| fact(12) | 139 / 102 | 57 | 35 / 24 | 21 / 23 | 35 / 57 | 27 / 42 | 19 / 44 | 7×, 2.3× | status 0 (366 cycles, peak 19 / 44) |
+| list(25) | 1,377 / 1,423 | 523 | 146 / 203 | 77 / 87 | 201 / 356 | 90 / 174 | 260 / 462 | 5×, 3.1× | status 0 (4,014 cycles, peak 260 / 462) |
+| sort(15) | 2,679 / 2,435 | 292 | 84 / 142 | 108 / 148 | 84 / 144 | 88 / 156 | 117 / 188 | 23×, 13.0× | status 0 (7,141 cycles, peak 117 / 188) |
+| higher(30) | 1,332 / 1,363 | 458 | 170 / 240 | 82 / 132 | 173 / 385 | 85 / 223 | 226 / 469 | 6×, 2.9× | status 0 (3,752 cycles, peak 226 / 469) |
+| treesum(6) | 2,345 / 2,029 | 894 | 49 / 70 | 671 / 727 | 57 / 88 | 321 / 546 | 60 / 109 | 39×, 18.6× | status 0 (6,050 cycles, peak 60 / 109) |
+| treesum_direct(8) | 3,064 / 2,299 | 1,663 | 31 / 46 | 1,407 / 1,790 | 36 / 61 | 273 / 460 | 30 / 65 | 102×, 35.4× | status 0 (8,207 cycles, peak 30 / 65) |
+
+* **B holds everywhere:** every semantic order (5 per case), fabric run (1×1, 2×2, 4×4; whole mesh and per cell)
+  and RTL run stays below B, B is identical from all 5 orders, and an independent recount gives the same B.
+* **With exactly B slots the RTL finishes.** A 4,096-slot 1×1 cell with ballast leaving exactly B_nodes − n0 free
+  node slots and B_vars − v0 free var slots (so the program has B of each) finishes with the right answer for all 8
+  programs above and for 30 typed fuzz programs; a 2×2 mesh whose every cell keeps `slots_mesh` free finishes for
+  fib(8), list(20), treesum(5), sort(10), higher(30).
+* **How loose.** B is an all-schedule bound, so it cannot go below the worst schedule. The causal bound W (max-weight
+  closure of the interaction DAG, `results/s24/worst.py`; the same W from six different recorded orders on 7
+  programs at small N) is B / 1.7–2.9 on the suite (sort B / 9.2). For the fork programs breadth-first order comes
+  close to W (treesum(9): 5,375 of 7,166 nodes), and over all the schedules in the table B is 2.2–23× the largest
+  peak any of them reached in nodes (treesum_direct 2.2, fib and treesum 3.5, sort 23) and 1.3–13× in vars. But the
+  fabric and the RTL reduce close to depth first: B is 5–102× their 1×1 peak in nodes and 2.3–35× in vars at these sizes, and the ratio grows with N for the
+  exponential programs (treesum(9): B_nodes 18,921 against an RTL 1×1 peak of 281). B is the answer to "is this
+  program safe on this fabric under any schedule", not a cell size to build.
+* **Typed fuzz** (`--fuzz 200 --rtl-fuzz 30`): 200 random Ω-L programs from producers (lists from a seeded
+  recurrence, trees), transformers (map with a random inert closure, filter, append, insertion sort, reverse,
+  tree map / mirror / flatten), consumers (weighted checksum, fold with a random closure, tree sum) and numeric
+  recursions (fan-out 1 and 2 with random guards), with random sizes: all accepted, B ≥ every peak (5 semantic
+  orders, one fabric run on a random mesh, 30 on RTL 1×1 with exactly B slots), B / semantic peak median 3.6 for
+  nodes (1.0–10.9) and 2.8 for vars (1.0–8.2). Each fuzz program is also broken in one way (a duplicated list, a
+  non-decreasing call, an increasing argument, a non-inert closure to a !-parameter, a function in a data field) and
+  must be rejected for that rule: 200 / 200.
+* **Mutants of the checker and the bound** (`OMEGA_EAL_MUT`, `tests/test_eal.py --mutants`): 7 / 7 caught (affinity
+  off, any closure duplicable, termination check off, commutation nodes / vars not counted, constructor fields typed
+  per use, numeric guards ignored).
+
+**Limits.** B is computed by a counting run, not symbolically in N (one run per N; a program outside Ω-L may not
+terminate, so the compiler never runs one). The var bound counts allocations; there is no var analogue of W yet.
+The task stack is not bounded (sum(1000) needs 1,005 entries on one cell). Ω-L makes no claim about the
+interaction-combinator oracle problem (DUP labels are still one per binder; box depth 1 keeps the suite clear of
+it). B covers memory slots only: a fabric with B slots can still stop on a cycle limit or a full task stack.
 
 ### Expansion order: internal redexes before the root link (step 23)
 
@@ -1281,6 +1367,9 @@ What this says:
      fib(12) 6×6 to +3% / +6% against `+rto=8` alone (which livelocks); the full-cell pass-on (rule 4)
      moves a blocked `NODE` / `PULL` on but has no hop budget, so on a globally full fabric it can bounce
      like the SPAWNs (status 3, as before);
+   * step 24 closes the completion gap *statically* for the Ω-L subset (SPEC §7.2): a cell with B slots (a mesh
+     with `slots_mesh` per cell) cannot reach the memory stall under any schedule; programs outside Ω-L (qsort)
+     keep the dynamic behaviour above, and B is far above the depth-first peaks the fabric actually reaches (gap 13);
    * mutant 27 (roomy offload disabled) survives on its own since step 10: escalation alone rescues
      every pressure case in the suite, so the roomy offload is now only a fast path, and no current
      benchmark shows its speed benefit.
@@ -1295,7 +1384,8 @@ What this says:
    Both are checked against the semantic model, not against each other cycle by cycle.
 7. **Frontend.**
    * The type checker is shape-only: data types are not parameterised and constructor fields are
-     untyped (a list may mix numbers and functions); mutual recursion is monomorphic.
+     untyped (a list may mix numbers and functions); mutual recursion is monomorphic. Ω-L (step 24) types constructor fields
+     monomorphically and first order, but only for its own check; the compiler still accepts the lenient programs.
    * DUP labels are allocated one per binder. Programs that duplicate closures that themselves
      duplicate can hit the usual interaction-combinator oracle problem; no such program is in the
      suite.
@@ -1334,6 +1424,17 @@ What this says:
     step 13 comes from `gen` gives, whose subtrees the walk partly follows. The low-parallel programs (qsort, list, sort, higher, sum) gain nothing from step
     14. The area figure is an estimate (≈ 8% of the cell's standard-cell part, not synthesised).
 
+13. **Ω-L bound (step 24): sound but schedule-agnostic.** B covers every schedule, so it is 5–102× (nodes) and
+    2.3–35× (vars) above the 1×1 RTL peaks at the tested sizes, growing with N for exponential programs (treesum(9):
+    18,921 nodes against 281), and the mesh rule gives every cell the whole B, so the benchmark sizes
+    (treesum(9), fib(20) B_nodes 262,690, sum(1000) 11,007) cannot be certified on 4,096-slot cells at all; only
+    small instances are. It is computed by one counting run per input size, not as a formula in N (the
+    generic stratification bound is a growth class, numerically useless: fib(20) ≈ 3.1·10^7 vs 262,690). The var
+    bound counts allocations (no causal refinement like the node bound W). The task stack is not bounded. Ω-L
+    rejects qsort (it duplicates a list), Church iteration (box depth 2), lexicographic recursion, defaults that
+    alias the scrutinee and polymorphic constructor fields; a type variable counts as non-duplicable. No claim
+    is made about the interaction-combinator oracle problem.
+
 ## Next steps (suggested)
 
 1. Microarchitecture: shorten the read-ahead address chain in RTL (a pipelining / architecture question;
@@ -1341,7 +1442,10 @@ What this says:
 2. Re-synthesise the v4 cell (2W RAMs, VHU) and re-do the area × time comparison. Cut cycles per
    interaction below 2.36: dual-issue independent tasks, or overlap the rule cycle with the next pick.
 3. Global memory pressure: step 22's low-memory watermarks fix the step-20 counterexample but give no
-   guarantee (SPEC §7.1); a guarantee still needs bounding the peak by the sequential one (e.g. no gives at all
+   guarantee (SPEC §7.1); step 24 gives one statically for Ω-L programs, but at a slot count sized for the worst
+   schedule. Tighter: a bound for a *restricted* schedule (e.g. the sequential peak, if a low-memory mode
+   provably stops all gives), a causal var bound like the node bound W, a symbolic B(N) from sized types
+   (amortised resource analysis), and an Ω-L variant that admits qsort (a `!`-list with a copy cost); a guarantee still needs bounding the peak by the sequential one (e.g. no gives at all
    once memory is low, which step 22 found the no-room forwarding path undoes) or spilling to off-fabric memory. The treesum(6) 3×3 +3.7% needs a signal that tells "the room is far from
    full" from "the room will run out" (the same spreading helps one and livelocks the other); a relative
    `roomy` watermark (free ≥ largest definition + `rsv` instead of SLOTS/4) would let the gradient see room
@@ -1399,3 +1503,4 @@ What this says:
 * step 21: default-configuration test for the full-cell pass-on (tests only): mempress ballast keep 0 / 8 (10 cases, a home cell with no free node slot), mutant 50 detector at the default `+rsv=1` (fib(12) 2×2, treesum(6) 3×2), fabric knob `OMEGA_PASSON`; units 42/42, programs 315/315, step-14 cross-check 90/90, fuzz 600/600 + big 200/200, security 420/420, mempress 54/54, mutants 52/52, identity 128/128
 * `ec9ea3f` step 22: low-memory watermarks (`+lm=2` default, `OMEGA_LM`; `+lm=0` = step 21): absolute roomy 64 / 32 and a 16-slot expansion reserve near a roomier neighbour; fixes treesum(9) 3×3 near-full stalls; mutant 52; identity 128/128, units 42/42, programs 315/315, s14 90/90, fuzz 600/600 + big 200/200, security 420/420, mempress 56/56, mutants 53/53
 * step 23: expansion order as a run-time knob (`+ilr` / `OMEGA_ILR`, default 0 = step 22 cycle for cycle): 1 = internal redexes before the root link, 2 = also the fabric model's child order; 1×1 treesum(9) peak vars 463 / 238 / 123, but program dependent (qsort, fib, sum peak higher; list / higher +22–38% cycles on 2×2 / 4×4), so knob only; mutants 53 / 54; identity 128/128, units 42/42, programs 315/315, s14 90/90, fuzz 600/600 + big 200/200, security 420/420, mempress 60/60, mutants 55/55
+* step 24: Ω-L, a light-affine typed subset of Ω-lang (`omega/eal.py`, SPEC §7.2) with a compile-time peak-memory bound B (n0 + Σ positive node deltas, v0 + Σ var allocations over the schedule-independent interaction multiset, read off one counting run, which Ω-L's termination makes safe); 8 / 9 suite programs in Ω-L (qsort duplicates a list); every semantic / fabric / RTL peak ≤ B, RTL 1×1 with exactly B slots and 2×2 with `slots_mesh` finish; causal node bound W = B / 1.7–2.9; no RTL / model change; Ω-L tests 597/597, Ω-L mutants 7/7, identity 128/128, units 42/42, programs 315/315, s14 90/90, fuzz 600/600 + big 200/200, security 420/420, mempress 60/60, mutants 55/55
