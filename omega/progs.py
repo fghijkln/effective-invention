@@ -43,6 +43,12 @@ REF = {
 }
 
 
+# step 27: programs outside the step-24 suite list (test_eal iterates REF; keeping them apart keeps its counts)
+REF_L = {
+    "qsort_l": lambda n: _check(sorted(_rnd(n))),      # qsort rewritten for Ω-L (programs/qsort_l.olm)
+}
+
+
 def source(name, n):
     with open(os.path.join(HERE, name + ".olm")) as f:
         return re.sub(r"\bN\b", str(n), f.read())
@@ -53,4 +59,4 @@ def book(name, n):
 
 
 def expected(name, n):
-    return f"#{REF[name](n)}"
+    return f"#{(REF[name] if name in REF else REF_L[name])(n)}"

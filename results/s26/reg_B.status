@@ -1,0 +1,10 @@
+mutA 0 0-15: 16 caught (mut_a_0_15.txt) + 16-18: mutants: 3/3 caught
+mutB 0 mutants: 18/18 caught
+mutC 0 mutants: 18/18 caught
+eal 0 Ω-L tests: 597/597 pass (86s) [checker + semantic + fabric + RTL]
+ealmut 0 Ω-L mutants: 7/7 caught
+s25 0 step 25 tests: 2749/2749 pass (214s)
+s25mut 0 s25 mutants: 6/6 caught
+s26 0 step 26 tests: 76/76 pass (416s)
+s27 0 step 27 tests: 253/253 pass (135s)
+ALLDONE

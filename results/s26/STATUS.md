@@ -1,0 +1,11 @@
+# Step 26 status: admission control in RTL
+- 23:20 CST 2026-11-01: base 84f8a84 (step 25). Toolchain missing; setup started (results/s26/setup.log).
+- 23:55: RTL controller rtl/omega_adm.sv + cell host port / root orientation rule + omega/adm_rtl.py + tests/test_s26.py written; smoke (12 TINY jobs 2x2x150) matches python (rejects, order, 1060 interactions). Full test_s26 running (s26_full.log).
+- 00:20 (11-02): test_s26 full 76/76 (s26_full.log, s26.json): flood 2x2 W/B, 3x3, reject, queue, untyped, 1x1, owners all match python (rejects, FIFO order, interactions); static floods stall (status 3). Mutants 60-64 running (s26_mut.log).
+- 02:25 (11-02): resumed after pause/restart. Mutants 60, 61 caught (s26_mut.log); 62-64 rerunning (s26_mut2.log, OMEGA_S26_ONLY). Then regression (reg.sh).
+- 02:35: s27 full 253/253. Regression split in 2 lanes: reg_A.sh (id/units/programs/s14/fuzz/bigfuzz/security/mempress) running; reg_B.sh (mutants/eal/s25/s26/s27) starts after s26 mutants 62-64.
+- 02:45: s26 mutants 5/5 caught (60-64). Lanes A and B running.
+- 03:10: sandbox restarted ~02:57 (lanes died at id8 / mutant 16); toolchain rebuilt, lanes resumed (mutA resumes at 16).
+- 04:20: regression lane A all green (identity 128/128, units 42/42, programs 315/315, s14 90/90, fuzz 600/600, bigfuzz 200/200, security 420/420, mempress 60/60). Lane B: mutants 19+18+18 = 55/55, eal 597/597, ealmut 7/7; s25/s26/s27 running.
+- 04:25: sandbox restarted again (~04:23); lane B resumed at s26 (toolchain rebuild first).
+- 04:40: lane B all green: s26 76/76, s27 253/253 (+ s25 2749/2749, 6/6). Committing steps 26+27.

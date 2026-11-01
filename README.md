@@ -51,6 +51,8 @@ python3 tests/test_eal.py --fuzz 200 --rtl-fuzz 30   # Ω-L checker + compile-ti
 python3 -m omega.eal treesum 9           # is a program in Ω-L, and how many slots can it ever need?
 python3 -m omega.eal --symbolic treesum  # the same bound as a closed form in N (step 25)
 python3 tests/test_s25.py --fuzz 40      # symbolic B(N), W_vars, admission control (step 25)
+python3 tests/test_s26.py                # admission control in the RTL vs the fabric model (step 26)
+python3 tests/test_s27.py                # quicksort in Ω-L: bounds, closed forms, RTL at exactly B (step 27)
 python3 bench/bench.py --8x8             # results/bench.md
 bash tests/run_all.sh                    # everything except the benchmarks
 ```
@@ -76,17 +78,18 @@ def main = tsum(gen(N))
 | `omega/symbolic.py` | step 25: B_nodes(N) / B_vars(N) in closed form (exact Berlekamp–Massey + recurrence solving, certified on a range; envelope fallback) (`python3 -m omega.eal --symbolic`) |
 | `omega/causal.py` | causal bounds over all schedules: W_nodes (step 24) and W_vars (step 25, atomic links only) |
 | `omega/admission.py` | step 25: memory-bound admission control for multi-tenant jobs on the fabric model (`Scheduler`) |
+| `omega/adm_rtl.py`, `rtl/omega_adm.sv` | step 26: admission control in the RTL (controller beside the mesh, host port on cell (0,0); `+adm`, default off) |
 | `omega/randnet.py` | random interaction-net generator |
 | `omega/rtl.py` | Verilator build/run harness |
 | `rtl/omega_defs.svh` `omega_router.sv` `omega_cell.sv` `omega_rom.sv` `omega_mesh.sv` | RTL: encodings; 5-port XY router; cell (RAMs, owner tags, free stacks, task stack, directory, rewrite FSM); cluster definition ROM with round-robin arbiter; W×H mesh |
 | `tb/tb_mesh.cpp` | testbench: reset, run to quiescence, dump |
-| `programs/*.olm` | fib, sum, fact, list map/sum, tree build+sum, direct tree sum, insertion sort, quicksort, higher-order |
+| `programs/*.olm` | fib, sum, fact, list map/sum, tree build+sum, direct tree sum, insertion sort, quicksort, higher-order; `qsort_l.olm`: quicksort in Ω-L (step 27) |
 | `tests/test_security.py` | owner-capability isolation: multi-tenant demos, attacks, fault injection, multi-tenant fuzz |
 | `tests/` `bench/` `results/` | test suites, benchmarks, logs |
 
 ## Results
 
-### Verification (full regression on step 25 = step 24 + symbolic B(N), W_vars and admission control (new modules only; no RTL / `fabric.Fabric` change; identity 128 / 128); step 24 = step 23 + the Ω-L checker and memory bound (no RTL / model change; identity 128 / 128); step 23 = step 22 + the expansion-order knob `+ilr` (default 0 = step 22 cycle for cycle; identity 128 / 128); step 22 = step 21 + low-memory watermarks (`+lm=2`, default; `+lm=0` = step 21 cycle for cycle); step 21 = step 20 + the keep-0 pressure cases (tests only); step 20 = step 19 with slot reserve 1 (`+rsv=1`), defaults `+rto=8 +rgrad=3 +rsv=1`; step 19 = step 18 + the room-distance gradient: v4 engine + retry slot + spawn threshold / fork hints + local-first link orientation + producer hint / message-budget governor + fork deque with the step-15 deque hint; default 2×2 cells per ROM, one port)
+### Verification (full regression on step 27 = step 26 + `programs/qsort_l.olm`, quicksort in Ω-L (new program and tests only); step 26 = step 25 + admission control in the RTL (`+adm`, default 0 = step 25 cycle for cycle; identity 128 / 128); step 25 = step 24 + symbolic B(N), W_vars and admission control (new modules only; no RTL / `fabric.Fabric` change; identity 128 / 128); step 24 = step 23 + the Ω-L checker and memory bound (no RTL / model change; identity 128 / 128); step 23 = step 22 + the expansion-order knob `+ilr` (default 0 = step 22 cycle for cycle; identity 128 / 128); step 22 = step 21 + low-memory watermarks (`+lm=2`, default; `+lm=0` = step 21 cycle for cycle); step 21 = step 20 + the keep-0 pressure cases (tests only); step 20 = step 19 with slot reserve 1 (`+rsv=1`), defaults `+rto=8 +rgrad=3 +rsv=1`; step 19 = step 18 + the room-distance gradient: v4 engine + retry slot + spawn threshold / fork hints + local-first link orientation + producer hint / message-budget governor + fork deque with the step-15 deque hint; default 2×2 cells per ROM, one port)
 
 | suite | result | what it checks |
 |---|---|---|
@@ -101,6 +104,9 @@ def main = tsum(gen(N))
 | Ω-L mutants (`tests/test_eal.py --mutants`) | **7 / 7 caught** | affinity off, any closure duplicable, termination check off, commutation node deltas / var allocations not counted, constructor fields typed per use, numeric guards ignored |
 | symbolic B(N), W_vars, admission (`tests/test_s25.py --fuzz 40`, step 25) | **2,749 / 2,749** | closed forms of the 8 suite programs and two sort variants equal to an independent count on N = 0..12–40 and on 1–4 held-out N past the range (sort: envelope ≥ the count); 40 random Ω-L programs with N in a size argument (38 exact, 2 envelopes, all sound); synthetic recurrence units; W_vars ≥ 14 semantic var peaks and ≤ B_vars for 8 programs; 7 multi-tenant admission scenarios on the fabric model (floods that stall without admission finish with it, reject, queue, untyped pass-through, one cell), each audited every cycle |
 | step-25 mutants (`tests/test_s25.py --mutants`) | **6 / 6 caught** | fit accepted without held-out terms, envelope without feasibility, W_vars freeing at the first event, admission ignoring running jobs, reservations never released, depth-first peak reserved |
+| admission in the RTL (`tests/test_s26.py`, step 26) | **76 / 76** | 8 scenarios (floods of 180 / 300 jobs on 2×2 / 3×3 with W and B reservations, reject, queue, untyped, one cell, owners): RTL controller and fabric-model scheduler agree on the rejected set, the start order and the interaction count; every admitted job correct; zero violations of the per-cycle audit; no owner overlap; the same floods without admission stop |
+| step-26 mutants (`tests/test_s26.py --mutants`) | **5 / 5 caught** | admission ignoring running reservations, no reject check, two jobs of one owner at once, root var not reset, reservations never released |
+| quicksort in Ω-L (`tests/test_s27.py`, step 27) | **253 / 253** | `qsort_l` accepted / `qsort` rejected; qsort_l = qsort = `sorted` on 182 inputs (semantic), fabric 1×1 / 2×2 / 4×4, RTL 2×2; B ≥ semantic and fabric peaks, W between; exact closed forms (descending, ascending) with held-out N, decomposition exact on 263 inputs with its maximum equal to the descending form; RTL 1×1 with exactly B slots |
 | mutation testing (`tests/mutants.py`) | **55 / 55 caught** | 15 functional mutants of the rule logic / protocol / quiescence + 1 performance mutant (no work distribution, caught by the speed-up bound) + 6 security mutants (each owner-capability check disabled, owner stamping missing, trap not blocking). Two mutants (eraser reaches only aux1; REF~DUP expands instead of copying) produce the *right* answer and are caught only by the node count / interaction count. That is why all three observables are compared. + 5 v3 engine mutants (read-ahead write bypass, write-queue drain, var owner-tag queue, allocation pop count, ROM read-ahead) + 2 memory-pressure mutants (caught by `tests/test_mempress.py`) + 3 cluster-ROM mutants (grant beyond the port count, EXPAND not waiting for its template word, stale buffered word) + 7 v4 mutants (second node write port not bypassed into the read-ahead, second EXPAND entry's var tag to the wrong slot, EXPAND skipping an entry, VHU without the same-slot stall, VHU hand-back never taken, VHU disabled = performance mutant caught by a fib(12) cycle bound, VHU read-ahead without bypass of write port 1) + 3 retry-slot mutants (39 parked retry never taken, 40 quiescence ignores the slot, 41 no escalation). Mutant 27 (roomy offload disabled) now survives on its own, because escalation also rescues every pressure case (roomy offload became a fast path); it is run together with 41 and caught. Mutant 28 (a full cell still asks for work) is tolerated by the step-19 full-cell pass-on on the quick pressure set, so since step 19 it runs on the full set and is caught by the global treesum(9) 3×3 case. + 3 step-11/12 performance mutants, each caught by its own bound: 42 spawn threshold ignored (qsort(20) 4×4 > 0.6 messages per interaction), 43 fork hint ignored (fib(12) 4×4 > 1.3× slower), 44 local-first link orientation disabled (treesum(7) 4×4 > 1.3× more LINKs) + 2 step-13 performance mutants: 45 producer hint ignored (qsort(30) 4×4 > 1.15× slower: 11,383 vs 9,118 cycles), 46 governor never tightens (qsort(30) 4×4 > 1.15× more messages per interaction: 0.529 vs 0.398) + 2 step-14 mutants: 47 oldest-fork give disabled (performance only: fib(16) 4×4 seed 1 > 1.05× slower, 8,254 vs 7,530 cycles; a treesum(7) bound let it survive at 1.04×, because the step-11 path still gives a fork task popped from an empty stack), 48 a fork task finding the deque full is dropped (caught by the program suite: fib(8) 2×2 loses work) + 2 step-19 mutants, each caught by the livelock / deadlock seeds that motivated the change at the new default: 49 room-distance gradient ignored (global treesum(9) 3×3 seeds 3 / 10 / 11 stop without progress), 50 full-cell pass-on off (since step 21 caught at the default `+rsv=1` by the ballast keep 0 / 8 cases fib(12) 2×2 and treesum(6) 3×2, which stop with status 3; step 19's global treesum(7) 8×8 seeds 16 / 18 stop only at `+rsv=4`) + 1 step-20 mutant: 51 slot reserve applied without a downhill neighbour (fib(10) on 1×1 with exactly the 93 free node / var slots its RTL run needs ends in status 2) + 1 step-22 mutant: 52 low-memory watermarks never engage (caught by the near-overfull treesum(9) 3×3 corner-500 case, RTL seed 9 stops with status 3) + 2 step-23 mutants: 53 the root is linked at once whatever `+ilr` says, 54 `+ilr=2` without the model's child order (both caught by the expansion-order pressure cases) |
 
 Strong confluence is the test oracle. Any schedule (arbitration, delays, stalls, task/message priority,
@@ -146,6 +152,73 @@ slower than one cell (sum(1000) on 1×1 needs a 4,096-slot cell: 29,018 cycles v
 step 12 the cost was qsort: on meshes it was 16–27% slower than with step 10's eager spreading,
 because its filter chains (lo/hi/app) stayed where they started; step 13 (next section) fixes that. treesum(9)
 on 8×8 varies ±20% with the arbitration seed; over seeds 1–4 the mean is 2,374 vs 2,470 for step 10.
+
+### Quicksort in Ω-L (step 27)
+
+Step 24 left qsort as the one suite program outside Ω-L (it duplicates a list: `lo(h, t)` and `hi(h, t)` both use
+`t`). Step 27 adds an Ω-L rewrite next to it, `programs/qsort_l.olm` (`qsort.olm` is unchanged): one structural
+`part(p, xs)` returns both halves as a pair `P(lo, hi)` that `qs` matches once, `app` is structural, and `qs(n, xs)`
+recurses on a numeric fuel `n` started at N (each call's list is shorter than its parent's, so `len(xs) ≤ n` and the
+fuel never runs out first). Same answer as qsort and Python's `sorted` on 182 inputs (N = 0..40, several seeds,
+ascending, descending, constant, duplicates), on the fabric model (1×1, 2×2, 4×4) and on the RTL. SPEC §7.6.
+
+| | qsort_l | note |
+|---|---|---|
+| Ω-L | accepted (`qs` numeric fuel, `part` / `app` / `check` structural) | qsort still rejected (rule A) |
+| B, worst case over every input of length N ≥ 1 | **B_nodes = 32·N² + 86·N + 17, B_vars = 59/2·N² + 141/2·N + 15** | the descending input's exact closed form (N = 0..40 + 2 held out), attained |
+| why it is the worst case | B_nodes = 35 + 118·N + 43·P + 21·A − 9·Z, B_vars = 27 + 100·N + 41·P + 18·A − 6·Z, exact on 263 inputs | P = elements partitioned ≤ N(N−1)/2, A = app steps ≤ P, Z = fuel-0 calls ∈ {0, 2} |
+| ascending input | 43/2·N² + 193/2·N + 17 / 41/2·N² + 159/2·N + 15 (exact) | the program's own random input: envelope |
+| B / W (causal) at N = 2, 4, 8, 12 | nodes 317 / 88, 721 / 154, 1,813 / 280, 2,842 / 412; vars 274 / 137, 627 / 277, 1,604 / 644, 2,527 / 994 | W ≥ every semantic peak of 5 orders |
+| RTL 1×1 with exactly B slots | N = 0, 1, 4, 8, 12 finish correctly; peaks (14, 14), (21, 28), (53, 77), (91, 134), (111, 170) | B / peak at N = 12: 26× nodes, 15× vars |
+| interactions vs qsort | 0.97× (N = 5), 0.88× (10), 0.83× (20), **0.78× (40)** | one partition pass instead of two filters |
+| RTL 2×2 cycles vs qsort | 4,979 vs 3,671 (N = 12, +36%), 14,238 vs 10,788 (N = 30, +32%) | the pair is ready only after the whole list was walked, so less overlaps |
+
+So qsort can now be admitted (step 26) and certified at a size: e.g. qsort_l(12) needs 2,842 / 2,527 slots on one
+cell. It is a slower program on a mesh, so the benchmarks keep `qsort.olm`. Tests (`tests/test_s27.py`): **253 / 253**
+(Ω-L verdicts, semantic / fabric / RTL correctness, B ≥ all semantic and fabric peaks, W between peaks and B,
+closed forms with held-out N, the decomposition exact on every input and its maximum equal to the descending form,
+RTL 1×1 at exactly B, RTL 2×2 vs qsort).
+
+### Memory-bound admission control in the RTL (step 26)
+
+Step 25 admitted jobs only in the fabric model. Step 26 builds the same rule into the RTL: a controller beside the
+mesh (`rtl/omega_adm.sv`) with a 512-entry job table, a 16-slot root-var pool in cell (0,0), running reservation
+sums, an owner-busy vector and a host port into cell (0,0). SPEC §7.5. **Run-time knob `+adm` (testbench plusarg; `omega/adm_rtl.py` sets it),
+default 0 = step 25 cycle for cycle** (identity 128 / 128).
+
+* **Decision** (when the head of the FIFO reaches it): typed job with a reservation above the budget → reject;
+  owner idle, a root slot free and (typed) Σ running reservations + its own ≤ slots − margin for nodes and vars →
+  start; untyped → start unreserved; otherwise wait. Same budget, same margin, same FIFO as `omega/admission.py`.
+* **Start:** reset the root var slot through var write port 1 when the engine leaves it free, then hand cell (0,0)
+  the task {REF @main, VAR root}, taken as a SPAWN (expand there or hand on): `@main` is placed by the cell's own
+  allocator and spawn / pressure policy. A var ~ var link never writes into a pool root (the other var takes it),
+  so the controller's shadow copy of the root is the result.
+* **Completion:** at mesh quiescence every running job is done; the controller sweeps the roots, frees the owner,
+  and for an atom result frees the root and releases the reservation (a data result stays in the fabric and keeps
+  both, since the RTL has no host unload).
+* **Audit** (simulation): every cycle live nodes / vars ≤ reserved (while no untyped job runs), reserved ≤ budget,
+  every mesh cell keeps the margin free.
+
+Cross-check against the fabric-model scheduler on the same job lists (`tests/test_s26.py`; rejected set, start order
+and total interactions must match, every admitted job correct, zero audit violations, no owner overlap):
+
+| scenario | jobs | RTL (+adm=1) | fabric model (step 25) | without admission (RTL, +adm=0) |
+|---|---|---|---|---|
+| flood 2×2 × 280, W | 180 (sum, fib, treesum_direct, treesum, higher, fact; 15 owners) | 180 / 180 correct, 97,345 cycles (seed 2: 97,378), peak live 61 / 84, max reserved 129 / 246 of 252 | 180 / 180, 176,707 cycles; 46,620 interactions both | **stops** after 26,564 cycles (1,733 interactions) |
+| flood 2×2 × 280, B | 180 | 60 rejected (same 60), 120 / 120 correct, 56,482 cycles | 60 rejected, 120 / 120, 100,202 | — |
+| flood 3×3 × 280, W | 300 | 300 / 300, 158,710 cycles | 300 / 300, 281,480; 77,700 interactions both | **stops** after 24,425 cycles |
+| reject: treesum(9) + 18 small, 2×2 × 200 | 19 | treesum(9) rejected, 18 / 18 | same | — |
+| queue: treesum(5) first, 2×2 × 1,100 | 19 | the 18 start only after treesum(5) ends; 19 / 19 | same order | — |
+| untyped qsort(8) + 12, 2×2 × 280 | 13 | qsort starts first, unreserved; 13 / 13 | same | — |
+| one cell × 150 | 24 | 24 / 24 | same | — |
+| 18 jobs of 3 owners, 2×2 × 600 | 18 | 18 / 18, no overlap within an owner | same order | — |
+
+Tests 76 / 76; **mutants 60–64: 5 / 5 caught** (`OMEGA_S26_MUT`: admission ignores running reservations → audit
+violations; no reject check → wrong reject set; two jobs of one owner at once → overlap; root not reset → controller
+blocked; reservations never released → blocked). The RTL needs fewer cycles than the model's estimate (the model is
+cycle-approximate); decisions and interaction counts are identical. **Limits:** completion only at global quiescence (a job finished early keeps
+its reservation until the mesh is idle); data results stay in the fabric and keep their reservation; one start per
+cycle at most, through cell (0,0) only; the job table is written before the run (no run-time submission port).
 
 ### Symbolic bound B(N), a causal var bound, and memory-bound admission (step 25)
 
@@ -1522,15 +1595,17 @@ What this says:
     on the range it was counted on (beyond it: the C-finite argument), and sort's data-independent bound comes from a
     program-level argument, not from the tool. The causal var bound W_vars (step 25) holds for atomic links only, so
     the fabric / RTL keep B_vars. The task stack is not bounded (atoms occupy no slot). Ω-L
-    rejects qsort (it duplicates a list), Church iteration (box depth 2), lexicographic recursion, defaults that
+    rejects `qsort.olm` (it duplicates a list; step 27's rewrite `qsort_l.olm` is in Ω-L, but 32–36% slower on a 2×2 mesh), Church iteration (box depth 2), lexicographic recursion, defaults that
     alias the scrutinee and polymorphic constructor fields; a type variable counts as non-duplicable. No claim
     is made about the interaction-combinator oracle problem.
-14. **Admission control (step 25): fabric model only, and conservative.** The RTL has no run-time job loader or
-    per-owner idle signal, so admission exists in `omega/admission.py` only. The per-cell rule (every cell can hold
-    the sum of all reservations) ignores placement and B_vars is far above real var peaks, so small cells run about
-    one job at a time (120-job flood: 2.4× the unadmitted cycles); reserving real peaks would be fast but is unsound
-    (mutant 13). Untyped jobs run unreserved and void the guarantee while they run. Jobs of one owner run one at a
-    time. A job result is read back and its slots freed by the scheduler (host), not by the fabric.
+14. **Admission control (steps 25, 26): conservative, and coarse completion in the RTL.** The per-cell rule (every
+    cell can hold the sum of all reservations) ignores placement and B_vars is far above real var peaks, so small
+    cells run about one job at a time (120-job flood on the model: 2.4× the unadmitted cycles); reserving real peaks
+    would be fast but is unsound (step-25 mutant 13). Untyped jobs run unreserved and void the guarantee while they
+    run. Jobs of one owner run one at a time. In the RTL (step 26, `+adm`, default off) completion is detected only
+    at global quiescence, so an early finisher keeps its reservation until the mesh is idle; a data (non-atom)
+    result stays in the fabric and keeps its root slot and reservation (no host unload); the job table is loaded
+    before the run (no run-time submission port) and starts go through cell (0,0) only.
 
 ## Next steps (suggested)
 
@@ -1543,8 +1618,8 @@ What this says:
    schedule, and step 25 admits jobs by it (fabric model). Tighter: a bound for a *restricted* schedule (e.g. the
    sequential peak, if a low-memory mode provably stops all gives), a fabric-sound var bound (W_vars plus a bound on
    pending LINK tasks / messages), placement-aware admission (per-cell budgets instead of the whole sum in every
-   cell), admission in the RTL (a run-time job loader and per-owner idle bits), a sized-type derivation of B(N)
-   that needs no counting runs, and an Ω-L variant that admits qsort (a `!`-list with a copy cost); a guarantee still needs bounding the peak by the sequential one (e.g. no gives at all
+   cell), per-owner idle detection for the RTL admission controller (step 26 releases only at global quiescence) and a host
+   unload for data results, a sized-type derivation of B(N) that needs no counting runs; a guarantee still needs bounding the peak by the sequential one (e.g. no gives at all
    once memory is low, which step 22 found the no-room forwarding path undoes) or spilling to off-fabric memory. The treesum(6) 3×3 +3.7% needs a signal that tells "the room is far from
    full" from "the room will run out" (the same spreading helps one and livelocks the other); a relative
    `roomy` watermark (free ≥ largest definition + `rsv` instead of SLOTS/4) would let the gradient see room
@@ -1604,3 +1679,5 @@ What this says:
 * step 23: expansion order as a run-time knob (`+ilr` / `OMEGA_ILR`, default 0 = step 22 cycle for cycle): 1 = internal redexes before the root link, 2 = also the fabric model's child order; 1×1 treesum(9) peak vars 463 / 238 / 123, but program dependent (qsort, fib, sum peak higher; list / higher +22–38% cycles on 2×2 / 4×4), so knob only; mutants 53 / 54; identity 128/128, units 42/42, programs 315/315, s14 90/90, fuzz 600/600 + big 200/200, security 420/420, mempress 60/60, mutants 55/55
 * step 24: Ω-L, a light-affine typed subset of Ω-lang (`omega/eal.py`, SPEC §7.2) with a compile-time peak-memory bound B (n0 + Σ positive node deltas, v0 + Σ var allocations over the schedule-independent interaction multiset, read off one counting run, which Ω-L's termination makes safe); 8 / 9 suite programs in Ω-L (qsort duplicates a list); every semantic / fabric / RTL peak ≤ B, RTL 1×1 with exactly B slots and 2×2 with `slots_mesh` finish; causal node bound W = B / 1.7–2.9; no RTL / model change; Ω-L tests 597/597, Ω-L mutants 7/7, identity 128/128, units 42/42, programs 315/315, s14 90/90, fuzz 600/600 + big 200/200, security 420/420, mempress 60/60, mutants 55/55
 * step 25: symbolic B(N) for Ω-L (`omega/symbolic.py`, SPEC §7.3: count, exact Berlekamp–Massey, solve, certify on a range; exact for 7 / 8 suite programs, e.g. fib 24·F(N+1) − 14, treesum 37·2^N − 23; sort by a data decomposition ≤ 29/2·N² + 139/2·N + 24), causal var bound W_vars (`omega/causal.py`, atomic links only, B_vars / W_vars 1.1–2.4), memory-bound admission control on the fabric model (`omega/admission.py`, SPEC §7.4: Σ (W_nodes, B_vars) ≤ slots − margin per cell, FIFO, untyped unreserved; floods that stall without it finish with it); no RTL / `fabric.Fabric` change; step-25 tests 2,749/2,749, mutants 6/6; identity 128/128, units 42/42, programs 315/315, s14 90/90, fuzz 600/600 + big 200/200, security 420/420, mempress 60/60, mutants 55/55, Ω-L tests 597/597, Ω-L mutants 7/7
+* step 26: memory-bound admission control in the RTL (`rtl/omega_adm.sv`, `omega/adm_rtl.py`, SPEC §7.5: job table, 16-slot root pool in cell (0,0), FIFO, reservations, per-owner exclusion, start through a host port as a SPAWN of {REF @main, VAR root}, completion at mesh quiescence; `+adm`, default 0 = step 25 cycle for cycle); RTL and fabric-model scheduler agree on rejects, start order and interactions on 2×2 / 3×3 floods that stop without admission; step-26 tests 76/76, mutants 5/5; identity 128/128, units 42/42, programs 315/315, s14 90/90, fuzz 600/600 + big 200/200, security 420/420, mempress 60/60, mutants 55/55, Ω-L 597/597 + 7/7, step-25 2,749/2,749 + 6/6
+* step 27: quicksort in Ω-L (`programs/qsort_l.olm`, SPEC §7.6; `qsort.olm` unchanged): pair-returning partition, numeric fuel; worst case over all inputs B_nodes = 32·N² + 86·N + 17, B_vars = 59/2·N² + 141/2·N + 15 (attained by the descending input, proved by an exact data decomposition); RTL 1×1 with exactly B slots finishes; 0.78× qsort's interactions at N = 40 but +32–36% cycles on 2×2; step-27 tests 253/253

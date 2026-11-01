@@ -1,0 +1,27 @@
+0 2473 1060 (68, 102) (126, 126) (40, 43) 0 False 24.842301607131958
+fib(5) rejected None None None #5
+treesum_direct(4) rejected None None None #16
+fact(12) done 2 379 #479001600 #479001600
+sum(10) done 395 714 #55 #55
+fib(4) done 730 978 #3 #3
+treesum_direct(3) done 994 1233 #8 #8
+fib(5) rejected None None None #5
+treesum_direct(4) rejected None None None #16
+fact(12) done 1249 1626 #479001600 #479001600
+sum(10) done 1642 1961 #55 #55
+fib(4) done 1977 2218 #3 #3
+treesum_direct(3) done 2234 2458 #8 #8
+[('reject', 0, 0), ('reject', 1, 1), ('start', 2, 2, 0), ('done', 2, 379, 0, 4611686018906389504), ('start', 3, 395, 0), ('done', 3, 714, 0, 4611686018427387959)]
+py ok 4407 1060 (68, 102) (126, 126) None
+  fib(5) rejected (110, 141) None None None
+  treesum_direct(4) rejected (103, 139) None None None
+  fact(12) done (57, 102) 0 800 #479001600
+  sum(10) done (49, 86) 800 1461 #55
+  fib(4) done (68, 84) 1461 1887 #3
+  treesum_direct(3) done (51, 67) 1887 2216 #8
+  fib(5) rejected (110, 141) None None None
+  treesum_direct(4) rejected (103, 139) None None None
+  fact(12) done (57, 102) 2216 3018 #479001600
+  sum(10) done (49, 86) 3018 3680 #55
+  fib(4) done (68, 84) 3680 4090 #3
+  treesum_direct(3) done (51, 67) 4090 4407 #8

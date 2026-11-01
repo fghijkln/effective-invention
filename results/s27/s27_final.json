@@ -1,0 +1,257 @@
+{
+ "omega_l": {
+  "rnd": "numeric on parameter 1, linear in its value",
+  "part": "structural on parameter 2, linear in its size",
+  "app": "structural on parameter 1, linear in its size",
+  "qs": "numeric on parameter 1, \u2264 2^value unfolds",
+  "check": "structural on parameter 1, linear in its size"
+ },
+ "interactions_qsl_vs_qs": [
+  [
+   5,
+   826,
+   852
+  ],
+  [
+   10,
+   1914,
+   2173
+  ],
+  [
+   20,
+   4514,
+   5451
+  ],
+  [
+   40,
+   10756,
+   13855
+  ]
+ ],
+ "bounds": {
+  "2": {
+   "B": [
+    317,
+    274
+   ],
+   "W": [
+    88,
+    137
+   ],
+   "sem_peak": [
+    53,
+    58
+   ],
+   "fabric2x2_peak": [
+    46,
+    61
+   ],
+   "interactions": 277
+  },
+  "4": {
+   "B": [
+    721,
+    627
+   ],
+   "W": [
+    154,
+    277
+   ],
+   "sem_peak": [
+    71,
+    86
+   ],
+   "fabric2x2_peak": [
+    59,
+    92
+   ],
+   "interactions": 622
+  },
+  "8": {
+   "B": [
+    1813,
+    1604
+   ],
+   "W": [
+    280,
+    644
+   ],
+   "sem_peak": [
+    88,
+    126
+   ],
+   "fabric2x2_peak": [
+    81,
+    131
+   ],
+   "interactions": 1521
+  },
+  "12": {
+   "B": [
+    2842,
+    2527
+   ],
+   "W": [
+    412,
+    994
+   ],
+   "sem_peak": [
+    173,
+    215
+   ],
+   "fabric2x2_peak": [
+    114,
+    184
+   ],
+   "interactions": 2372
+  }
+ },
+ "symbolic": {
+  "desc": {
+   "nodes": {
+    "formula": "32\u00b7N^2 + 86\u00b7N + 17",
+    "exact": true,
+    "start": 1,
+    "max_ratio": 1.0
+   },
+   "vars": {
+    "formula": "59/2\u00b7N^2 + 141/2\u00b7N + 15",
+    "exact": true,
+    "start": 1,
+    "max_ratio": 1.0
+   }
+  },
+  "asc": {
+   "nodes": {
+    "formula": "43/2\u00b7N^2 + 193/2\u00b7N + 17",
+    "exact": true,
+    "start": 1,
+    "max_ratio": 1.0
+   },
+   "vars": {
+    "formula": "41/2\u00b7N^2 + 159/2\u00b7N + 15",
+    "exact": true,
+    "start": 1,
+    "max_ratio": 1.0
+   }
+  },
+  "rnd": {
+   "nodes": {
+    "formula": "791/190\u00b7N^2 + 36141/190\u00b7N + 26",
+    "exact": false,
+    "start": 0,
+    "max_ratio": 1.632
+   },
+   "vars": {
+    "formula": "739/190\u00b7N^2 + 31739/190\u00b7N + 21",
+    "exact": false,
+    "start": 0,
+    "max_ratio": 1.669
+   }
+  }
+ },
+ "decomposition": {
+  "nodes": {
+   "coeffs": [
+    "35",
+    "118",
+    "43",
+    "21",
+    "-9"
+   ],
+   "worst": "32\u00b7N^2 + 86\u00b7N + 17 (N >= 1)"
+  },
+  "vars": {
+   "coeffs": [
+    "27",
+    "100",
+    "41",
+    "18",
+    "-6"
+   ],
+   "worst": "59/2\u00b7N^2 + 141/2\u00b7N + 15 (N >= 1)"
+  }
+ },
+ "rtl": {
+  "1x1_B_0": {
+   "B": [
+    26,
+    21
+   ],
+   "rtl_peak": [
+    14,
+    14
+   ],
+   "cycles": 63,
+   "status": 0
+  },
+  "1x1_B_1": {
+   "B": [
+    135,
+    115
+   ],
+   "rtl_peak": [
+    21,
+    28
+   ],
+   "cycles": 359,
+   "status": 0
+  },
+  "1x1_B_4": {
+   "B": [
+    721,
+    627
+   ],
+   "rtl_peak": [
+    53,
+    77
+   ],
+   "cycles": 1894,
+   "status": 0
+  },
+  "1x1_B_8": {
+   "B": [
+    1813,
+    1604
+   ],
+   "rtl_peak": [
+    91,
+    134
+   ],
+   "cycles": 4765,
+   "status": 0
+  },
+  "1x1_B_12": {
+   "B": [
+    2842,
+    2527
+   ],
+   "rtl_peak": [
+    111,
+    170
+   ],
+   "cycles": 7438,
+   "status": 0
+  },
+  "2x2_12": {
+   "qsort_l": [
+    4979,
+    2372
+   ],
+   "qsort": [
+    3671,
+    2735
+   ]
+  },
+  "2x2_30": {
+   "qsort_l": [
+    14238,
+    7365
+   ],
+   "qsort": [
+    10788,
+    9230
+   ]
+  }
+ }
+}

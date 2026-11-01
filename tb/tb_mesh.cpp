@@ -9,7 +9,7 @@ int main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
     auto* m = new Vomega_mesh;
     unsigned long long maxc = 50000000ULL;
-    unsigned seed = 1, jit = 0, stl = 0, pmsg = 128, fi = 0, spk = 16, sph = 1, ll = 1, spk2 = 4, spkp = 4, govb = 30, s14 = 2, govnb = 0, govl0 = 2, rto = 8, rgrad = 3, rsv = 1, lm = 2, lmhi = 64, lmlo = 32, lmrsv = 16, ilr = 0;   // step 14 knobs: omega/rtl.py always passes +s14 / +govnb / +govl0; step 18: +rto = retry timeout (rtl.py passes OMEGA_RTO); step 19: +rgrad, defaults 8 / 3 (+rto=32 +rgrad=0 = step 18); step 20: +rsv, default 1 (+rsv=4 = step 19)
+    unsigned seed = 1, jit = 0, stl = 0, pmsg = 128, fi = 0, spk = 16, sph = 1, ll = 1, spk2 = 4, spkp = 4, govb = 30, s14 = 2, govnb = 0, govl0 = 2, rto = 8, rgrad = 3, rsv = 1, lm = 2, lmhi = 64, lmlo = 32, lmrsv = 16, ilr = 0, adm = 0, noprog = 0;   // step 14 knobs: omega/rtl.py always passes +s14 / +govnb / +govl0; step 18: +rto = retry timeout (rtl.py passes OMEGA_RTO); step 19: +rgrad, defaults 8 / 3 (+rto=32 +rgrad=0 = step 18); step 20: +rsv, default 1 (+rsv=4 = step 19)
     for (int i = 1; i < argc; i++) {
         if (!strncmp(argv[i], "+seed=", 6)) seed = strtoul(argv[i] + 6, 0, 0);
         if (!strncmp(argv[i], "+jitter=", 8)) jit = strtoul(argv[i] + 8, 0, 0);
@@ -26,6 +26,8 @@ int main(int argc, char** argv) {
         if (!strncmp(argv[i], "+rsv=", 5)) rsv = strtoul(argv[i] + 5, 0, 0);         // step 20: reserve with room downhill (step 19: 4)
         if (!strncmp(argv[i], "+lm=", 4)) lm = strtoul(argv[i] + 4, 0, 0);           // step 22: low-memory mode
         if (!strncmp(argv[i], "+ilr=", 5)) ilr = strtoul(argv[i] + 5, 0, 0);     // step 23: internal redexes before the root link (0 = off = step 22, 1 = root link deferred, 2 = also the model's child order)
+        if (!strncmp(argv[i], "+adm=", 5)) adm = strtoul(argv[i] + 5, 0, 0);       // step 26: admission controller (0 = off)
+        if (!strncmp(argv[i], "+noprog=", 8)) noprog = strtoul(argv[i] + 8, 0, 0); // step 26: status 3 after this many cycles without an interaction (0 = off)
         if (!strncmp(argv[i], "+lmhi=", 6)) lmhi = strtoul(argv[i] + 6, 0, 0);
         if (!strncmp(argv[i], "+lmlo=", 6)) lmlo = strtoul(argv[i] + 6, 0, 0);
         if (!strncmp(argv[i], "+lmrsv=", 7)) lmrsv = strtoul(argv[i] + 7, 0, 0);
@@ -35,20 +37,21 @@ int main(int argc, char** argv) {
         if (!strncmp(argv[i], "+pmsg=", 6)) pmsg = strtoul(argv[i] + 6, 0, 0);
         if (!strncmp(argv[i], "+maxcycles=", 11)) maxc = strtoull(argv[i] + 11, 0, 0);
     }
-    m->seed = seed; m->jitter = jit; m->stall = stl; m->pmsg = pmsg; m->fi = fi; m->spawn_k = spk; m->spawn_hint = sph; m->link_local = ll; m->spawn_k2 = spk2; m->spawn_kp = spkp; m->gov_b = govb; m->fork_dq = s14 & 3; m->gov_nb = govnb; m->gov_l0 = govl0; m->rto_m1 = (rto < 1 ? 1 : rto > 64 ? 64 : rto) - 1; m->rgrad = rgrad > 7 ? 7 : rgrad; m->rsv = rsv > 7 ? 7 : rsv; m->lm_mode = lm > 2 ? 2 : lm; m->lm_hi = lmhi > 255 ? 255 : lmhi; m->lm_lo = lmlo > 255 ? 255 : lmlo; m->lm_rsv = lmrsv > 31 ? 31 : lmrsv; m->ilr = ilr > 2 ? 2 : ilr; m->dump = 0;
+    m->seed = seed; m->jitter = jit; m->stall = stl; m->pmsg = pmsg; m->fi = fi; m->spawn_k = spk; m->spawn_hint = sph; m->link_local = ll; m->spawn_k2 = spk2; m->spawn_kp = spkp; m->gov_b = govb; m->fork_dq = s14 & 3; m->gov_nb = govnb; m->gov_l0 = govl0; m->rto_m1 = (rto < 1 ? 1 : rto > 64 ? 64 : rto) - 1; m->rgrad = rgrad > 7 ? 7 : rgrad; m->rsv = rsv > 7 ? 7 : rsv; m->lm_mode = lm > 2 ? 2 : lm; m->lm_hi = lmhi > 255 ? 255 : lmhi; m->lm_lo = lmlo > 255 ? 255 : lmlo; m->lm_rsv = lmrsv > 31 ? 31 : lmrsv; m->ilr = ilr > 2 ? 2 : ilr; m->adm_on = adm ? 1 : 0; m->dump = 0;
     m->rst = 1; m->clk = 0;
     for (int i = 0; i < 4; i++) { m->clk = 1; m->eval(); m->clk = 0; m->eval(); }
     m->rst = 0;
     // initialisation (free-stack build) is not counted
     unsigned long long init = 0;
     while (!m->all_ready) { m->clk = 1; m->eval(); m->clk = 0; m->eval(); init++; }
-    unsigned long long cyc = 0; int quiet = 0; int status = 0;
+    unsigned long long cyc = 0, lastc = 0; int quiet = 0; int status = 0; unsigned lasti = 0;
     while (true) {
         m->clk = 1; m->eval(); m->clk = 0; m->eval(); cyc++;
         if (m->any_err) { status = 2; break; }
         quiet = m->all_idle ? quiet + 1 : 0;
         if (quiet >= 2) break;
         if (cyc >= maxc) { status = 3; break; }
+        if (noprog) { if (m->interactions != lasti) { lasti = m->interactions; lastc = cyc; } else if (cyc - lastc > noprog) { status = 3; break; } }
     }
     m->dump = 1; m->clk = 1; m->eval(); m->clk = 0; m->eval(); m->dump = 0;
     printf("status %d\ncycles %llu\ninteractions %u\nerr %u\ninit %llu\n", status, cyc - 2 + (status ? 2 : 0), m->interactions, m->any_err, init);

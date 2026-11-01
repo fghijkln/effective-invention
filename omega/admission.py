@@ -57,17 +57,27 @@ class Job:
         self.state, self.t_submit, self.t_start, self.t_end, self.result = "new", None, None, None, None
 
 
+def merge_unique(jobs):
+    """One merged book in which jobs with the same source share one copy of their definitions; sets j.main."""
+    srcs = list(dict.fromkeys(j.src for j in jobs))
+    book, mains = ir.merge_books([next(j.book for j in jobs if j.src == s) for s in srcs])
+    for j in jobs: j.main = mains[srcs.index(j.src)]
+    return book
+
+
 class Scheduler:
     """Runs jobs on a fabric model.  admit=True: memory-bound admission; False: every job loaded at cycle 0."""
 
-    def __init__(self, jobs, W, H, slots, admit=True, seed=1, stall=20000, max_cycles=2_000_000, **fab_kw):
+    def __init__(self, jobs, W, H, slots, admit=True, seed=1, stall=20000, max_cycles=2_000_000, dedupe=False, **fab_kw):
         self.jobs, self.W, self.H, self.slots, self.admit = jobs, W, H, slots, admit
-        self.book, mains = ir.merge_books([j.book for j in jobs])
-        for j, m in zip(jobs, mains): j.main = m
+        if dedupe: self.book = merge_unique(jobs)        # step 26: jobs with one source share their definitions (RTL ROM)
+        else:
+            self.book, mains = ir.merge_books([j.book for j in jobs])
+            for j, m in zip(jobs, mains): j.main = m
         self.dmax = max(max(len(d.nodes), d.nvars) for d in self.book.defs)
         self.margin = 0 if W * H == 1 else self.dmax + max(fabric.LM_RSV, fabric.RSV)
         self.budget = (slots - self.margin, slots - self.margin)
-        img = fabric.Image(self.book, W, H, slots, 1024, tenants=[{"owner": 0, "main": mains[0]}])
+        img = fabric.Image(self.book, W, H, slots, 1024, tenants=[{"owner": 0, "main": jobs[0].main}])
         for c in img.nodes:                              # an empty image: every job is loaded by load()
             img.nodes[c] = [None] * slots; img.vars[c] = [None] * slots
             img.nown[c] = [OWNER_FREE] * slots; img.vown[c] = [OWNER_FREE] * slots; img.queue[c] = []

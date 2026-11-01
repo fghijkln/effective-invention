@@ -1,0 +1,2 @@
+  mutant 60 (admission ignores the running jobs' reservations): caught  [FAIL flood_2x2_W: rtl audit violations 37805 first [('viol', 6, 1, 1, 239, 387, 279)]]
+  mutant 61 (no reject check (over-budget jobs admitted)): caught  [FAIL reject: python ok 18/19 None]

@@ -1,0 +1,15 @@
+// quicksort in Ω-L (step 27): same result as qsort.olm.  One partition returns both halves as a pair that is matched
+// once (no list is duplicated, rule A); the recursion runs on a numeric fuel parameter (rule R) that starts at the
+// list length, so qs(n, xs) is called only with len(xs) <= n and the fuel never runs out before the list does.
+data List = Nil | Cons(h, t)
+data Pair = P(l, r)
+def rnd(n, s) = switch n { 0 => Nil; p => Cons(s % 100, rnd(p, (s * 1103515245 + 12345) % 2147483648)) }
+def part(p, xs) = match xs {
+  Nil => P(Nil, Nil);
+  Cons(h, t) => match part(p, t) { P(l, r) => if h < p then P(Cons(h, l), r) else P(l, Cons(h, r)) } }
+def app(xs, ys) = match xs { Nil => ys; Cons(h, t) => Cons(h, app(t, ys)) }
+def qs(n, xs) = switch n {
+  0 => Nil;
+  k => match xs { Nil => Nil; Cons(h, t) => match part(h, t) { P(l, r) => app(qs(k, l), Cons(h, qs(k, r))) } } }
+def check(xs, i) = match xs { Nil => 0; Cons(h, t) => i * h + check(t, i + 1) }
+def main = check(qs(N, rnd(N, 42)), 1)

@@ -11,4 +11,6 @@ python3 tests/test_security.py --fuzz 20
 python3 tests/test_mempress.py --quick
 python3 tests/test_eal.py --no-rtl --fuzz 40
 python3 tests/test_s25.py --quick
+python3 tests/test_s26.py --ci
+python3 tests/test_s27.py --quick --no-rtl
 echo CI_QUICK_OK

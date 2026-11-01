@@ -96,7 +96,23 @@ module omega_cell #(
   input  logic [1:0]  cfg_sel,             // 2 = directory
   input  logic [15:0] cfg_a,
   input  logic [127:0] cfg_d,
-  output logic [31:0] st_inter
+  output logic [31:0] st_inter,
+  // step 26 host port (admission controller, SPEC 7.5; tied off except in cell (0,0), idle by default):
+  // hq = one start task {REF @main, VAR root} taken as a SPAWN at the next pick; hw = one var-slot write
+  // (the root var's reset) on var write port 1 when the engine does not use it; mon = var writes (registered)
+  input  logic        adm_on,             //   step 26: admission on (root-var orientation rule below)
+  input  logic [11:0] adm_rb,             //   first slot of the root-var pool in cell (0,0)
+  input  logic        hq_v,
+  input  logic [63:0] hq_a, hq_b,
+  output logic        hq_ack,
+  input  logic        hw_v,
+  input  logic [11:0] hw_a,
+  input  logic [67:0] hw_d,
+  output logic        hw_ack,
+  output logic        mon_we, mon_we2,
+  output logic [11:0] mon_wa, mon_wa2,
+  output logic [63:0] mon_wd, mon_wd2,
+  output logic [12:0] free_n, free_v      // free node / var slots (audit)
 );
   `include "omega_funcs.svh"
   localparam int SB = $clog2(SLOTS);
@@ -178,6 +194,7 @@ module omega_cell #(
     vf_tot = (SB+2)'(vcnt) + (SB+2)'(vsp) + (SB+2)'(vpend);
     tq_tot = (QB+2)'(qcnt) + (QB+2)'(qsp) + (QB+2)'(qpend);
     tq_all = tq_tot + (QB+2)'(fcnt);
+    free_n = 13'(nf_tot); free_v = 13'(vf_tot);
   end
 
   flit_t [DEPTH-1:0] ob;                // outbox (router local input)
@@ -347,11 +364,20 @@ module omega_cell #(
   function automatic logic lflip(input logic [63:0] x, input logic [63:0] y);
     lflip = link_local && !MUT[44] && is_var(x) && is_var(y) && !oob(x) && !local_p(x) && !oob(y) && local_p(y);
   endfunction
+  // step 26: with the admission controller on, a var ~ var link never writes into a root var of its pool (cell (0,0),
+  // slots adm_rb .. adm_rb + 15): the other var takes the root instead, so a root only ever receives the job's value
+  // (the controller reads it from its shadow copy).  adm_on = 0: never (step 25 orientation).
+  function automatic logic rootv(input logic [63:0] p);
+    rootv = adm_on && is_var(p) && px(p) == 4'd0 && py(p) == 4'd0 && pslot(p) >= adm_rb && pslot(p) < adm_rb + 12'd16;
+  endfunction
+  function automatic logic rflip(input logic [63:0] x, input logic [63:0] y);   // swap so that the root is B
+    rflip = is_var(x) && is_var(y) && ((rootv(x) && !rootv(y)) ? 1'b1 : (rootv(y) && !rootv(x)) ? 1'b0 : lflip(x, y));
+  endfunction
   function automatic logic [63:0] ordA(input logic [63:0] x, input logic [63:0] y);
-    ordA = ((!is_var(x) && is_var(y)) || lflip(x, y)) ? y : x;
+    ordA = ((!is_var(x) && is_var(y)) || rflip(x, y)) ? y : x;
   endfunction
   function automatic logic [63:0] ordB(input logic [63:0] x, input logic [63:0] y);
-    ordB = ((!is_var(x) && is_var(y)) || lflip(x, y)) ? x : y;
+    ordB = ((!is_var(x) && is_var(y)) || rflip(x, y)) ? x : y;
   endfunction
   function automatic logic qfirst(input logic [63:0] a, input logic [63:0] b);   // b is P
     qfirst = ptag(a) < ptag(b) || (ptag(a) == ptag(b) && plab(a) < plab(b));
@@ -379,6 +405,7 @@ module omega_cell #(
     A = ordA(ra, rb); B = ordB(ra, rb);
     dvar = is_var(A);
     if (qfirst(A, B)) begin dP = B; dQ = A; end else begin dP = A; dQ = B; end
+    if ((rsp || rsx) && is_var(A) && ptag(B) == T_REF) begin dP = A; dQ = B; end   // step 26: start task {REF, VAR root}
     dlP = is_node(dP) && !oob(dP) && local_p(dP);
     dlQ = is_node(dQ) && !oob(dQ) && local_p(dQ);
   end
@@ -507,6 +534,7 @@ module omega_cell #(
   logic [1:0] pn; logic [2:0][129:0] pq;          // task pushes this cycle (up to 3)
   logic tp; logic [1:0] tpr; logic [63:0] tpp;
   logic fin;                                      // the current step is done: pick new work this cycle
+  logic hq_take, hw_take;                         // step 26: host task / host var write taken this cycle
   st_t  nst;
   logic [63:0] nra, nrb; logic nrsp, nrsx, nrfw;
   logic [3:0] nf_pop, vf_pop;
@@ -537,6 +565,7 @@ module omega_cell #(
       st_minfn <= '1; st_minfv <= '1;
       st_traps <= '0; tr_addr <= '0; tr_reason <= '0; tr_owner <= '0; tr_mask <= '0;
       vh_v <= 1'b0; vh_ov <= 1'b0; st_vhu <= '0;
+      hq_ack <= 1'b0; hw_ack <= 1'b0; mon_we <= 1'b0; mon_we2 <= 1'b0;
       wq_n <= '0; vq_n <= '0; bufok <= 1'b0; rom_v <= 1'b0; rsp <= 1'b0; rsx <= 1'b0; rfw <= 1'b0; ej_taken <= 1'b0;
       room_big <= 1'b0; room_lm <= 1'b0; ample <= 1'b0; ex_dfr <= 1'b0; mrot <= 2'(X + Y + 1); rdist <= 3'd0;
       rs_v <= 1'b0; rs_e <= '0; rs_tm <= '0; rs_n <= '0; cur_rs <= 1'b0; cur_rsn <= '0; st_park <= '0;
@@ -557,6 +586,7 @@ module omega_cell #(
       n_we2 = 1'b0; n_wa2 = '0; n_wd2 = '0;
       v_we2 = 1'b0; v_wa2 = '0; v_wd2 = '0;
       alloc = 1'b0; al_start = 1'b0;
+      hq_take = 1'b0; hw_take = 1'b0;
       hand = 1'b0; nvh_a = vh_a; nvh_b = vh_b; nvh_v = vh_v; vh_go = 1'b0; al_nn = '0; al_nv = '0; al_in = '0; al_iv = '0; al_kn = '0; al_kv = '0;
       fpop_old = 1'b0; fpop_new = 1'b0;
       sp_go = 1'b0; sp_ref_p = '0; sp_x_p = '0; sp_local_only = 1'b0; park = 1'b0; esc = (NT > 1) && cur_rs && cur_rsn == 2'd3 && !MUT[41];
@@ -967,6 +997,11 @@ module omega_cell #(
           st_tasks <= st_tasks + 1;
           nra = vh_oa; nrb = vh_ob; nst = S_LINK;
           vh_ov <= 1'b0; nvh_v = 1'b0;
+        end else if (hq_v && !hq_ack) begin
+          // step 26: the admission controller's start task {REF @main, VAR root}: expand here or hand on (SPAWN
+          // path; not an interaction, like the static loader's @main)
+          st_tasks <= st_tasks + 1;
+          nra = hq_a; nrb = hq_b; nrsp = 1'b1; nst = S_LINK; hq_take = 1'b1;
         end else if (pick_msg) begin
           st_tasks <= st_tasks + 1;
           ej_taken <= 1'b1;
@@ -1084,6 +1119,12 @@ module omega_cell #(
       state <= nst; ra <= nra; rb <= nrb; rsp <= nrsp; rsx <= nrsx; rfw <= nrfw;
       vh_v <= nvh_v; vh_a <= nvh_a; vh_b <= nvh_b;
 
+      // ---- step 26: host var write (root reset) on port 1 when the engine leaves it free ----
+      if (hw_v && !hw_ack && !v_we) begin v_we = 1'b1; v_wa = SB'(hw_a); v_wd = hw_d; hw_take = 1'b1; end
+      hq_ack <= hq_take; hw_ack <= hw_take;
+      mon_we <= v_we; mon_wa <= 12'(v_wa); mon_wd <= v_wd[63:0];
+      mon_we2 <= v_we2; mon_wa2 <= 12'(v_wa2); mon_wd2 <= v_wd2[63:0];
+
       // ---- memory writes: one write port per array ----
       if (n_we) node_mem[n_wa] <= n_wd;
       if (n_we2) node_mem[n_wa2] <= n_wd2;
@@ -1098,6 +1139,7 @@ module omega_cell #(
       // ---- read-ahead: the addresses the NEXT cycle's step needs (synchronous reads, write bypass) ----
       la_A = ordA(nra, nrb); la_B = ordB(nra, nrb);
       if (qfirst(la_A, la_B)) begin la_P = la_B; la_Q = la_A; end else begin la_P = la_A; la_Q = la_B; end
+      if ((nrsp || nrsx) && is_var(la_A) && ptag(la_B) == T_REF) begin la_P = la_A; la_Q = la_B; end   // step 26
       la_v = SB'(pslot(la_A)); la_n1 = SB'(pslot(la_P)); la_n2 = SB'(pslot(la_Q));
       la_d = DB'(plab(la_Q));
       v_rd   <= (v_we2 && v_wa2 == la_v) ? v_wd2 : (v_we && v_wa == la_v) ? v_wd : var_mem[la_v];

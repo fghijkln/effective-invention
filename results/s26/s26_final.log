@@ -1,0 +1,13 @@
+step 26: admission control in RTL vs the fabric model
+  flood_2x2_W: 2x2 x 280, 180 jobs (W): rejected 0 (python 0); rtl 0 180/180 correct in 97345 cycles, peak live (61, 84), max reserved (129, 246) of (252, 252); python ok 180/180 in 176707 cycles; interactions 46620 / 46620 (40s rtl, 4s python)
+  flood_2x2_W_seed2: 2x2 x 280, 180 jobs (W): rejected 0 (python 0); rtl 0 180/180 correct in 97378 cycles, peak live (62, 81), max reserved (129, 246) of (252, 252); python ok 180/180 in 176707 cycles; interactions 46620 / 46620 (2s rtl, 5s python)
+  flood_2x2_B: 2x2 x 280, 180 jobs (B): rejected 60 (python 60); rtl 0 120/120 correct in 56482 cycles, peak live (59, 80), max reserved (227, 219) of (252, 252); python ok 120/120 in 100202 cycles; interactions 26700 / 26700 (1s rtl, 2s python)
+  flood_3x3_W: 3x3 x 280, 300 jobs (W): rejected 0 (python 0); rtl 0 300/300 correct in 158710 cycles, peak live (71, 88), max reserved (129, 246) of (252, 252); python ok 300/300 in 281480 cycles; interactions 77700 / 77700 (69s rtl, 10s python)
+  reject: 2x2 x 200, 19 jobs (W): rejected 1 (python 1); rtl 0 18/18 correct in 5026 cycles, peak live (55, 60), max reserved (117, 170) of (176, 176); python ok 18/18 in 7816 cycles; interactions 2877 / 2877 (41s rtl, 1s python)
+  queue: 2x2 x 1100, 19 jobs (W): rejected 0 (python 0); rtl 0 19/19 correct in 5177 cycles, peak live (113, 208), max reserved (546, 1005) of (1072, 1072); python ok 19/19 in 9112 cycles; interactions 5792 / 5792 (43s rtl, 0s python)
+  untyped: 2x2 x 280, 13 jobs (W): rejected 0 (python 0); rtl 0 13/13 correct in 8644 cycles, peak live (143, 239), max reserved (129, 246) of (249, 249); python ok 13/13 in 13336 cycles; interactions 4812 / 4812 (0s rtl, 0s python)
+  one_cell: 1x1 x 150, 24 jobs (W): rejected 0 (python 0); rtl 0 24/24 correct in 9615 cycles, peak live (22, 43), max reserved (110, 141) of (150, 150); python ok 24/24 in 21356 cycles; interactions 3836 / 3836 (26s rtl, 0s python)
+  owners: 2x2 x 600, 18 jobs (W): rejected 0 (python 0); rtl 0 18/18 correct in 3727 cycles, peak live (68, 90), max reserved (161, 241) of (576, 576); python ok 18/18 in 6136 cycles; interactions 2877 / 2877 (46s rtl, 0s python)
+  static_flood_2x2: 2x2 x 280, 180 jobs loaded at cycle 0, adm off: status 3 after 26564 cycles (1733 interactions) (47s)
+  static_flood_3x3: 3x3 x 280, 300 jobs loaded at cycle 0, adm off: status 3 after 24425 cycles (5896 interactions) (76s)
+step 26 tests: 76/76 pass (416s)

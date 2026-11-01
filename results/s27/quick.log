@@ -1,0 +1,13 @@
+step 27: qsort in Ω-L
+  Ω-L: qsort_l accepted (rnd: numeric on parameter 1, linear in its value, part: structural on parameter 2, linear in its size, app: structural on parameter 1, linear in its size, qs: numeric on parameter 1, ≤ 2^value unfolds, check: structural on parameter 1, linear in its size); qsort rejected: affine: qs: `t` (List) is used 2 times in template qs__a5; Ω-L duplicates only numbers and !-closures
+  semantic: qsort_l == qsort == sorted on 75 inputs
+  interactions qsort_l / qsort: N=5: 826 / 852 (0.97x), N=10: 1914 / 2173 (0.88x), N=20: 4514 / 5451 (0.83x), N=40: 10756 / 13855 (0.78x)
+  fabric model 1x1 / 2x2 / 4x4: ok
+  N=4: B (721, 627)  W (154, 277)  semantic peak (71, 86)  fabric 2x2 peak (59, 92)  B/W 4.68 / 2.26
+  N=8: B (1813, 1604)  W (280, 644)  semantic peak (88, 126)  fabric 2x2 peak (81, 131)  B/W 6.47 / 2.49
+  symbolic desc: B_nodes = 32·N^2 + 86·N + 17 | B_vars = 59/2·N^2 + 141/2·N + 15  [exact, N = 0..24]
+  symbolic asc: B_nodes = 43/2·N^2 + 193/2·N + 17 | B_vars = 41/2·N^2 + 159/2·N + 15  [exact, N = 0..24]
+  symbolic rnd: B_nodes = 67/16·N^2 + 1519/8·N + 26 | B_vars = 63/16·N^2 + 1331/8·N + 21  [envelope, N = 0..24]
+  decomposition B_nodes = 35 + 118·N + 43·P + 21·A + -9·Z  (exact on 77 literal + 60 program inputs); worst case over every input of length N >= 1: 32·N^2 + 86·N + 17 (N >= 1)
+  decomposition B_vars = 27 + 100·N + 41·P + 18·A + -6·Z  (exact on 77 literal + 60 program inputs); worst case over every input of length N >= 1: 59/2·N^2 + 141/2·N + 15 (N >= 1)
+step 27 tests: 131/131 pass (17s)

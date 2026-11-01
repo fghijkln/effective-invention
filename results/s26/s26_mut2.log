@@ -1,0 +1,4 @@
+  mutant 62 (two jobs of one owner may run at once): caught  [FAIL owners: jobs of one owner overlap (owners [0, 1, 2])]
+  mutant 63 (root var not reset before a start): caught  [FAIL flood_2x2_W: rtl status 0 blocked True 0/180 correct]
+  mutant 64 (reservations never released): caught  [FAIL flood_2x2_W: rtl status 0 blocked True 1/180 correct]
+s26 mutants: 3/3 caught

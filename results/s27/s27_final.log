@@ -1,0 +1,22 @@
+step 27: qsort in Ω-L
+  Ω-L: qsort_l accepted (rnd: numeric on parameter 1, linear in its value, part: structural on parameter 2, linear in its size, app: structural on parameter 1, linear in its size, qs: numeric on parameter 1, ≤ 2^value unfolds, check: structural on parameter 1, linear in its size); qsort rejected: affine: qs: `t` (List) is used 2 times in template qs__a5; Ω-L duplicates only numbers and !-closures
+  semantic: qsort_l == qsort == sorted on 182 inputs
+  interactions qsort_l / qsort: N=5: 826 / 852 (0.97x), N=10: 1914 / 2173 (0.88x), N=20: 4514 / 5451 (0.83x), N=40: 10756 / 13855 (0.78x)
+  fabric model 1x1 / 2x2 / 4x4: ok
+  N=2: B (317, 274)  W (88, 137)  semantic peak (53, 58)  fabric 2x2 peak (46, 61)  B/W 3.60 / 2.00
+  N=4: B (721, 627)  W (154, 277)  semantic peak (71, 86)  fabric 2x2 peak (59, 92)  B/W 4.68 / 2.26
+  N=8: B (1813, 1604)  W (280, 644)  semantic peak (88, 126)  fabric 2x2 peak (81, 131)  B/W 6.47 / 2.49
+  N=12: B (2842, 2527)  W (412, 994)  semantic peak (173, 215)  fabric 2x2 peak (114, 184)  B/W 6.90 / 2.54
+  symbolic desc: B_nodes = 32·N^2 + 86·N + 17 | B_vars = 59/2·N^2 + 141/2·N + 15  [exact, N = 0..40]
+  symbolic asc: B_nodes = 43/2·N^2 + 193/2·N + 17 | B_vars = 41/2·N^2 + 159/2·N + 15  [exact, N = 0..40]
+  symbolic rnd: B_nodes = 791/190·N^2 + 36141/190·N + 26 | B_vars = 739/190·N^2 + 31739/190·N + 21  [envelope, N = 0..40]
+  decomposition B_nodes = 35 + 118·N + 43·P + 21·A + -9·Z  (exact on 133 literal + 130 program inputs); worst case over every input of length N >= 1: 32·N^2 + 86·N + 17 (N >= 1)
+  decomposition B_vars = 27 + 100·N + 41·P + 18·A + -6·Z  (exact on 133 literal + 130 program inputs); worst case over every input of length N >= 1: 59/2·N^2 + 141/2·N + 15 (N >= 1)
+  RTL 1x1 at B (26, 21), N=0: status 0, peak (14, 14), 63 cycles
+  RTL 1x1 at B (135, 115), N=1: status 0, peak (21, 28), 359 cycles
+  RTL 1x1 at B (721, 627), N=4: status 0, peak (53, 77), 1894 cycles
+  RTL 1x1 at B (1813, 1604), N=8: status 0, peak (91, 134), 4765 cycles
+  RTL 1x1 at B (2842, 2527), N=12: status 0, peak (111, 170), 7438 cycles
+  RTL 2x2 N=12: qsort_l 4979 cycles / 2372 interactions, qsort 3671 / 2735
+  RTL 2x2 N=30: qsort_l 14238 cycles / 7365 interactions, qsort 10788 / 9230
+step 27 tests: 253/253 pass (135s)

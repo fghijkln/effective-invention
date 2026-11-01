@@ -725,9 +725,8 @@ home cell's task stack.
 
 **Untyped jobs** (not in Ω-L) keep the step-24 behaviour: admitted at once, unreserved; the guarantee covers only the
 moments when no untyped job runs. **Off by default**: `fabric.Fabric` is unchanged, and `Scheduler(admit=False)` loads
-every job at cycle 0, which is the step-24 multi-tenant behaviour. The RTL has no admission (it would need a host
-loader that writes a job into a running mesh and a per-owner idle signal; not added in step 25), so RTL defaults are
-cycle-identical to step 24.
+every job at cycle 0, which is the step-24 multi-tenant behaviour. Step 25 had no RTL admission; step 26 adds it
+behind a run-time knob (§7.5), so RTL defaults stay cycle-identical to step 24.
 
 **Cost.** The rule gives every cell the whole of every reservation (it knows nothing about placement), and B_vars is
 2.3–35× an RTL 1×1 run's var peak (§7.2), so on small cells it admits about one job at a time: the 180-job flood below takes 176,707
@@ -736,6 +735,101 @@ cycles admitted; a 120-job flood that the unadmitted fabric still survives takes
 without admission (no progress, no tenant finishes) and finish with it (every answer right, every cycle audited:
 live ≤ reserved, every cell keeps the margin); a never-admissible job (treesum(9), W_nodes 7,166) is rejected while
 the others finish; a job that fits only alone waits for the others; an untyped qsort passes through.
+
+### 7.5 Admission control in the RTL (step 26, `rtl/omega_adm.sv`, `omega/adm_rtl.py`)
+
+§7.4's rule, in hardware. A small controller beside the mesh (`omega_adm`) and a host port on cell (0,0) replace
+the Python scheduler's loader; nothing else in the mesh changes. **Run-time knob `+adm` (`adm_on`), default 0:**
+with it off every controller output is idle, the host port is never driven and the orientation rule below is
+inactive, so the mesh is the step-25 mesh cycle for cycle (identity 128 / 128).
+
+**State.** A job table of NJ = 512 entries (owner, typed bit, reservation (n, v), the owner-stamped REF of the job's
+`@main`), written by the host before the run like the definition ROM (`adm_info.hex`, `adm_ref.hex`); a config
+block (job count, budget_n, budget_v = S − margin computed exactly as §7.4, root-pool base, margin); the FIFO head;
+the running sums res_n, res_v of the running typed jobs' reservations; a 15-bit owner-busy vector; and a pool of
+RR = 16 **root var slots** in cell (0,0) placed outside its free stacks (slots S .. S + 15, so every cell still has
+exactly S allocatable slots, as in the model), each with a used / running bit, its job index and a shadow copy of
+the slot (the controller watches cell (0,0)'s two var write ports).
+
+**Start.** Each cycle with no action pending, the head job is
+
+* **rejected** if it is typed and its reservation exceeds the budget on its own (it can never fit; §7.4's
+  "rejected at submission", here when it reaches the head; the order of the other decisions is unchanged);
+* **started** if its owner has no running job, a root slot is free and (typed) res + its reservation ≤ budget for
+  nodes and vars alike, or (untyped) unconditionally (unreserved, as in §7.4);
+* otherwise it waits (FIFO, no overtaking).
+
+A start is two host-port actions on cell (0,0): (1) write {owner, NONE} into the chosen root slot, on var write
+port 1 in a cycle the engine leaves it free; (2) offer the task {REF @main, VAR root}, which the cell takes as a
+SPAWN at its next pick (the same path as a stack task, ahead of messages; expand here or hand on), so the cell's
+own allocator places `@main` and the spawn / pressure policy decides where it expands. Like the static loader's
+`@main`, the start is not an interaction.
+
+**Root orientation rule** (only with `adm_on`): a var ~ var link never writes into a root var of the pool (the
+other var takes the root instead). So a root slot only ever receives the job's final value, never a forwarding
+pointer, and the shadow copy is the result.
+
+**Completion** is detected at mesh quiescence (every cell idle for 2 cycles and no start pending): then no task,
+message, retry slot or var-hop link of any owner exists, so every running job is done. The controller sweeps the
+root slots (one per cycle): each running job is marked done, its owner freed, and when its result is an atom (NUM
+/ ERA) its root slot is freed and its reservation released. A data result (a constructor) stays in the fabric (the
+RTL has no host unload): its root slot stays used and, if typed, its reservation stays charged, so it is never
+overwritten and the guarantee still holds. If the queue is not empty, nothing runs, the mesh is idle and the head
+cannot start (no root slot, or reservations held by data results), the controller stops with an error (`blocked`)
+instead of hanging.
+
+**Guarantee.** The argument of §7.4 carries over unchanged: the controller admits exactly when the model's rule
+does (same budget, same FIFO, same per-owner exclusion), tenants share no slots, and every typed job's live graph is
+within its reservation, so while no untyped job runs the live graph is ≤ res ≤ budget and every cell keeps the
+margin free. A simulation-only audit in the controller checks this every cycle (live nodes / vars from the cells'
+free counters ≤ res while no untyped job runs or left data behind; res ≤ budget; on a mesh, every cell's free
+node and var slots ≥ margin) and counts violations.
+
+**Difference from the model.** The model detects completion per owner; the RTL only at global quiescence, so a job
+that finished early keeps its reservation until the mesh is idle. On the test floods this costs nothing measurable
+(the budget admits about one W-reserved job per batch anyway) and the decisions are identical (below); with many
+small jobs and a large budget it would serialise batches. Per-owner idle detection (an owner-busy bit through the
+mesh, routers included) is left open.
+
+**Cross-check** (`tests/test_s26.py`): the RTL and `admission.Scheduler(dedupe=True)` (jobs with one source share
+one copy of their definitions, as the ROM does) run the same job lists with the same budget and must agree on the
+rejected set, the start order and the total interaction count (each job's count is schedule independent), every
+admitted job must end with its known answer, no stall or blocked controller, zero audit violations, reservations
+≤ budget, and no two jobs of one owner overlap in time. Without admission (`run_static`: every job loaded at cycle 0,
+`+adm=0`) the same floods stop (status 3, no progress for 20,000 cycles).
+
+### 7.6 Quicksort in Ω-L (step 27, `programs/qsort_l.olm`)
+
+`programs/qsort.olm` stays outside Ω-L (rule A: `qs` uses the tail `t` twice, once per `filter`) and is unchanged.
+`programs/qsort_l.olm` computes the same result with three rewrites:
+
+* **one partition, a pair.** `part(p, xs)` walks the list once and returns `P(lo, hi)`; `qs` matches the pair once,
+  so every list is used exactly once (affine). Elements `< p` go left, the rest (duplicates of the pivot included)
+  right, as in `qsort.olm`.
+* **structural `part` and `app`** (recursion on the list argument, rule R structural).
+* **numeric fuel for `qs`.** `qs(n, xs)` recurses on `n − 1` (rule R numeric), started at `n = N`; since each
+  recursive call gets a strictly shorter list than its parent, `len(xs) ≤ n` always holds, so the fuel never runs
+  out before the list does (the `0` arm is never reached with a non-empty list on any input). The checker records
+  `qs: numeric, ≤ 2^value unfolds`.
+
+**Bounds.** B (§7.2) depends on the data (how many elements each partition moves, how much `app` copies). The
+counted B is exact in closed form (§7.3) for two input families of the program's own template shape: descending
+(the worst case) **B_nodes = 32·N² + 86·N + 17, B_vars = 59/2·N² + 141/2·N + 15** and ascending 43/2·N² + 193/2·N
++ 17 / 41/2·N² + 159/2·N + 15, exact on N = 0..40 with held-out N = 41, 42; the program's own pseudo-random input
+gets an envelope only. A data decomposition (`results/s27/decomp.py`) is exact on every one of 133 literal and 130
+program inputs:
+
+    B_nodes = 35 + 118·N + 43·P + 21·A − 9·Z,   B_vars = 27 + 100·N + 41·P + 18·A − 6·Z
+
+with P = elements moved by partitions (Σ over `qs` calls of the partitioned length), A = `app` steps, Z = `qs`
+calls at fuel 0 (0 or 2). P ≤ N(N − 1)/2, A ≤ P, and Z = 2 only at the full chain, so with positive P and A
+coefficients the maximum over every input of length N ≥ 1 is P = A = N(N − 1)/2, Z = 2: exactly the descending
+closed form. **The worst-case envelope is attained and holds for every input**, not only the sampled ones. W (§7.3,
+causal) is 3.6–6.9× below B_nodes and 2.0–2.5× below B_vars at N = 2..12, and above every semantic peak (5 orders).
+
+**Cost.** qsort_l does fewer interactions than qsort (0.78× at N = 40: one pass per partition instead of two
+filters) but is slower on a mesh (RTL 2×2: +36% cycles at N = 12, +32% at N = 30), because `part` returns its pair
+only after the whole list was walked and `app` waits for the left half, so less work overlaps.
 
 ## 8. Termination detection
 

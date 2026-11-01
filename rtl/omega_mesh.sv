@@ -29,6 +29,7 @@ module omega_mesh #(
   input  logic [7:0]  lm_lo,
   input  logic [4:0]  lm_rsv,              //     reserve with room downhill in low-memory mode
   input  logic [1:0]  ilr,                 //   step 23: 1 = internal redexes before an expansion's root link, 2 = also fabric child order (0 = step 22)
+  input  logic        adm_on,              // step 26: admission controller (0 = off = step 25)
   input  logic        link_local,          // step 12 local-first link orientation (configuration, SPEC 4)
   input  logic        dump,
   output logic        all_ready,
@@ -59,6 +60,17 @@ module omega_mesh #(
   logic        rgnt [W][H];
   logic [511:0] rdn [W][H];
   logic [511:0] rdr [W][H];
+  // step 26 admission controller wiring (host port of cell (0,0))
+  logic        c_hq_ack [W][H], c_hw_ack [W][H], c_mwe [W][H], c_mwe2 [W][H];
+  logic [11:0] c_mwa [W][H], c_mwa2 [W][H];
+  logic [63:0] c_mwd [W][H], c_mwd2 [W][H];
+  logic [12:0] c_fn [W][H], c_fv [W][H];
+  logic        a_hq_v, a_hw_v, adm_idle, cells_idle;
+  logic [63:0] a_hq_a, a_hq_b;
+  logic [11:0] a_hw_a, a_rb;
+  logic [67:0] a_hw_d;
+  logic [3:0]  adm_err;
+  logic [31:0] sum_fn, sum_fv, min_f;
 
   // ---- cluster ROMs: cell (x, y) is member (x % CW) + (y % CH) * CW of cluster (x / CW, y / CH) ----
   localparam int NCX = (W + CW - 1) / CW, NCY = (H + CH - 1) / CH;
@@ -91,7 +103,11 @@ module omega_mesh #(
         .out_v(ov[x][y]), .out_f(of[x][y]), .out_rdy(ordy[x][y]),
         .idle(cidle[x][y]), .hungry(chung[x][y]), .nbr_hungry(nhung[x][y]), .roomy(croom[x][y]), .nbr_roomy(nroom[x][y]), .rdist(crd[x][y]), .nbr_rdist(nrd[x][y]), .ready(crdy[x][y]), .err(cerr[x][y]), .dump,
         .rom_req(rreq[x][y]), .rom_an(ran[x][y]), .rom_ar(rar[x][y]), .rom_gnt(rgnt[x][y]), .rom_dn(rdn[x][y]), .rom_dr(rdr[x][y]),
-        .cfg_we(1'b0), .cfg_sel(2'd0), .cfg_a(16'd0), .cfg_d(128'd0), .st_inter(cint[x][y]));
+        .cfg_we(1'b0), .cfg_sel(2'd0), .cfg_a(16'd0), .cfg_d(128'd0), .st_inter(cint[x][y]),
+        .adm_on, .adm_rb(a_rb), .hq_v((x == 0 && y == 0) ? a_hq_v : 1'b0), .hq_a(a_hq_a), .hq_b(a_hq_b), .hq_ack(c_hq_ack[x][y]),
+        .hw_v((x == 0 && y == 0) ? a_hw_v : 1'b0), .hw_a(a_hw_a), .hw_d(a_hw_d), .hw_ack(c_hw_ack[x][y]),
+        .mon_we(c_mwe[x][y]), .mon_we2(c_mwe2[x][y]), .mon_wa(c_mwa[x][y]), .mon_wa2(c_mwa2[x][y]),
+        .mon_wd(c_mwd[x][y]), .mon_wd2(c_mwd2[x][y]), .free_n(c_fn[x][y]), .free_v(c_fv[x][y]));
       assign nhung[x][y][0] = (y > 0)     ? chung[x][(y > 0) ? y-1 : 0] : 1'b0;
       assign nhung[x][y][1] = (x < W - 1) ? chung[(x < W - 1) ? x+1 : x][y] : 1'b0;
       assign nhung[x][y][2] = (y < H - 1) ? chung[x][(y < H - 1) ? y+1 : y] : 1'b0;
@@ -145,14 +161,28 @@ module omega_mesh #(
     else lowmem <= !any_ample;
   end
 
+  omega_adm #(.NJ(512), .RR(16), .NCELL(W * H), .MUT(MUT)) u_adm (
+    .clk, .rst, .adm_on, .ready(all_ready), .cells_idle,
+    .mon_we(c_mwe[0][0]), .mon_we2(c_mwe2[0][0]), .mon_wa(c_mwa[0][0]), .mon_wa2(c_mwa2[0][0]),
+    .mon_wd(c_mwd[0][0]), .mon_wd2(c_mwd2[0][0]),
+    .hq_v(a_hq_v), .hq_a(a_hq_a), .hq_b(a_hq_b), .hq_ack(c_hq_ack[0][0]),
+    .hw_v(a_hw_v), .hw_a(a_hw_a), .hw_d(a_hw_d), .hw_ack(c_hw_ack[0][0]), .rbase(a_rb),
+    .sum_free_n(sum_fn), .sum_free_v(sum_fv), .min_free(min_f), .adm_idle, .adm_err);
+
   always_comb begin
     all_idle = 1'b1; all_ready = 1'b1; any_err = '0; interactions = '0;
+    cells_idle = 1'b1; sum_fn = '0; sum_fv = '0; min_f = 32'hFFFF_FFFF;
     for (int x = 0; x < W; x++)
       for (int y = 0; y < H; y++) begin
+        cells_idle &= cidle[x][y];
+        sum_fn += 32'(c_fn[x][y]); sum_fv += 32'(c_fv[x][y]);
+        if (32'(c_fn[x][y]) < min_f) min_f = 32'(c_fn[x][y]);
+        if (32'(c_fv[x][y]) < min_f) min_f = 32'(c_fv[x][y]);
         all_idle &= cidle[x][y];
         all_ready &= crdy[x][y];
         any_err |= cerr[x][y];
         interactions += cint[x][y];
       end
+    all_idle &= adm_idle;
   end
 endmodule
