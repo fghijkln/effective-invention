@@ -6,3 +6,4 @@
 - 14:00: sandbox restarted (~13:57); lane A had fuzz done, lane B at mut1. Rebuilding toolchain, relaunching lanes.
 - 14:43: lane A ALLDONE: identity 128/128, units 42/42, programs 315/315, s14 90/90, fuzz 600/600, bigfuzz 200/200, security 420/420, mempress 60/60. Lane B: s29 326/326 + 8/8, s28 129/129 + 2/2, RTL mutants through 26 caught; lane C (s27, s26, s25, eal reverse) running.
 - 15:31-16:05: sandbox restarted again (~15:32); resumed with reg_B2.sh (mutants 47-54 only, no eal duplicate) + reg_C.sh (ealmut, eal). Lane B/C ALLDONE: RTL mutants 55/55 caught (0-54), Ω-L 597/597 + mutants 7/7, s25 2749/2749 + 6/6, s26 76/76 + 5/5, s27 253/253, s28 129/129 + 2/2, s29 326/326 + 8/8. Full default-config regression green.
+- 16:12: final step-29 commit c2eb892 pushed (master -> main, 748f3c9..c2eb892); CI run 41411363881 success. Step 29 DONE.

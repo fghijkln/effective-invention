@@ -65,6 +65,7 @@ module omega_mesh #(
   logic [15:0] c_mwa [W][H], c_mwa2 [W][H];
   logic [63:0] c_mwd [W][H], c_mwd2 [W][H];
   logic [16:0] c_fn [W][H], c_fv [W][H];
+  logic [31:0] c_tq [W][H];               // step 30: task entries per cell (audit only)
   logic        a_hq_v, a_hw_v, adm_idle, cells_idle;
   logic [63:0] a_hq_a, a_hq_b;
   logic [15:0] a_hw_a, a_rb;
@@ -107,7 +108,7 @@ module omega_mesh #(
         .adm_on, .adm_rb(a_rb), .hq_v((x == 0 && y == 0) ? a_hq_v : 1'b0), .hq_a(a_hq_a), .hq_b(a_hq_b), .hq_ack(c_hq_ack[x][y]),
         .hw_v((x == 0 && y == 0) ? a_hw_v : 1'b0), .hw_a(a_hw_a), .hw_d(a_hw_d), .hw_ack(c_hw_ack[x][y]),
         .mon_we(c_mwe[x][y]), .mon_we2(c_mwe2[x][y]), .mon_wa(c_mwa[x][y]), .mon_wa2(c_mwa2[x][y]),
-        .mon_wd(c_mwd[x][y]), .mon_wd2(c_mwd2[x][y]), .free_n(c_fn[x][y]), .free_v(c_fv[x][y]));
+        .mon_wd(c_mwd[x][y]), .mon_wd2(c_mwd2[x][y]), .free_n(c_fn[x][y]), .free_v(c_fv[x][y]), .tasks(c_tq[x][y]));
       assign nhung[x][y][0] = (y > 0)     ? chung[x][(y > 0) ? y-1 : 0] : 1'b0;
       assign nhung[x][y][1] = (x < W - 1) ? chung[(x < W - 1) ? x+1 : x][y] : 1'b0;
       assign nhung[x][y][2] = (y < H - 1) ? chung[x][(y < H - 1) ? y+1 : y] : 1'b0;
@@ -216,5 +217,41 @@ module omega_mesh #(
     if (uv > pc_uv) pc_uv = uv;
   end
   final if (pc_on) $display("pcert_viol %0d\npcert_min %0d\npcert_used_n %0d\npcert_used_v %0d", pc_viol, pc_min, pc_un, pc_uv);
+  // step 30 (simulation only, SPEC 7.9): task-stack audit, on with +tcert=A (A = the job's atom-atom interaction
+  // count).  Every cycle after initialisation: E = stored task entries summed over all cells (stack, fork deque,
+  // retry slot); a cycle with E > used_n + 2 * used_v + A (used: node / var slots in use, ballast included) counts as a
+  // violation (the linear-reference argument of SPEC 7.9).  Also the peak of E, of any one cell's entries, and the
+  // smallest slack.  Reported as "tcert_viol", "tcert_peak", "tcert_cell", "tcert_slack"; without +tcert nothing runs.
+  // Joint-load audit (same switch): peaks of wn * used_n + 8 * used_v for wn = 0, 1, 2, 4, ..., 64 (the hull of SPEC 7.9
+  // at lam = wn / 8), reported as "jcert_peak_<wn>".
+  int tc_a; logic tc_on; longint tc_viol, tc_peak, tc_cell, tc_slack; longint jc_pk [8];
+  initial begin
+    tc_on = $value$plusargs("tcert=%d", tc_a); tc_viol = 0; tc_peak = 0; tc_cell = 0; tc_slack = 64'd1 << 40;
+    for (int k = 0; k < 8; k++) jc_pk[k] = 0;
+  end
+  always @(posedge clk) if (tc_on && !rst && all_ready) begin
+    longint e, un, uv, sl;
+    e = 0; un = 0; uv = 0;
+    for (int x = 0; x < W; x++)
+      for (int y = 0; y < H; y++) begin
+        e += longint'(c_tq[x][y]);
+        if (longint'(c_tq[x][y]) > tc_cell) tc_cell = longint'(c_tq[x][y]);
+        un += longint'(SLOTS) - longint'(c_fn[x][y]); uv += longint'(SLOTS) - longint'(c_fv[x][y]);
+      end
+    sl = un + 2 * uv + longint'(tc_a) - e;
+    if (sl < 0) tc_viol++;
+    if (sl < tc_slack) tc_slack = sl;
+    if (e > tc_peak) tc_peak = e;
+    for (int k = 0; k < 8; k++) begin
+      longint wn, jv;
+      wn = (k == 0) ? 0 : (longint'(1) << (k - 1));
+      jv = wn * un + 8 * uv;
+      if (jv > jc_pk[k]) jc_pk[k] = jv;
+    end
+  end
+  final if (tc_on) begin
+    $display("tcert_viol %0d\ntcert_peak %0d\ntcert_cell %0d\ntcert_slack %0d", tc_viol, tc_peak, tc_cell, tc_slack);
+    for (int k = 0; k < 8; k++) $display("jcert_peak_%0d %0d", (k == 0) ? 0 : (1 << (k - 1)), jc_pk[k]);
+  end
 `endif
 endmodule

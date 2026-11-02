@@ -113,6 +113,7 @@ module omega_cell #(
   output logic [15:0] mon_wa, mon_wa2,
   output logic [63:0] mon_wd, mon_wd2,
   output logic [16:0] free_n, free_v      // free node / var slots (audit)
+  ,output logic [31:0] tasks            // step 30: stored task entries (stack + fork deque + retry slot; audit only)
 );
   `include "omega_funcs.svh"
   localparam int SB = $clog2(SLOTS);
@@ -195,6 +196,7 @@ module omega_cell #(
     tq_tot = (QB+2)'(qcnt) + (QB+2)'(qsp) + (QB+2)'(qpend);
     tq_all = tq_tot + (QB+2)'(fcnt);
     free_n = 17'(nf_tot); free_v = 17'(vf_tot);
+    tasks = 32'(tq_all) + 32'(rs_v);
   end
 
   flit_t [DEPTH-1:0] ob;                // outbox (router local input)
