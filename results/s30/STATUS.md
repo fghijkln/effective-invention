@@ -27,3 +27,5 @@
   behaviour): RTL mutants 55/55, Ω-L 597/597 + 7/7, s25 2749/2749 + 6/6, s26 76/76 + 5/5, s27 253/253, s28 129/129 + 2/2,
   s29 mutants 8/8.
 resumed 2026-11-02 22:32 CST (executor 3)
+- 22:35: security 420/420 (424 s) and bigfuzz 200/200 (4088 diverging rejected, 1792 s) finished on step-30 code
+  (lane5/lane6 survived the 22:30 executor loss). Regression complete. Step 30 DONE: final commit, README totals.
