@@ -26,3 +26,4 @@
   rebuilt, tc3.log); security + bigfuzz relaunched (lane5/lane6). Carried over from step 29 (c2eb892, same default RTL
   behaviour): RTL mutants 55/55, Ω-L 597/597 + 7/7, s25 2749/2749 + 6/6, s26 76/76 + 5/5, s27 253/253, s28 129/129 + 2/2,
   s29 mutants 8/8.
+resumed 2026-11-02 22:32 CST (executor 3)
