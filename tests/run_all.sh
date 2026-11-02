@@ -22,5 +22,7 @@ python3 tests/test_s28.py                    2>&1 | tee results/s28_tests.log   
 python3 tests/test_s28.py --mutants          2>&1 | tee results/s28_mutants.log
 python3 tests/test_s29.py                    2>&1 | tee results/s29_tests.log   # step 29: placement-aware certificate
 python3 tests/test_s29.py --mutants          2>&1 | tee results/s29_mutants.log
+python3 tests/test_s30.py                    2>&1 | tee results/s30_tests.log   # step 30: joint loads + task stack
+python3 tests/test_s30.py --mutants          2>&1 | tee results/s30_mutants.log
 python3 tests/mutants.py                      2>&1 | tee results/mutants.txt
 echo ALLDONE

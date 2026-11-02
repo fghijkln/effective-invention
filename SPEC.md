@@ -958,6 +958,90 @@ separately, 3 `rgrad` ignored, 4 `lm_lo` ≥ D_max not required, 5 poor-cell cos
 ballast ignored, 8 budgets one cell too generous: 8 / 8 caught (brute-force disagreement, boundary loads, refused modes,
 budget check).
 
+### 7.9 Joint node + var loads and the task stack in the certificate (step 30, `omega/joint.py`)
+
+§7.8 takes the loads as a box (L_n, L_v) = (B_nodes, B_vars) and leaves the task stack out. Step 30 tightens the box
+where the RTL allows it, asks how far a *joint* condition can go, and brings the task stack in.
+
+**Joint loads.** At any moment of any schedule the interactions done so far form a causally closed set X of the
+event DAG (§7.3, `omega/causal.py`); the live node count is n(X) = n0 + Σ_X w(e) (exact: a node in flight holds no
+slot) and the live var count is at most v(X) = v0 + Σ_X a(e) (vars *allocated*: the RTL frees a var when a LINK
+arrives, which no event fixes, so frees are not used). Every (nodes, vars) pair a schedule can show therefore lies
+under the convex hull of {(n(X), v(X))}, i.e. for every λ ≥ 0
+
+    λ·n + v ≤ Φ(λ) = λ·n0 + v0 + maxclosure(λ·w + a)          (one min cut per λ; Φ(∞) ~ W_nodes, Φ(0) = B_vars)
+
+A ball can be made entirely non-roomy (§7.8) only by a split (s_n, s_v) of its poor costs that one moment can show:
+s_n ≤ W_nodes, s_v ≤ B_vars and λ·s_n + s_v ≤ Φ(λ) for every λ. `joint.certify_mesh` decides this per ball, exactly
+for a given λ grid (0, 1/8, …, 8; any grid is sound): homogeneous cells check the n_r + 1 splits (q, n_r − q) with costs
+(q·m, (n_r − q)·m), ballast the 2^|ball| splits. With an empty hull this is §7.8's ⌊L_n/m⌋ + ⌊L_v/m⌋ ≤ n_r − 1.
+**Engine margin**: an RTL rule is not atomic, an engine may hold its new nodes before freeing the ≤ 2 it consumes, so on
+a W×H mesh the node load gets + 2·W·H (and Φ(λ) + 2λ·W·H); a B_nodes box (no frees counted) needs none.
+
+**How tight a joint condition can be.** For fib, treesum_direct, sum and fact the hull *is* the box: one closed set
+(all var allocations, none of the node-freeing events that do not cost a var allocation) attains (W_nodes, B_vars) at
+once, Φ(λ) = λ·W_nodes + B_vars for every λ (all N counted; `joint.attainer` builds that set by an independent
+fixpoint). For list, higher, treesum and sort the hull is a few % inside the box. Since the floor-sum cover is exact for
+a box, no joint condition over these loads can do better than the box with W_nodes: the step-29 proposal of "≈ 2×
+from combining nodes and vars" does not exist with RTL-sound loads. What step 30 gains comes from W_nodes (causal,
+0.25–0.6 of B_nodes) and the hull: **1.26–1.55× smaller cells**. The remaining 2× lever is vars: B_vars counts every
+allocation, W_vars (frees at their causal maximum, 0.4–0.9 of B_vars) holds only for atomic links (§7.3).
+
+**Task stack.** Every entry of a cell's task stack, fork deque or retry slot is a pending link of two port words
+(`K_LINK`, `K_SPAWN`, `K_FWD`). Nets are linear: a node's principal port is held in exactly one place, a var in at most
+two (its two ends), and an entry made of two atoms holds neither; an atom–atom entry becomes exactly one atom–atom
+interaction (void, REF ~ NUM / REF ~ REF expansion; a retry moves the same entry). So at every moment
+
+    entries (all cells together)  ≤  n + 2·v + A,      A = the number of atom–atom interactions (schedule free)
+
+and with the joint loads Q = max_X (n(X) + 2·v(X)) + A + 1 (one more min cut; + 1 for the root's host reference). Nothing
+in the policy bounds one cell's share below the total (an entry can name a node in any cell, and one cell may hold every
+pending link), so the certificate asks **QDEPTH ≥ Q + 2·W·H + 3** (engine margin; a cycle pushes up to 3 entries). This is
+sound but far from what runs use: Q is 3–6× the slots a job needs (fib(20): Q = 614,547, sum(1000): 22,024) while the
+RTL's depth-first stacks stay in the hundreds (sum(1000) on one cell: 1,005). Covering the stack therefore costs a
+deep (or spilled) stack, not a different argument: the gradient argument of §7.8 places work, it does not drain stacks.
+
+**Step-30 certificate** (`joint.certified(W, H, L, S, qdepth)`): the step-28 single-cell / mesh rule or the ball cover
+above, both with the joint loads and the engine margin, **and** QDEPTH ≥ Q + 2·W·H + 3. Progress argument: §7.8's,
+which now also excludes `err` = 1 (status 2). Still not covered: cycle limits, untyped jobs, `lm_mode` ≠ 2.
+
+**Closed forms** (`results/s30/seqs.py`, `cert_table.py`: exact Berlekamp–Massey with held-out terms, as §7.3;
+checked against direct counts at the benchmark sizes, `results/s30/direct.json`): sum / fact W_nodes 4N + 9, A 2N + 2,
+Q 22N + 24; list 20N + 23, 5N + 7, 130N + 77; higher 14N + 38, 4N + 5, 106N + 128; fib 16·F(N+1) − 3·F(N) − 3,
+4·F(N+1) − 2, 58·F(N+1) − 3·F(N) − 26; treesum 14·2^N − 2, 4·2^N − 2, 78·2^N − 41; treesum_direct 13/2·2^N − 1,
+2·2^N − 1, 53/2·2^N − 11 (B_vars as §7.3). sort / qsort_l keep the step-27 worst-case B box (no worst case over inputs is
+known for W_nodes or A; per-instance loads are used for their RTL runs).
+
+**Smallest certified cell for the benchmark size** (step 29 → step 30; `rgrad` 3 unless noted):
+
+| program (N) | 1×1 | 2×2 | 3×3 | 4×4 `rgrad` 6 | Q (task entries) |
+|---|---|---|---|---|---|
+| sum (1000) | 11,007 → 8,006 | 4,067 → 2,732 | 2,265 → 1,406 | 1,207 → 791 | 22,024 |
+| list (120) | 6,743 → 6,743 | 3,317 → 2,148 | 1,690 → 1,107 | 877 → 586 | 15,677 |
+| higher (100) | 4,443 → 4,443 | 2,235 → 1,510 | 1,149 → 792 | 606 → 431 | 10,728 |
+| fib (20) | 262,690 → 207,963 | 104,045 → **77,487** | 52,602 → **41,656** | 29,251 → 22,188 | 614,547 |
+| treesum (9) | 18,921 → 16,365 | 8,246 → 5,436 | 4,155 → 2,751 | 2,166 → 1,408 | 39,895 |
+| treesum_direct (14) | 196,600 → 147,451 | 73,789 → **53,315** | 39,384 → **29,554** | 21,128 → 15,282 | 434,165 |
+| sort (20), qsort_l (40) | unchanged (worst-case B box) | | | | per input |
+
+**treesum_direct(14) is now certified on a 2×2 mesh of 65,536-slot cells** (53,315 slots); fib(20) on 2×2 is not
+(77,487 > 65,536: B_vars = 207,963 alone needs 3 var-poor cells' worth). Certifiable N at 1,024 / 4,096 / 65,536 slots
+per mesh: `results/s30/cert_table.json` (`nmax`, with step 29's beside it).
+
+**Validation** (`results/s30/validate.py`, RTL audits `+pcert=r` and `+tcert=A`, simulation only, default off): `+tcert`
+checks every cycle that the stored task entries of all cells ≤ used_n + 2·used_v + A and records the peaks of
+wn·used_n + 8·used_v (wn = 0, 1, 2, …, 64: the hull at λ = wn/8). A certified run must finish with the right answer and
+interaction count, both audits clean, live nodes ≤ W_nodes + margin, live vars ≤ B_vars, every hull line, entries ≤ Q.
+See README step 30 for the run counts. **Uncertified boundary** (`val_boundary.jsonl`): a QDEPTH below the depth-first
+need ends in `err` 1 (status 2) on every run (sum(1000) at 512, list(120) at 64, fib(12) / treesum(7) at 16), and a 3×3
+mesh with 10 free slots per cell (90 in total, no cell roomy) stalls treesum(4) (status 3) with the audit counting
+no-room cycles throughout, while the same programs finish once one cell is roomy within reach.
+
+**Checker mutants** (`OMEGA_S30_MUT`, `tests/test_s30.py --mutants`): 1 hull cut below an attained point, 2 atom pairs
+left out of Q, 3 vars counted once in Q, 4 off by one at the load cap, 5 a cell poor only when nodes *and* vars are
+short, 6 ball one hop too wide, 7 stack not checked, 8 no engine margin: 8 / 8 caught (closed-set enumeration, brute-force
+witness, stack and margin checks).
+
 ## 8. Termination detection
 
 A cell is *idle* when its engine is in IDLE, its task stack is empty, its eject FIFO and outbox are

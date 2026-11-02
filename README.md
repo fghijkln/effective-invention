@@ -54,6 +54,9 @@ python3 tests/test_s25.py --fuzz 40      # symbolic B(N), W_vars, admission cont
 python3 tests/test_s26.py                # admission control in the RTL vs the fabric model (step 26)
 python3 tests/test_s27.py                # quicksort in Ω-L: bounds, closed forms, RTL at exactly B (step 27)
 python3 tests/test_s28.py                # 16-bit slots: high-slot runs, benchmark sizes certified at B (step 28)
+python3 tests/test_s29.py                # placement certificate, +pcert audit (step 29)
+python3 tests/test_s30.py                # joint loads + task-stack bound in the certificate, +tcert audit (step 30)
+python3 -m omega.joint fib:10            # W_nodes, B_vars, atom pairs A, hull, task-stack bound Q of one job
 python3 bench/bench.py --8x8             # results/bench.md
 bash tests/run_all.sh                    # everything except the benchmarks
 ```
@@ -78,6 +81,7 @@ def main = tsum(gen(N))
 | `omega/eal.py` | Ω-L (step 24): light-affine typed subset checker and compile-time peak-memory bound (`python3 -m omega.eal`) |
 | `omega/symbolic.py` | step 25: B_nodes(N) / B_vars(N) in closed form (exact Berlekamp–Massey + recurrence solving, certified on a range; envelope fallback) (`python3 -m omega.eal --symbolic`) |
 | `omega/causal.py` | causal bounds over all schedules: W_nodes (step 24) and W_vars (step 25, atomic links only) |
+| `omega/placement.py`, `omega/joint.py` | steps 29 / 30: placement certificate (room within `rgrad` hops of every cell); joint node + var loads (W_nodes, hull over causally closed sets) and the task-stack bound Q (`python3 -m omega.joint fib:10`) |
 | `omega/admission.py` | step 25: memory-bound admission control for multi-tenant jobs on the fabric model (`Scheduler`) |
 | `omega/adm_rtl.py`, `rtl/omega_adm.sv` | step 26: admission control in the RTL (controller beside the mesh, host port on cell (0,0); `+adm`, default off) |
 | `omega/randnet.py` | random interaction-net generator |
@@ -112,6 +116,8 @@ def main = tsum(gen(N))
 | step-28 mutants (`tests/test_s28.py --mutants`) | **2 / 2 caught** | allocated slot addresses truncated to 12 bits, OOB check on slot bits [11:0] only |
 | placement certificate (`tests/test_s29.py`, step 29) | **326 / 326** | certify = brute-force witness on 2,500 random meshes / radii / ballast shapes / loads, boundary loads, refused modes, admission budgets; certifiable-N table vs step 28; RTL with the `+pcert` audit: 8 programs at the largest N certified on 1,024-slot cells (2×2, 3×3 at `rgrad` 3 / 4, 3 knob sets), ballast shapes (corner room: certified at `rgrad` 4; the audit sees the uncertified `rgrad` 3 case), fib(20) / treesum_direct(14) on 3×3 at 52,602 / 39,384 slots; placement-budget admission, RTL = model |
 | step-29 mutants (`tests/test_s29.py --mutants`) | **8 / 8 caught** | watermark ignored, nodes and vars separately, `rgrad` ignored, `lm_lo` ≥ D_max not required, cost off by one, ball too wide, ballast ignored, budgets too generous |
+| joint loads + task stack (`tests/test_s30.py`, step 30) | **S30_FULL** | closed-set enumeration (tiny suite programs + 150 random DAGs) = min-cut W_nodes / B_vars / Φ(λ) / Q; semantic random schedules inside the loads and the task bound; certify vs brute-force witness (incl. boundary loads; certified ⇒ no witness); stack and engine-margin checks; fitted closed forms = direct counts at the benchmark sizes, every smallest cell ≤ step 29's, treesum_direct(14) on 2×2 ≤ 65,536; RTL: certified runs sound with `+pcert` / `+tcert`, QDEPTH 16 → status 2, a no-room mesh stalls, the audit off changes nothing |
+| step-30 mutants (`tests/test_s30.py --mutants`) | **8 / 8 caught** | hull cut below an attained point, atom pairs left out of Q, vars counted once in Q, off by one at the cap, a cell poor only when both are short, ball too wide, stack not checked, no engine margin |
 | mutation testing (`tests/mutants.py`) | **55 / 55 caught** | 15 functional mutants of the rule logic / protocol / quiescence + 1 performance mutant (no work distribution, caught by the speed-up bound) + 6 security mutants (each owner-capability check disabled, owner stamping missing, trap not blocking). Two mutants (eraser reaches only aux1; REF~DUP expands instead of copying) produce the *right* answer and are caught only by the node count / interaction count. That is why all three observables are compared. + 5 v3 engine mutants (read-ahead write bypass, write-queue drain, var owner-tag queue, allocation pop count, ROM read-ahead) + 2 memory-pressure mutants (caught by `tests/test_mempress.py`) + 3 cluster-ROM mutants (grant beyond the port count, EXPAND not waiting for its template word, stale buffered word) + 7 v4 mutants (second node write port not bypassed into the read-ahead, second EXPAND entry's var tag to the wrong slot, EXPAND skipping an entry, VHU without the same-slot stall, VHU hand-back never taken, VHU disabled = performance mutant caught by a fib(12) cycle bound, VHU read-ahead without bypass of write port 1) + 3 retry-slot mutants (39 parked retry never taken, 40 quiescence ignores the slot, 41 no escalation). Mutant 27 (roomy offload disabled) now survives on its own, because escalation also rescues every pressure case (roomy offload became a fast path); it is run together with 41 and caught. Mutant 28 (a full cell still asks for work) is tolerated by the step-19 full-cell pass-on on the quick pressure set, so since step 19 it runs on the full set and is caught by the global treesum(9) 3×3 case. + 3 step-11/12 performance mutants, each caught by its own bound: 42 spawn threshold ignored (qsort(20) 4×4 > 0.6 messages per interaction), 43 fork hint ignored (fib(12) 4×4 > 1.3× slower), 44 local-first link orientation disabled (treesum(7) 4×4 > 1.3× more LINKs) + 2 step-13 performance mutants: 45 producer hint ignored (qsort(30) 4×4 > 1.15× slower: 11,383 vs 9,118 cycles), 46 governor never tightens (qsort(30) 4×4 > 1.15× more messages per interaction: 0.529 vs 0.398) + 2 step-14 mutants: 47 oldest-fork give disabled (performance only: fib(16) 4×4 seed 1 > 1.05× slower, 8,254 vs 7,530 cycles; a treesum(7) bound let it survive at 1.04×, because the step-11 path still gives a fork task popped from an empty stack), 48 a fork task finding the deque full is dropped (caught by the program suite: fib(8) 2×2 loses work) + 2 step-19 mutants, each caught by the livelock / deadlock seeds that motivated the change at the new default: 49 room-distance gradient ignored (global treesum(9) 3×3 seeds 3 / 10 / 11 stop without progress), 50 full-cell pass-on off (since step 21 caught at the default `+rsv=1` by the ballast keep 0 / 8 cases fib(12) 2×2 and treesum(6) 3×2, which stop with status 3; step 19's global treesum(7) 8×8 seeds 16 / 18 stop only at `+rsv=4`) + 1 step-20 mutant: 51 slot reserve applied without a downhill neighbour (fib(10) on 1×1 with exactly the 93 free node / var slots its RTL run needs ends in status 2) + 1 step-22 mutant: 52 low-memory watermarks never engage (caught by the near-overfull treesum(9) 3×3 corner-500 case, RTL seed 9 stops with status 3) + 2 step-23 mutants: 53 the root is linked at once whatever `+ilr` says, 54 `+ilr=2` without the model's child order (both caught by the expansion-order pressure cases) |
 
 Strong confluence is the test oracle. Any schedule (arbitration, delays, stalls, task/message priority,
@@ -157,6 +163,67 @@ slower than one cell (sum(1000) on 1×1 needs a 4,096-slot cell: 29,018 cycles v
 step 12 the cost was qsort: on meshes it was 16–27% slower than with step 10's eager spreading,
 because its filter chains (lo/hi/app) stayed where they started; step 13 (next section) fixes that. treesum(9)
 on 8×8 varies ±20% with the arbitration seed; over seeds 1–4 the mean is 2,374 vs 2,470 for step 10.
+
+### Joint node + var loads and the task stack in the certificate (step 30)
+
+Step 29's certificate took the job's load as two separate numbers (B_nodes, B_vars) and did not cover the task stack.
+Step 30 (SPEC §7.9, `omega/joint.py`) does three things.
+
+* **Joint loads.** The interactions done by any moment form a causally closed set X of the event DAG; live nodes are
+  n(X) (exact) and live vars at most the vars allocated in X (the RTL frees vars on LINK arrival, which no event fixes).
+  So every (nodes, vars) pair a schedule can show lies under the hull λ·n + v ≤ Φ(λ) = max over closed X (one min cut
+  per λ). A ball can be made non-roomy only by a split of its poor costs that satisfies all of these; with no hull this
+  is step 29's ⌊L_n/m⌋ + ⌊L_v/m⌋ ≤ n_r − 1. RTL rules are not atomic, so the node load gets + 2 per cell.
+* **What a joint condition can and cannot buy.** For fib, treesum_direct, sum and fact the hull *is* the box
+  [0, W_nodes] × [0, B_vars]: one closed set (`joint.attainer`) reaches both maxima at once. For list, higher, treesum and
+  sort it is a few % inside. The floor-sum cover is already exact for a box, so the hoped-for "≈ 2× from combining nodes
+  and vars" is not there. The gain comes from W_nodes (causal, 0.25–0.6 × B_nodes) and the hull: **cells 1.26–1.55×
+  smaller**. Vars, counted as allocations, are now the binding term. Getting closer to 2× would need a var bound with
+  frees that holds in the RTL (W_vars holds only for atomic links).
+* **Task stack.** Every stored entry (stack, fork deque, retry slot) is a pending link of two ports. In a linear net a
+  node's principal port is held once and a var's ends twice, and an atom pair turns into exactly one atom–atom
+  interaction. So **entries over all cells ≤ n + 2v + A**, A = atom–atom interactions (schedule-free), and
+  Q = max over closed X of (n + 2v) + A + 1. One cell can hold every pending link, so the certificate requires
+  **QDEPTH ≥ Q + 2·W·H + 3**. This is sound but large: Q is 3–6× the job's slots (fib(20) 614,547; sum(1000) 22,024),
+  while runs use hundreds of entries.
+
+Smallest certified cell for the benchmark sizes, step 29 → step 30 (`results/s30/cert_table.py`; closed forms of W_nodes,
+A, Q and the hull fitted as in step 25 and checked against direct counts at these sizes):
+
+| program (N) | 1×1 | 2×2 | 3×3 | 4×4 `rgrad` 6 | Q |
+|---|---|---|---|---|---|
+| sum (1000) | 11,007 → 8,006 | 4,067 → 2,732 | 2,265 → 1,406 | 1,207 → 791 | 22,024 |
+| list (120) | 6,743 → 6,743 | 3,317 → 2,148 | 1,690 → 1,107 | 877 → 586 | 15,677 |
+| higher (100) | 4,443 → 4,443 | 2,235 → 1,510 | 1,149 → 792 | 606 → 431 | 10,728 |
+| fib (20) | 262,690 → 207,963 | 104,045 → 77,487 | 52,602 → 41,656 | 29,251 → 22,188 | 614,547 |
+| treesum (9) | 18,921 → 16,365 | 8,246 → 5,436 | 4,155 → 2,751 | 2,166 → 1,408 | 39,895 |
+| treesum_direct (14) | 196,600 → 147,451 | 73,789 → **53,315** | 39,384 → 29,554 | 21,128 → 15,282 | 434,165 |
+| sort (20), qsort_l (40) | unchanged: worst case over inputs is known only for B | | | | per input |
+
+**treesum_direct(14) is now certified on 2×2 × 65,536-slot cells; fib(20) is not** (it needs 77,487 slots, because
+B_vars = 207,963 alone takes three var-poor cells' worth).
+
+RTL validation (`results/s30/validate.py`; the simulation-only audits `+pcert` and `+tcert` are off by default; summary
+`results/s30/summarize.py`). `+tcert=A` checks every cycle that entries ≤ used_n + 2·used_v + A and records the hull
+peaks.
+* **small**: 8 programs at the largest N certified on 1,024-slot cells (2×2, 3×3 at `rgrad` 3 / 4, 4×4 at 6) × 4 knob
+  sets, QDEPTH 65,536: **128 / 128 sound**.
+* **hetero**: 3×3 with ballast: **43 / 43 certified runs sound**; the 21 uncertified runs all finished.
+* **big**: the benchmark sizes on the smallest certified cells, 2×2 / 3×3 / 4×4, 6 knob sets, QDEPTH 2^20, including
+  treesum_direct(14) 2×2 × 53,315 and fib(20) 3×3 × 41,656: see `val_big.jsonl` (all sound so far, final count in
+  `results/s30/STATUS.md`).
+
+On every certified run, live nodes reach at most 0.41 of the node load. That is much closer to the edge than step 29,
+where runs stayed 2.6–678× below. Task entries stay ≤ 1.5% of Q (at most 383 entries in all, 93 in one cell).
+
+**Uncertified boundary** (`val_boundary.jsonl`):
+* A QDEPTH below the depth-first need ends in `err` 1 (status 2) on every run: sum(1000) at 512, list(120) at 64,
+  fib(12) and treesum(7) at 16.
+* A 3×3 mesh with 10 free slots per cell (90 in total, no cell roomy) stalls treesum(4) (status 3), and the audit
+  counts no-room cycles throughout.
+* With room within reach the same programs finish.
+
+Tests: `tests/test_s30.py`, with mutants 8 / 8.
 
 ### A placement-aware memory certificate: bigger meshes certify bigger inputs (step 29)
 
@@ -1719,7 +1786,9 @@ What this says:
     still charges the whole-mesh all-schedule B, 2.6–678× the measured live load). Step 25 gives B as a closed form in N (exact for 7 of 8 suite programs), but certified only
     on the range it was counted on (beyond it: the C-finite argument), and sort's data-independent bound comes from a
     program-level argument, not from the tool. The causal var bound W_vars (step 25) holds for atomic links only, so
-    the fabric / RTL keep B_vars. The task stack is not bounded (atoms occupy no slot). Ω-L
+    the fabric / RTL keep B_vars. Step 30 bounds the task stack (entries over all cells ≤ n + 2v + A, SPEC §7.9) but only
+    globally, so the certificate wants QDEPTH ≥ Q, 3–6× the job's slots and ~10³× what runs use; and its joint loads
+    (W_nodes + hull) give 1.26–1.55×, not 2×, because vars stay at B_vars (allocation count). Ω-L
     rejects `qsort.olm` (it duplicates a list; step 27's rewrite `qsort_l.olm` is in Ω-L, but 32–36% slower on a 2×2 mesh), Church iteration (box depth 2), lexicographic recursion, defaults that
     alias the scrutinee and polymorphic constructor fields; a type variable counts as non-duplicable. No claim
     is made about the interaction-combinator oracle problem.
@@ -1743,7 +1812,8 @@ What this says:
    guarantee (SPEC §7.1); step 24 gives one statically for Ω-L programs, but at a slot count sized for the worst
    schedule, and step 25 admits jobs by it (fabric model). Tighter: a bound for a *restricted* schedule (e.g. the
    sequential peak, if a low-memory mode provably stops all gives), a fabric-sound var bound (W_vars plus a bound on
-   pending LINK tasks / messages), a bound that is tight for the depth-first fabric (step 29's placement certificate
+   pending LINK tasks / messages: since step 30 the binding term of the placement certificate, see SPEC §7.9; a per-cell
+   task-stack bound below the global Q, which needs a locality invariant for pending links), a bound that is tight for the depth-first fabric (step 29's placement certificate
    uses the whole-mesh load B; a schedule-restricted load would shrink every cell it needs), per-owner idle detection for the RTL admission controller (step 26 releases only at global quiescence) and a host
    unload for data results, a sized-type derivation of B(N) that needs no counting runs; a guarantee still needs bounding the peak by the sequential one (e.g. no gives at all
    once memory is low, which step 22 found the no-room forwarding path undoes) or spilling to off-fabric memory. The treesum(6) 3×3 +3.7% needs a signal that tells "the room is far from
@@ -1808,3 +1878,4 @@ What this says:
 * step 26: memory-bound admission control in the RTL (`rtl/omega_adm.sv`, `omega/adm_rtl.py`, SPEC §7.5: job table, 16-slot root pool in cell (0,0), FIFO, reservations, per-owner exclusion, start through a host port as a SPAWN of {REF @main, VAR root}, completion at mesh quiescence; `+adm`, default 0 = step 25 cycle for cycle); RTL and fabric-model scheduler agree on rejects, start order and interactions on 2×2 / 3×3 floods that stop without admission; step-26 tests 76/76, mutants 5/5; identity 128/128, units 42/42, programs 315/315, s14 90/90, fuzz 600/600 + big 200/200, security 420/420, mempress 60/60, mutants 55/55, Ω-L 597/597 + 7/7, step-25 2,749/2,749 + 6/6
 * step 27: quicksort in Ω-L (`programs/qsort_l.olm`, SPEC §7.6; `qsort.olm` unchanged): pair-returning partition, numeric fuel; worst case over all inputs B_nodes = 32·N² + 86·N + 17, B_vars = 59/2·N² + 141/2·N + 15 (attained by the descending input, proved by an exact data decomposition); RTL 1×1 with exactly B slots finishes; 0.78× qsort's interactions at N = 40 but +32–36% cycles on 2×2; step-27 tests 253/253
 * step 29: placement-aware memory certificate (`omega/placement.py`, SPEC §7.8): a roomy cell within `rgrad` hops of every cell while ⌊L_n / m⌋ + ⌊L_v / m⌋ ≤ n_r − 1 (m = S − `lm_hi` + 1, n_r = smallest `rgrad`-ball), exact cover check for ballast, independent brute force; fib(20) / treesum_direct(14) certified on 3×3 × 52,602 / 39,384-slot cells (4×4 `rgrad` 6: 29,251 / 21,128); RTL `+pcert` audit (simulation only), 448 certified RTL runs sound; placement-budget admission option (default off, RTL = model); test_s29 326/326, mutants 8/8; defaults cycle-identical
+* step 30: joint node + var loads and the task stack in the certificate (`omega/joint.py`, SPEC §7.9): W_nodes plus the hull λ·n + v ≤ Φ(λ) over causally closed sets (the box for fib / treesum_direct / sum / fact, a few % inside for list / higher / treesum / sort), engine margin 2 / cell; task entries ≤ n + 2v + A, QDEPTH ≥ Q + 2WH + 3; cells 1.26–1.55× smaller (not 2×: vars stay B_vars); treesum_direct(14) certified on 2×2 × 53,315 (fib(20) 2×2 needs 77,487); RTL `+tcert` audit (simulation only); certified RTL runs sound; uncertified QDEPTH below need → status 2, no-room 3×3 stalls; test_s30, mutants 8/8; defaults cycle-identical
