@@ -1,0 +1,33 @@
+step 29: placement-aware memory certificate
+  checker: certify = no brute-force witness on 2500 random instances; boundaries; refused modes; 60 budget pairs sound
+  load: the certificate charges B (>= the depth-first peak), not a measured peak
+  table: N_max per cell size, 1x1 (step 28) / 2x2 / 3x3:
+    sum            1024: 92/239/436  4096: 371/1007/1832  65536: 5957/16367/29759
+    fact           1024: 92/239/436  4096: 371/1007/1832  65536: 5957/16367/29759
+    list           1024: 17/35/70  4096: 72/148/298  65536: 1169/2424/4849
+    higher         1024: 22/43/88  4096: 92/186/374  65536: 1488/3044/6089
+    fib            1024: 8/10/11  4096: 11/13/14  65536: 17/19/20
+    treesum        1024: 4/5/6  4096: 6/7/8  65536: 10/11/12
+    treesum_direct 1024: 6/7/8  4096: 8/9/10  65536: 12/13/14
+    sort           1024: 6/9/14  4096: 14/22/32  65536: 64/96/137
+    qsort_l        1024: 4/6/10  4096: 10/15/22  65536: 43/65/93
+  RTL sum: 1x1 certifies N <= 92 at 1,024 slots; 2x2 N = 239, 3x3 N = 436, 3x3 rgrad 4 N = 479 run certified (3 knob sets each)
+  RTL list: 1x1 certifies N <= 17 at 1,024 slots; 2x2 N = 35, 3x3 N = 70, 3x3 rgrad 4 N = 85 run certified (3 knob sets each)
+  RTL higher: 1x1 certifies N <= 22 at 1,024 slots; 2x2 N = 43, 3x3 N = 88, 3x3 rgrad 4 N = 108 run certified (3 knob sets each)
+  RTL fib: 1x1 certifies N <= 8 at 1,024 slots; 2x2 N = 10, 3x3 N = 11, 3x3 rgrad 4 N = 11 run certified (3 knob sets each)
+  RTL treesum: 1x1 certifies N <= 4 at 1,024 slots; 2x2 N = 5, 3x3 N = 6, 3x3 rgrad 4 N = 7 run certified (3 knob sets each)
+  RTL treesum_direct: 1x1 certifies N <= 6 at 1,024 slots; 2x2 N = 7, 3x3 N = 8, 3x3 rgrad 4 N = 8 run certified (3 knob sets each)
+  RTL sort: 1x1 certifies N <= 6 at 1,024 slots; 2x2 N = 9, 3x3 N = 14, 3x3 rgrad 4 N = 15 run certified (3 knob sets each)
+  RTL qsort_l: 1x1 certifies N <= 4 at 1,024 slots; 2x2 N = 6, 3x3 N = 10, 3x3 rgrad 4 N = 10 run certified (3 knob sets each)
+  RTL ballast fib(7) 3x3 (8 free slots in 8 cells): room in the corner certified at rgrad 4 (status 0, audit 0), uncertified at rgrad 3 (audit 1396 cell-cycles without room in reach, status 0); room in the centre certified at rgrad 3
+  RTL ballast treesum(4) 3x3 (8 free slots in 8 cells): room in the corner certified at rgrad 4 (status 0, audit 0), uncertified at rgrad 3 (audit 1526 cell-cycles without room in reach, status 0); room in the centre certified at rgrad 3
+  RTL ballast sum(60) 3x3 (8 free slots in 8 cells): room in the corner certified at rgrad 4 (status 0, audit 0), uncertified at rgrad 3 (audit 1840 cell-cycles without room in reach, status 0); room in the centre certified at rgrad 3
+  RTL ballast list(12) 3x3 (8 free slots in 8 cells): room in the corner certified at rgrad 4 (status 0, audit 0), uncertified at rgrad 3 (audit 1981 cell-cycles without room in reach, status 0); room in the centre certified at rgrad 3
+  RTL fib(20) 3x3 x 52602 slots (smallest certified; one cell would need 262690): status 0, 79957 cycles, live peak (748, 1179) vs L (262690, 207963), largest per-cell peak 267 (143s)
+  RTL fib(20) 3x3 x 52602 slots (smallest certified; one cell would need 262690): status 0, 80011 cycles, live peak (721, 1242) vs L (262690, 207963), largest per-cell peak 240 (11s)
+  RTL fib(20) 3x3 x 52602 slots (smallest certified; one cell would need 262690): status 0, 88498 cycles, live peak (1193, 1744) vs L (262690, 207963), largest per-cell peak 353 (12s)
+  RTL treesum_direct(14) 3x3 x 39384 slots (smallest certified; one cell would need 196600): status 0, 60309 cycles, live peak (323, 720) vs L (196600, 147451), largest per-cell peak 129 (10s)
+  RTL treesum_direct(14) 3x3 x 39384 slots (smallest certified; one cell would need 196600): status 0, 60203 cycles, live peak (372, 928) vs L (196600, 147451), largest per-cell peak 174 (8s)
+  RTL treesum_direct(14) 3x3 x 39384 slots (smallest certified; one cell would need 196600): status 0, 66833 cycles, live peak (551, 1028) vs L (196600, 147451), largest per-cell peak 221 (10s)
+  admission 3x3 x 2048: per-cell budgets (2019, 2019) (2 rejected, 1 jobs at once, 25316 cycles) vs placement budgets (5954, 11909) (7 at once, 11621 cycles, model audit clean); RTL controller with the same budgets: order = model, 14558 interactions, 6986 cycles
+step 29 tests: 326/326 pass (568s)
