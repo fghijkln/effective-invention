@@ -1,0 +1,2 @@
+mutant 27 CAUGHT  memory pressure: roomy neighbours ignored (no PULL / NODE offload); run with bit 41 (no escalation) because since step 10 escalation alone also rescues every pressure case (alone: survives) -- ballast list(20) 2x2 keep 8/8: wrong result / timeout
+mutants: 1/1 caught

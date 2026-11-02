@@ -1,0 +1,2 @@
+mutant 12 CAUGHT  eraser only reaches aux1 -- prog fib(8) on 2x2: got #21 / 835 interactions / 33 nodes, want #21 / 901 / 0
+mutants: 1/1 caught

@@ -1,0 +1,2 @@
+mutant 21 CAUGHT  security: node slot owner-tag check disabled -- attack erase the victim's result node on 2x2 fi=0: honest result / trap set differs (rtl traps [], semantic [(2, 9)])
+mutants: 1/1 caught

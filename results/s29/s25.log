@@ -1,0 +1,28 @@
+symbolic B(N): suite
+  fib: N 0..20 (+2 beyond): nodes 24·F(N+1) - 14 | vars 19·F(N+1) - 11  [exact]
+  sum: N 0..40 (+4 beyond): nodes 11·N + 7 | vars 8·N + 6  [exact]
+  fact: N 0..40 (+4 beyond): nodes 11·N + 7 | vars 8·N + 6  [exact]
+  list: N 0..40 (+4 beyond): nodes 54·N + 27 | vars 56·N + 23  [exact]
+  higher: N 0..40 (+4 beyond): nodes 43·N + 42 | vars 44·N + 43  [exact]
+  treesum: N 0..12 (+1 beyond): nodes 37·2^N - 23 | vars 32·2^N - 19  [exact]
+  treesum_direct: N 0..14 (+2 beyond): nodes 12·2^N - 8 | vars 9·2^N - 5  [exact]
+  sort: N 0..40 (+0 beyond): nodes 183/19·N^2 + 1125/19·N + 24 | vars 4419/494·N^2 + 25603/494·N + 20  [envelope]
+  sort_desc: N 0..40 (+3 beyond): nodes 29/2·N^2 + 97/2·N + 24 | vars 27/2·N^2 + 85/2·N + 20  [exact]
+  sort_asc: N 0..40 (+3 beyond): nodes 84·N + 3 | vars 74·N + 2  [exact]
+symbolic B(N): fuzz 40
+  40 programs: exact 38, envelope 2, none 0; by size argument {'gen': {'exact': 16, 'envelope': 2}, 'nlin': {'exact': 5}, 'tgen': {'exact': 12}, 'nrec': {'exact': 5}}
+causal bound W_vars
+  fib(8): vars peak 286 <= W 476 <= B 635 (B/W 1.33); nodes W 478 B 802
+  sum(40): vars peak 52 <= W 247 <= B 326 (B/W 1.32); nodes W 169 B 447
+  fact(12): vars peak 27 <= W 79 <= B 102 (B/W 1.29); nodes W 57 B 139
+  list(12): vars peak 112 <= W 450 <= B 695 (B/W 1.54); nodes W 263 B 675
+  sort(10): vars peak 108 <= W 536 <= B 1237 (B/W 2.31); nodes W 202 B 1373
+  higher(12): vars peak 114 <= W 386 <= B 571 (B/W 1.48); nodes W 206 B 558
+  treesum(5): vars peak 363 <= W 661 <= B 1005 (B/W 1.52); nodes W 446 B 1161
+  treesum_direct(6): vars peak 446 <= W 508 <= B 571 (B/W 1.12); nodes W 415 B 760
+admission control (fabric model)
+  flood 180 jobs, 2x2 x 280: without admission stall after 49141 cycles (0 finished); with admission (W) ok, 180/180 admitted jobs correct, 0 rejected (bound > budget), 176707 cycles, peak live (68, 96), max reserved (129, 246) of (252, 252)
+  flood 180 jobs, 2x2 x 280: without admission stall after 49141 cycles (0 finished); with admission (B) ok, 120/120 admitted jobs correct, 60 rejected (bound > budget), 100202 cycles, peak live (64, 83), max reserved (227, 219) of (252, 252)
+  flood 300 jobs, 3x3 x 280: without admission stall after 62895 cycles (0 finished, peak live (1679, 2515)); with admission ok, 300/300 correct, 281480 cycles
+  reject / queue / untyped / 1x1: ok, ok, ok, ok
+step 25 tests: 2749/2749 pass (296s)

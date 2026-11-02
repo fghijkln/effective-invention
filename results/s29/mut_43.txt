@@ -1,0 +1,2 @@
+mutant 43 CAUGHT  spawn policy: fork hint ignored (divide-and-conquer REFs held back by the threshold; performance only: caught by the speed-up bound) -- fib(12) 4x4 cycles 2510 with the mutant vs 1623 (bound: > 1.3x)
+mutants: 1/1 caught

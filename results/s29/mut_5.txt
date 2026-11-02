@@ -1,0 +1,2 @@
+mutant  5 CAUGHT  annihilation cross-wires aux1 with aux2 -- prog fib(8) on 2x2: got {1 x0 $(< #2 ?((@fib__a1 (* (x1 x1))) (x0 ^loop)))} / 2 interactions / 7 nodes, want #21 / 901 / 0
+mutants: 1/1 caught

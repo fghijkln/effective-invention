@@ -1,0 +1,2 @@
+mutant 50 CAUGHT  step 19 full-cell pass-on off (a NODE / PULL at the ejection head of a cell with no free node slot blocks it again; caught since step 21 at the default +rsv=1 by mempress ballast keep 0/8, a home cell with no free node slot: fib(12) 2x2, treesum(6) 3x2 stop with status 3; step 19's global treesum(7) 8x8 seeds 16 / 18 only stop at +rsv=4) -- ballast keep 0/8 at the default +rsv=1: fib(12) 2x2 status 3, treesum(6) 3x2 status 3 stop with the mutant
+mutants: 1/1 caught

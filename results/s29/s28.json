@@ -1,0 +1,287 @@
+{
+ "high_fib_10_2x2_8192": {
+  "status": 0,
+  "cycles": 1783,
+  "interactions": 2386
+ },
+ "high_treesum_6_2x2_8192": {
+  "status": 0,
+  "cycles": 2053,
+  "interactions": 2282
+ },
+ "high_qsort_15_2x2_16384": {
+  "status": 0,
+  "cycles": 5497,
+  "interactions": 3680
+ },
+ "high_list_20_3x2_8192": {
+  "status": 0,
+  "cycles": 1642,
+  "interactions": 1069
+ },
+ "high_sort_10_2x2_65536": {
+  "status": 0,
+  "cycles": 3023,
+  "interactions": 1185
+ },
+ "high_treesum_direct_7_2x2_8192": {
+  "status": 0,
+  "cycles": 1330,
+  "interactions": 1910
+ },
+ "high_higher_12_1x1_65536": {
+  "status": 0,
+  "cycles": 1565,
+  "interactions": 497
+ },
+ "certify": {
+  "qsort_l(40)": {
+   "B": [
+    13212,
+    11947
+   ],
+   "slots_1x1": 13212,
+   "slots_mesh": 13241,
+   "rtl_1x1": {
+    "status": 0,
+    "peak": [
+     292,
+     592
+    ],
+    "cycles": 34649,
+    "max_task_stack": 168
+   },
+   "rtl_2x2_mesh": {
+    "slots": 13241,
+    "status": 0,
+    "cycles": 20941
+   }
+  },
+  "list(120)": {
+   "B": [
+    6507,
+    6743
+   ],
+   "slots_1x1": 6743,
+   "slots_mesh": 6768,
+   "rtl_1x1": {
+    "status": 0,
+    "peak": [
+     1210,
+     2172
+    ],
+    "cycles": 19024,
+    "max_task_stack": 601
+   }
+  },
+  "sum(1000)": {
+   "B": [
+    11007,
+    8006
+   ],
+   "slots_1x1": 11007,
+   "slots_mesh": 11029,
+   "rtl_1x1": {
+    "status": 0,
+    "peak": [
+     1007,
+     3008
+    ],
+    "cycles": 29018,
+    "max_task_stack": 1005
+   },
+   "rtl_2x2_mesh": {
+    "slots": 11029,
+    "status": 0,
+    "cycles": 29008
+   }
+  },
+  "sort(20)": {
+   "B": [
+    4889,
+    4470
+   ],
+   "slots_1x1": 4889,
+   "slots_mesh": 4916,
+   "rtl_1x1": {
+    "status": 0,
+    "peak": [
+     152,
+     248
+    ],
+    "cycles": 13052,
+    "max_task_stack": 100
+   }
+  },
+  "higher(100)": {
+   "B": [
+    4342,
+    4443
+   ],
+   "slots_1x1": 4443,
+   "slots_mesh": 4471,
+   "rtl_1x1": {
+    "status": 0,
+    "peak": [
+     716,
+     1519
+    ],
+    "cycles": 12257,
+    "max_task_stack": 501
+   }
+  },
+  "treesum(9)": {
+   "B": [
+    18921,
+    16365
+   ],
+   "slots_1x1": 18921,
+   "slots_mesh": 18943,
+   "rtl_1x1": {
+    "status": 0,
+    "peak": [
+     281,
+     463
+    ],
+    "cycles": 49199,
+    "max_task_stack": 38
+   },
+   "rtl_2x2_mesh": {
+    "slots": 18943,
+    "status": 0,
+    "cycles": 13269
+   }
+  },
+  "fact(20)": {
+   "B": [
+    227,
+    166
+   ],
+   "slots_1x1": 227,
+   "slots_mesh": 249,
+   "rtl_1x1": {
+    "status": 0,
+    "peak": [
+     27,
+     68
+    ],
+    "cycles": 598,
+    "max_task_stack": 25
+   }
+  },
+  "fib(17)": {
+   "B": [
+    62002,
+    49085
+   ],
+   "slots_1x1": 62002,
+   "slots_mesh": 62026,
+   "rtl_1x1": {
+    "status": 0,
+    "peak": [
+     87,
+     128
+    ],
+    "cycles": 164752,
+    "max_task_stack": 34
+   }
+  },
+  "treesum_direct(12)": {
+   "B": [
+    49144,
+    36859
+   ],
+   "slots_1x1": 49144,
+   "slots_mesh": 49165,
+   "rtl_1x1": {
+    "status": 0,
+    "peak": [
+     42,
+     93
+    ],
+    "cycles": 130549,
+    "max_task_stack": 30
+   }
+  },
+  "treesum(10)": {
+   "B": [
+    37865,
+    32749
+   ],
+   "slots_1x1": 37865,
+   "slots_mesh": 37887,
+   "rtl_1x1": {
+    "status": 0,
+    "peak": [
+     538,
+     853
+    ],
+    "cycles": 98657,
+    "max_task_stack": 42
+   }
+  },
+  "fib(20)": {
+   "B": [
+    262690,
+    207963
+   ],
+   "slots_1x1": 262690,
+   "fits": false
+  },
+  "treesum_direct(14)": {
+   "B": [
+    196600,
+    147451
+   ],
+   "slots_1x1": 196600,
+   "fits": false
+  }
+ },
+ "big_admission": {
+  "jobs": [
+   [
+    "treesum",
+    9
+   ],
+   [
+    "qsort_l",
+    40
+   ],
+   [
+    "list",
+    120
+   ],
+   [
+    "sum",
+    1000
+   ],
+   [
+    "sort",
+    20
+   ],
+   [
+    "higher",
+    100
+   ],
+   [
+    "fact",
+    20
+   ]
+  ],
+  "budget": [
+   19971,
+   19971
+  ],
+  "rtl_cycles": 70258,
+  "python_cycles": 113272,
+  "interactions": 56692,
+  "max_reserved": [
+   7166,
+   18690
+  ],
+  "peak_live": [
+   1007,
+   1045
+  ]
+ }
+}

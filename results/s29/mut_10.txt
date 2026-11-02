@@ -1,0 +1,2 @@
+mutant 10 CAUGHT  NODE migration: aux ports swapped when re-homed -- prog fib(8) on 2x2: got STATUS 3 err 0 / 1917 interactions / 2806 nodes, want #21 / 901 / 0
+mutants: 1/1 caught

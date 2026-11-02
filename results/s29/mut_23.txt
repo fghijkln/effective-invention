@@ -1,0 +1,2 @@
+mutant 23 CAUGHT  v4 S_WQ: second queued node write dropped (a commutation copy never written) -- prog list(6) on 2x2: got x0 / 270 interactions / 26 nodes, want #97 / 341 / 0
+mutants: 1/1 caught

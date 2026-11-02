@@ -1,0 +1,2 @@
+mutant 16 CAUGHT  security: var slot owner-tag check disabled (forged VAR pointers accepted) -- attack steal-result: write a forged result into the victim's root var on 2x2 fi=0: honest result / trap set differs (rtl traps [], semantic [(2, 9)])
+mutants: 1/1 caught

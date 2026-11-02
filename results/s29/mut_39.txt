@@ -1,0 +1,2 @@
+mutant 39 CAUGHT  retry slot: a parked retry is never taken again (lost work / hang) -- ballast fib(12) 2x2 keep 4/200: wrong result / timeout
+mutants: 1/1 caught

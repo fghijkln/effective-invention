@@ -20,3 +20,8 @@ step 28: 16-bit slot field, certified benchmark sizes
   certified treesum(10) on RTL 1x1 with exactly B = (37865, 32749) free slots: status 0, peak (538, 853) = B / (70, 38), task stack 42, 98657 cycles (36s)
   certified treesum(9) on RTL 2x2 with slots_mesh = 18943 free slots in every cell: status 0, 13269 cycles (59s)
   certified qsort_l(40) on RTL 2x2 with slots_mesh = 13241 free slots in every cell: status 0, 20941 cycles (56s)
+  certified sum(1000) on RTL 2x2 with slots_mesh = 11029 free slots in every cell: status 0, 29008 cycles (55s)
+  fib(20): B = (262690, 207963) > 65,536: not certifiable on one cell
+  treesum_direct(14): B = (196600, 147451) > 65,536: not certifiable on one cell
+  admission with 2x2 x 20000 cells (root pool at slots 20000..20015): 7/7 jobs correct, start order [0, 1, 2, 3, 4, 5, 6] = model, 56692 interactions, 70258 cycles (model 113272), max reserved (7166, 18690) of (19971, 19971), peak live (1007, 1045) (68s)
+step 28 tests: 129/129 pass (1017s)

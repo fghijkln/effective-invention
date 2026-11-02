@@ -1,0 +1,2 @@
+mutant 14 CAUGHT  commutation: two fresh wires share one var -- prog list(6) on 2x2: got STATUS 3 err 0 / 1598 interactions / 2746 nodes, want #97 / 341 / 0
+mutants: 1/1 caught

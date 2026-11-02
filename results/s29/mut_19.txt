@@ -1,0 +1,2 @@
+mutant 19 CAUGHT  security: expansion does not stamp the tenant's owner (ROM owner 0 leaks into tenants) -- demo fib(12) || qsort(15) on 2x2 fi=0: honest result / trap set differs (rtl traps [(1, 0)], semantic [])
+mutants: 1/1 caught

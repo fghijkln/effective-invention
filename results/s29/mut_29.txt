@@ -1,0 +1,2 @@
+mutant 29 CAUGHT  cluster ROM: arbiter grants more requesters than it has read ports (they get another cell's data) -- prog fib(8) on 2x2: got STATUS 3 err 0 / 5797 interactions / 2525 nodes, want #21 / 901 / 0
+mutants: 1/1 caught

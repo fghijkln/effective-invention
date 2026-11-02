@@ -1,0 +1,2 @@
+mutant 52 CAUGHT  step 22 low-memory watermarks never engage (roomy stays SLOTS/4, reserve stays rsv; caught by the near-overfull treesum(9) 3x3 case, corner 500 free slots, RTL seed 9, which stops with status 3) -- near treesum(9) 3x3 corner 500 RTL seed 9: status 3
+mutants: 1/1 caught

@@ -1,0 +1,2 @@
+mutant 18 CAUGHT  security: out-of-bounds pointer check disabled -- attack out-of-bounds slot on 2x2 fi=0: honest result / trap set differs (rtl traps [(2, 9)], semantic [(3, 9)])
+mutants: 1/1 caught

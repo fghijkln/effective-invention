@@ -1,0 +1,6 @@
+  mutant 60 (admission ignores the running jobs' reservations): caught  [FAIL flood_2x2_W: rtl audit violations 37805 first [('viol', 6, 1, 1, 239, 387, 279)]]
+  mutant 61 (no reject check (over-budget jobs admitted)): caught  [FAIL reject: python ok 18/19 None]
+  mutant 62 (two jobs of one owner may run at once): caught  [FAIL owners: jobs of one owner overlap (owners [0, 1, 2])]
+  mutant 63 (root var not reset before a start): caught  [FAIL flood_2x2_W: rtl status 0 blocked True 0/180 correct]
+  mutant 64 (reservations never released): caught  [FAIL flood_2x2_W: rtl status 0 blocked True 1/180 correct]
+s26 mutants: 5/5 caught

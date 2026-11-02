@@ -1,0 +1,2 @@
+mutant 37 CAUGHT  VHU disabled (performance only: main engine follows every chain; caught by the cycle bound) -- fib(12) 1x1 cycles 17892 with the mutant vs 14849 (bound: > 1.1x)
+mutants: 1/1 caught

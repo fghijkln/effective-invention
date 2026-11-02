@@ -1,0 +1,2 @@
+mutant 28 CAUGHT  memory pressure: hungry does not require roomy (a full cell still asks for work); since step 19 the full-cell pass-on tolerates it on the quick pressure set, so it runs on the full set and is caught by the step-19 global treesum(9) 3x3 case -- global treesum(9) 3x3 keep 8/8 in 8 cells: wrong result / timeout
+mutants: 1/1 caught
