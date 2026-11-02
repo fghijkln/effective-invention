@@ -18,3 +18,11 @@
   rest, then test_s30 full), lane2.sh (id8, idcmp, units, programs, s14). Regression reuse: since c2eb892 the RTL change
   is an extra audit output port + a +tcert-gated sim block; Python change is a new module only (omega/joint.py), so the
   step-29 results for fuzz/bigfuzz/security/mempress/mutants 55/Ω-L/s25-s29 carry over (identity re-checked cycle-for-cycle).
+- 21:15: val_big 138/138 sound (all 138 big jobs done) -> 309/309 certified RTL runs sound in all; test_s30 full 1856/1856
+  (280 s); validation.md (results/s30/report.py) with smallest-cell and certifiable-N tables vs step 29. wip 3 d3f5de7
+  (CI 41452499442 success), wip 4 d7c8079 (README totals).
+- 21:55 rerun on step-30 code at defaults: identity 128/128 (id4 64 + id8 64 cycle-identical to step 15), units 42/42,
+  programs 315/315, s14 90/90, fuzz 600/600, mempress 60/60, test_s29 326/326. Sandbox restarted again ~21:56 (toolchain
+  rebuilt, tc3.log); security + bigfuzz relaunched (lane5/lane6). Carried over from step 29 (c2eb892, same default RTL
+  behaviour): RTL mutants 55/55, Ω-L 597/597 + 7/7, s25 2749/2749 + 6/6, s26 76/76 + 5/5, s27 253/253, s28 129/129 + 2/2,
+  s29 mutants 8/8.
