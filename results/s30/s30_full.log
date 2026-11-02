@@ -1,0 +1,6 @@
+step 30: joint loads, task stack, certificate
+  hull: 9 suite programs + 150 random DAGs enumerated
+  semantic: 10200 steps, 0 outside
+  checker: 1500 cases, 0 unsound required (0), exact 1489/1500
+  table: treesum_direct(14) 2x2 53315, fib(20) 2x2 77487
+step 30 tests: 1856/1856 pass (280s)

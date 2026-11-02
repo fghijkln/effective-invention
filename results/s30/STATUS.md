@@ -11,3 +11,10 @@
 - RTL validation lanes: small+hetero (ob1), boundary+big (ob2). Boundary: QDEPTH below need -> status 2; 3x3 with 10 free
   slots per cell (no roomy cell) -> treesum(4) stalls (status 3). treesum_direct(14) 2x2 x 53,315 runs sound.
 - tests/test_s30.py --ci 1850/1850.
+- 20:20: executor crashed; 20:35 resumed (wip 38eba1f + a7db455 already on origin/main). Sandbox had restarted
+  (toolchain rebuilt, results/s30/tc2.log). Done before crash: val_small 128/128, val_hetero 43/43 certified sound
+  (21 uncertified finished), val_boundary 37 (all uncertified: QDEPTH-below-need -> status 2 in 8/10, frag10 treesum(4) ->
+  status 3), val_big 118/118 sound, s30 checker mutants 8/8 (mut.log), id4 64 runs. Lanes relaunched: lane1.sh (val_big
+  rest, then test_s30 full), lane2.sh (id8, idcmp, units, programs, s14). Regression reuse: since c2eb892 the RTL change
+  is an extra audit output port + a +tcert-gated sim block; Python change is a new module only (omega/joint.py), so the
+  step-29 results for fuzz/bigfuzz/security/mempress/mutants 55/Ω-L/s25-s29 carry over (identity re-checked cycle-for-cycle).

@@ -1,0 +1,9 @@
+  mutant 1 (hull cut below what a closed set attains): caught  [FAIL fib(1): Phi(0) 7 != brute 8]
+  mutant 2 (atom pairs left out of the stack bound): caught  [FAIL fib(1): Q 26 != brute 28]
+  mutant 3 (vars counted once in the stack bound): caught  [FAIL fib(1): Q 20 != brute 28]
+  mutant 4 (off by one at the load cap): caught  [FAIL checker: 26 certified configurations have a witness]
+  mutant 5 (a cell poor only if nodes AND vars short): caught  [FAIL checker: 181 certified configurations have a witness]
+  mutant 6 (ball one hop too wide): caught  [FAIL checker: 34 certified configurations have a witness]
+  mutant 7 (stack not checked): caught  [FAIL stack check 1x1]
+  mutant 8 (no engine margin): caught  [FAIL qdepth_needed 1x1: 1886]
+s30 mutants: 8/8 caught

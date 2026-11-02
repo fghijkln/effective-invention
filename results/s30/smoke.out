@@ -1,0 +1,3 @@
+fib 8 2 2 0 #21 {'tcert_viol': 0, 'tcert_peak': 39, 'tcert_cell': 15, 'tcert_slack': 138, 'cycles': 832} Q 1883
+treesum 4 3 3 0 #16 {'tcert_viol': 0, 'tcert_peak': 26, 'tcert_cell': 7, 'tcert_slack': 64, 'cycles': 527} Q 1207
+sum 50 1 1 0 #1275 {'tcert_viol': 0, 'tcert_peak': 55, 'tcert_cell': 55, 'tcert_slack': 104, 'cycles': 1468} Q 1124
