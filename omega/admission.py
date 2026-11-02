@@ -57,6 +57,18 @@ class Job:
         self.state, self.t_submit, self.t_start, self.t_end, self.result = "new", None, None, None, None
 
 
+def placement_budget(jobs, W, H, slots):
+    """Step 29 (SPEC 7.8): (margin, (budget_n, budget_v)) from the placement certificate: margin 0 and per-resource
+    budgets split from the smallest rgrad-ball in the ratio of the typed jobs' total (nodes, vars) reservations
+    (omega/placement.budgets), so that any reserved sums within them satisfy the certificate.  Shared by the model
+    scheduler and the RTL host (omega/adm_rtl.py) so both admit identically."""
+    from . import placement as PL
+    tn = sum(j.need[0] for j in jobs if j.typed); tv = sum(j.need[1] for j in jobs if j.typed)
+    b = PL.budgets(W, H, slots, mix=(tn, tv))
+    if b is None: raise ValueError("no placement certificate for this mesh / mode (1x1, rgrad 0 or lm_mode != 2)")
+    return 0, b
+
+
 def merge_unique(jobs):
     """One merged book in which jobs with the same source share one copy of their definitions; sets j.main."""
     srcs = list(dict.fromkeys(j.src for j in jobs))
@@ -68,8 +80,9 @@ def merge_unique(jobs):
 class Scheduler:
     """Runs jobs on a fabric model.  admit=True: memory-bound admission; False: every job loaded at cycle 0."""
 
-    def __init__(self, jobs, W, H, slots, admit=True, seed=1, stall=20000, max_cycles=2_000_000, dedupe=False, **fab_kw):
+    def __init__(self, jobs, W, H, slots, admit=True, seed=1, stall=20000, max_cycles=2_000_000, dedupe=False, placement=False, **fab_kw):
         self.jobs, self.W, self.H, self.slots, self.admit = jobs, W, H, slots, admit
+        self.placement = placement and W * H > 1
         if dedupe: self.book = merge_unique(jobs)        # step 26: jobs with one source share their definitions (RTL ROM)
         else:
             self.book, mains = ir.merge_books([j.book for j in jobs])
@@ -77,6 +90,8 @@ class Scheduler:
         self.dmax = max(max(len(d.nodes), d.nvars) for d in self.book.defs)
         self.margin = 0 if W * H == 1 else self.dmax + max(fabric.LM_RSV, fabric.RSV)
         self.budget = (slots - self.margin, slots - self.margin)
+        if self.placement:                               # step 29 (SPEC 7.8): placement-certificate budgets, no per-cell margin
+            self.margin, self.budget = placement_budget(jobs, W, H, slots)
         img = fabric.Image(self.book, W, H, slots, 1024, tenants=[{"owner": 0, "main": jobs[0].main}])
         for c in img.nodes:                              # an empty image: every job is loaded by load()
             img.nodes[c] = [None] * slots; img.vars[c] = [None] * slots
@@ -205,6 +220,13 @@ class Scheduler:
         lv = sum(len(c.vars) - len(c.vfree) for c in self.fab.cells.values())
         if ln > self.reserved[0] or lv > self.reserved[1]:
             return f"cycle {self.fab.cycles}: live {ln}/{lv} > reserved {self.reserved[0]}/{self.reserved[1]}"
+        if self.placement:                               # step 29: the certificate's conclusion (a roomy cell near every cell)
+            from . import placement as PL
+            fr = {xy: min(len(c.nfree), len(c.vfree)) for xy, c in self.fab.cells.items()}
+            for xy in fr:
+                if max(fr[d] for d in PL.ball(self.W, self.H, xy, fabric.RGRAD)) < fabric.LM_HI:
+                    return f"cycle {self.fab.cycles}: no cell within {fabric.RGRAD} hops of {xy} has {fabric.LM_HI} free slots"
+            return None
         if self.margin:
             mf = min(min(len(c.nfree), len(c.vfree)) for c in self.fab.cells.values())
             if mf < self.margin: return f"cycle {self.fab.cycles}: a cell has only {mf} free slots (margin {self.margin})"

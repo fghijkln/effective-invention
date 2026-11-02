@@ -14,4 +14,5 @@ python3 tests/test_s25.py --quick
 python3 tests/test_s26.py --ci
 python3 tests/test_s27.py --quick --no-rtl
 python3 tests/test_s28.py --ci
+python3 tests/test_s29.py --ci
 echo CI_QUICK_OK

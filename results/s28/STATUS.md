@@ -9,3 +9,4 @@
 - 06:15: sandbox restarted ~05:57 (lane B at mutant 29, lane C in s27); lanes B and C relaunched (B rebuilds toolchain, C waits for it). Lane A ALLDONE: + mempress 60/60.
 - 06:35: s27 253/253, s26 mutants 5/5, RTL mutants through 43 caught; s26 + mutants 44+ running.
 - 06:50: full regression green: identity 128/128, units 42/42, programs 315/315, s14 90/90, fuzz 600/600, bigfuzz 200/200, security 420/420, mempress 60/60, mutants 55/55, s28 129/129 + 2/2, eal 597/597 + 7/7, s25 2749/2749 + 6/6, s26 76/76 + 5/5, s27 253/253. Committing step 28.
+- 07:00: final 9962976 CI 41358908424 success. Step 28 done.

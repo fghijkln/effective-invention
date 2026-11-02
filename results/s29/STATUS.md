@@ -1,0 +1,5 @@
+# Step 29 status: placement-aware per-cell memory certificate
+- 12:10 CST 2026-11-02: start (main 9962976). Sandbox restarted; toolchain rebuild (results/tc_s29.log).
+- 12:45: omega/placement.py (pigeonhole certificate, witness brute force: 3,000 random instances agree), RTL +pcert audit (rtl/omega_mesh.sv, simulation only), cert_table.py done (fib(20) 3x3 min S 52,602, treesum_direct(14) 3x3 39,384). Validation lanes: val_small (ob1), val_hetero (ob2).
+- 13:20: val_small 192/192 sound (8 progs x {2x2, 3x3 r3, 3x3 r4, 4x4 r6} at the largest N certified on 1,024-slot cells x 6 knob sets), val_hetero 124 runs (70 certified: all sound; audit sees the uncertified corner case), val_big: fib(20) / treesum_direct(14) on 3x3 (52,602 / 39,384 slots) and 4x4 r6 (29,251 / 21,128) finish, audit clean. tests/test_s29.py --ci 117/117, mutants 8/8. Admission placement option in admission.py / adm_rtl.py. Full s29 + extended big set running.
+- 13:55: docs (SPEC §7.8, README step 29 section, test table, gaps 13/14, next steps, commits), ci_quick/run_all hooks; val_big 186/186 sound; validation.md. Regression lanes A (reg_A.sh) and B (reg_B.sh) running; C after A.

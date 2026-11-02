@@ -1,0 +1,1145 @@
+{
+ "table": {
+  "sum": {
+   "1x1 S=1024": 92,
+   "1x1 S=4096": 371,
+   "1x1 S=65536": 5957,
+   "2x2 S=1024": 239,
+   "2x2 S=4096": 1007,
+   "2x2 S=65536": 16367,
+   "3x3 S=1024": 436,
+   "3x3 S=4096": 1832,
+   "3x3 S=65536": 29759
+  },
+  "fact": {
+   "1x1 S=1024": 92,
+   "1x1 S=4096": 371,
+   "1x1 S=65536": 5957,
+   "2x2 S=1024": 239,
+   "2x2 S=4096": 1007,
+   "2x2 S=65536": 16367,
+   "3x3 S=1024": 436,
+   "3x3 S=4096": 1832,
+   "3x3 S=65536": 29759
+  },
+  "list": {
+   "1x1 S=1024": 17,
+   "1x1 S=4096": 72,
+   "1x1 S=65536": 1169,
+   "2x2 S=1024": 35,
+   "2x2 S=4096": 148,
+   "2x2 S=65536": 2424,
+   "3x3 S=1024": 70,
+   "3x3 S=4096": 298,
+   "3x3 S=65536": 4849
+  },
+  "higher": {
+   "1x1 S=1024": 22,
+   "1x1 S=4096": 92,
+   "1x1 S=65536": 1488,
+   "2x2 S=1024": 43,
+   "2x2 S=4096": 186,
+   "2x2 S=65536": 3044,
+   "3x3 S=1024": 88,
+   "3x3 S=4096": 374,
+   "3x3 S=65536": 6089
+  },
+  "fib": {
+   "1x1 S=1024": 8,
+   "1x1 S=4096": 11,
+   "1x1 S=65536": 17,
+   "2x2 S=1024": 10,
+   "2x2 S=4096": 13,
+   "2x2 S=65536": 19,
+   "3x3 S=1024": 11,
+   "3x3 S=4096": 14,
+   "3x3 S=65536": 20
+  },
+  "treesum": {
+   "1x1 S=1024": 4,
+   "1x1 S=4096": 6,
+   "1x1 S=65536": 10,
+   "2x2 S=1024": 5,
+   "2x2 S=4096": 7,
+   "2x2 S=65536": 11,
+   "3x3 S=1024": 6,
+   "3x3 S=4096": 8,
+   "3x3 S=65536": 12
+  },
+  "treesum_direct": {
+   "1x1 S=1024": 6,
+   "1x1 S=4096": 8,
+   "1x1 S=65536": 12,
+   "2x2 S=1024": 7,
+   "2x2 S=4096": 9,
+   "2x2 S=65536": 13,
+   "3x3 S=1024": 8,
+   "3x3 S=4096": 10,
+   "3x3 S=65536": 14
+  },
+  "sort": {
+   "1x1 S=1024": 6,
+   "1x1 S=4096": 14,
+   "1x1 S=65536": 64,
+   "2x2 S=1024": 9,
+   "2x2 S=4096": 22,
+   "2x2 S=65536": 96,
+   "3x3 S=1024": 14,
+   "3x3 S=4096": 32,
+   "3x3 S=65536": 137
+  },
+  "qsort_l": {
+   "1x1 S=1024": 4,
+   "1x1 S=4096": 10,
+   "1x1 S=65536": 43,
+   "2x2 S=1024": 6,
+   "2x2 S=4096": 15,
+   "2x2 S=65536": 65,
+   "3x3 S=1024": 10,
+   "3x3 S=4096": 22,
+   "3x3 S=65536": 93
+  }
+ },
+ "rtl_small": {
+  "sum(239) 2x2 seed 1": {
+   "status": 0,
+   "cycles": 6940,
+   "live": [
+    246,
+    277
+   ],
+   "L": [
+    2636,
+    1918
+   ],
+   "pcert_min": 972
+  },
+  "sum(239) 2x2 seed 2": {
+   "status": 0,
+   "cycles": 7250,
+   "live": [
+    246,
+    272
+   ],
+   "L": [
+    2636,
+    1918
+   ],
+   "pcert_min": 980
+  },
+  "sum(239) 2x2 seed 3": {
+   "status": 0,
+   "cycles": 6777,
+   "live": [
+    251,
+    304
+   ],
+   "L": [
+    2636,
+    1918
+   ],
+   "pcert_min": 963
+  },
+  "sum(436) 3x3 seed 1": {
+   "status": 0,
+   "cycles": 12663,
+   "live": [
+    443,
+    465
+   ],
+   "L": [
+    4803,
+    3494
+   ],
+   "pcert_min": 1007
+  },
+  "sum(436) 3x3 seed 2": {
+   "status": 0,
+   "cycles": 13262,
+   "live": [
+    443,
+    473
+   ],
+   "L": [
+    4803,
+    3494
+   ],
+   "pcert_min": 1006
+  },
+  "sum(436) 3x3 seed 3": {
+   "status": 0,
+   "cycles": 12386,
+   "live": [
+    448,
+    533
+   ],
+   "L": [
+    4803,
+    3494
+   ],
+   "pcert_min": 982
+  },
+  "sum(479) 3x3 rgrad 4 seed 1": {
+   "status": 0,
+   "cycles": 13919,
+   "live": [
+    486,
+    518
+   ],
+   "L": [
+    5276,
+    3838
+   ],
+   "pcert_min": 1007
+  },
+  "sum(479) 3x3 rgrad 4 seed 2": {
+   "status": 0,
+   "cycles": 14563,
+   "live": [
+    486,
+    515
+   ],
+   "L": [
+    5276,
+    3838
+   ],
+   "pcert_min": 1006
+  },
+  "sum(479) 3x3 rgrad 4 seed 3": {
+   "status": 0,
+   "cycles": 13603,
+   "live": [
+    491,
+    582
+   ],
+   "L": [
+    5276,
+    3838
+   ],
+   "pcert_min": 982
+  },
+  "list(35) 2x2 seed 1": {
+   "status": 0,
+   "cycles": 3326,
+   "live": [
+    143,
+    257
+   ],
+   "L": [
+    1917,
+    1983
+   ],
+   "pcert_min": 983
+  },
+  "list(35) 2x2 seed 2": {
+   "status": 0,
+   "cycles": 3439,
+   "live": [
+    139,
+    239
+   ],
+   "L": [
+    1917,
+    1983
+   ],
+   "pcert_min": 978
+  },
+  "list(35) 2x2 seed 3": {
+   "status": 0,
+   "cycles": 3619,
+   "live": [
+    129,
+    230
+   ],
+   "L": [
+    1917,
+    1983
+   ],
+   "pcert_min": 990
+  },
+  "list(70) 3x3 seed 1": {
+   "status": 0,
+   "cycles": 4991,
+   "live": [
+    224,
+    401
+   ],
+   "L": [
+    3807,
+    3943
+   ],
+   "pcert_min": 989
+  },
+  "list(70) 3x3 seed 2": {
+   "status": 0,
+   "cycles": 5681,
+   "live": [
+    213,
+    393
+   ],
+   "L": [
+    3807,
+    3943
+   ],
+   "pcert_min": 1006
+  },
+  "list(70) 3x3 seed 3": {
+   "status": 0,
+   "cycles": 6029,
+   "live": [
+    242,
+    429
+   ],
+   "L": [
+    3807,
+    3943
+   ],
+   "pcert_min": 1014
+  },
+  "list(85) 3x3 rgrad 4 seed 1": {
+   "status": 0,
+   "cycles": 6055,
+   "live": [
+    268,
+    477
+   ],
+   "L": [
+    4617,
+    4783
+   ],
+   "pcert_min": 990
+  },
+  "list(85) 3x3 rgrad 4 seed 2": {
+   "status": 0,
+   "cycles": 7050,
+   "live": [
+    268,
+    468
+   ],
+   "L": [
+    4617,
+    4783
+   ],
+   "pcert_min": 1003
+  },
+  "list(85) 3x3 rgrad 4 seed 3": {
+   "status": 0,
+   "cycles": 7207,
+   "live": [
+    280,
+    505
+   ],
+   "L": [
+    4617,
+    4783
+   ],
+   "pcert_min": 1014
+  },
+  "higher(43) 2x2 seed 1": {
+   "status": 0,
+   "cycles": 3205,
+   "live": [
+    114,
+    235
+   ],
+   "L": [
+    1891,
+    1935
+   ],
+   "pcert_min": 974
+  },
+  "higher(43) 2x2 seed 2": {
+   "status": 0,
+   "cycles": 3615,
+   "live": [
+    155,
+    299
+   ],
+   "L": [
+    1891,
+    1935
+   ],
+   "pcert_min": 962
+  },
+  "higher(43) 2x2 seed 3": {
+   "status": 0,
+   "cycles": 4478,
+   "live": [
+    162,
+    303
+   ],
+   "L": [
+    1891,
+    1935
+   ],
+   "pcert_min": 977
+  },
+  "higher(88) 3x3 seed 1": {
+   "status": 0,
+   "cycles": 6770,
+   "live": [
+    266,
+    516
+   ],
+   "L": [
+    3826,
+    3915
+   ],
+   "pcert_min": 981
+  },
+  "higher(88) 3x3 seed 2": {
+   "status": 0,
+   "cycles": 7219,
+   "live": [
+    249,
+    520
+   ],
+   "L": [
+    3826,
+    3915
+   ],
+   "pcert_min": 999
+  },
+  "higher(88) 3x3 seed 3": {
+   "status": 0,
+   "cycles": 8025,
+   "live": [
+    257,
+    522
+   ],
+   "L": [
+    3826,
+    3915
+   ],
+   "pcert_min": 1018
+  },
+  "higher(108) 3x3 rgrad 4 seed 1": {
+   "status": 0,
+   "cycles": 8314,
+   "live": [
+    312,
+    620
+   ],
+   "L": [
+    4686,
+    4795
+   ],
+   "pcert_min": 993
+  },
+  "higher(108) 3x3 rgrad 4 seed 2": {
+   "status": 0,
+   "cycles": 8887,
+   "live": [
+    312,
+    632
+   ],
+   "L": [
+    4686,
+    4795
+   ],
+   "pcert_min": 999
+  },
+  "higher(108) 3x3 rgrad 4 seed 3": {
+   "status": 0,
+   "cycles": 9949,
+   "live": [
+    319,
+    654
+   ],
+   "L": [
+    4686,
+    4795
+   ],
+   "pcert_min": 1018
+  },
+  "fib(10) 2x2 seed 1": {
+   "status": 0,
+   "cycles": 1853,
+   "live": [
+    159,
+    234
+   ],
+   "L": [
+    2122,
+    1680
+   ],
+   "pcert_min": 976
+  },
+  "fib(10) 2x2 seed 2": {
+   "status": 0,
+   "cycles": 1817,
+   "live": [
+    109,
+    189
+   ],
+   "L": [
+    2122,
+    1680
+   ],
+   "pcert_min": 983
+  },
+  "fib(10) 2x2 seed 3": {
+   "status": 0,
+   "cycles": 1813,
+   "live": [
+    236,
+    309
+   ],
+   "L": [
+    2122,
+    1680
+   ],
+   "pcert_min": 973
+  },
+  "fib(11) 3x3 seed 1": {
+   "status": 0,
+   "cycles": 1563,
+   "live": [
+    302,
+    429
+   ],
+   "L": [
+    3442,
+    2725
+   ],
+   "pcert_min": 986
+  },
+  "fib(11) 3x3 seed 2": {
+   "status": 0,
+   "cycles": 1671,
+   "live": [
+    295,
+    432
+   ],
+   "L": [
+    3442,
+    2725
+   ],
+   "pcert_min": 983
+  },
+  "fib(11) 3x3 seed 3": {
+   "status": 0,
+   "cycles": 1771,
+   "live": [
+    382,
+    513
+   ],
+   "L": [
+    3442,
+    2725
+   ],
+   "pcert_min": 989
+  },
+  "fib(11) 3x3 rgrad 4 seed 1": {
+   "status": 0,
+   "cycles": 1563,
+   "live": [
+    302,
+    429
+   ],
+   "L": [
+    3442,
+    2725
+   ],
+   "pcert_min": 990
+  },
+  "fib(11) 3x3 rgrad 4 seed 2": {
+   "status": 0,
+   "cycles": 1671,
+   "live": [
+    295,
+    432
+   ],
+   "L": [
+    3442,
+    2725
+   ],
+   "pcert_min": 988
+  },
+  "fib(11) 3x3 rgrad 4 seed 3": {
+   "status": 0,
+   "cycles": 1771,
+   "live": [
+    382,
+    513
+   ],
+   "L": [
+    3442,
+    2725
+   ],
+   "pcert_min": 992
+  },
+  "treesum(5) 2x2 seed 1": {
+   "status": 0,
+   "cycles": 1066,
+   "live": [
+    101,
+    192
+   ],
+   "L": [
+    1161,
+    1005
+   ],
+   "pcert_min": 983
+  },
+  "treesum(5) 2x2 seed 2": {
+   "status": 0,
+   "cycles": 1167,
+   "live": [
+    122,
+    215
+   ],
+   "L": [
+    1161,
+    1005
+   ],
+   "pcert_min": 974
+  },
+  "treesum(5) 2x2 seed 3": {
+   "status": 0,
+   "cycles": 1135,
+   "live": [
+    123,
+    189
+   ],
+   "L": [
+    1161,
+    1005
+   ],
+   "pcert_min": 987
+  },
+  "treesum(6) 3x3 seed 1": {
+   "status": 0,
+   "cycles": 1152,
+   "live": [
+    230,
+    467
+   ],
+   "L": [
+    2345,
+    2029
+   ],
+   "pcert_min": 980
+  },
+  "treesum(6) 3x3 seed 2": {
+   "status": 0,
+   "cycles": 1247,
+   "live": [
+    297,
+    522
+   ],
+   "L": [
+    2345,
+    2029
+   ],
+   "pcert_min": 979
+  },
+  "treesum(6) 3x3 seed 3": {
+   "status": 0,
+   "cycles": 1208,
+   "live": [
+    326,
+    522
+   ],
+   "L": [
+    2345,
+    2029
+   ],
+   "pcert_min": 976
+  },
+  "treesum(7) 3x3 rgrad 4 seed 1": {
+   "status": 0,
+   "cycles": 1939,
+   "live": [
+    317,
+    617
+   ],
+   "L": [
+    4713,
+    4077
+   ],
+   "pcert_min": 968
+  },
+  "treesum(7) 3x3 rgrad 4 seed 2": {
+   "status": 0,
+   "cycles": 2037,
+   "live": [
+    468,
+    822
+   ],
+   "L": [
+    4713,
+    4077
+   ],
+   "pcert_min": 950
+  },
+  "treesum(7) 3x3 rgrad 4 seed 3": {
+   "status": 0,
+   "cycles": 1973,
+   "live": [
+    489,
+    743
+   ],
+   "L": [
+    4713,
+    4077
+   ],
+   "pcert_min": 959
+  },
+  "treesum_direct(7) 2x2 seed 1": {
+   "status": 0,
+   "cycles": 1343,
+   "live": [
+    83,
+    168
+   ],
+   "L": [
+    1528,
+    1147
+   ],
+   "pcert_min": 985
+  },
+  "treesum_direct(7) 2x2 seed 2": {
+   "status": 0,
+   "cycles": 1463,
+   "live": [
+    129,
+    227
+   ],
+   "L": [
+    1528,
+    1147
+   ],
+   "pcert_min": 976
+  },
+  "treesum_direct(7) 2x2 seed 3": {
+   "status": 0,
+   "cycles": 1497,
+   "live": [
+    108,
+    184
+   ],
+   "L": [
+    1528,
+    1147
+   ],
+   "pcert_min": 986
+  },
+  "treesum_direct(8) 3x3 seed 1": {
+   "status": 0,
+   "cycles": 1334,
+   "live": [
+    159,
+    336
+   ],
+   "L": [
+    3064,
+    2299
+   ],
+   "pcert_min": 992
+  },
+  "treesum_direct(8) 3x3 seed 2": {
+   "status": 0,
+   "cycles": 1437,
+   "live": [
+    196,
+    403
+   ],
+   "L": [
+    3064,
+    2299
+   ],
+   "pcert_min": 992
+  },
+  "treesum_direct(8) 3x3 seed 3": {
+   "status": 0,
+   "cycles": 1410,
+   "live": [
+    268,
+    418
+   ],
+   "L": [
+    3064,
+    2299
+   ],
+   "pcert_min": 980
+  },
+  "treesum_direct(8) 3x3 rgrad 4 seed 1": {
+   "status": 0,
+   "cycles": 1334,
+   "live": [
+    159,
+    336
+   ],
+   "L": [
+    3064,
+    2299
+   ],
+   "pcert_min": 995
+  },
+  "treesum_direct(8) 3x3 rgrad 4 seed 2": {
+   "status": 0,
+   "cycles": 1437,
+   "live": [
+    196,
+    403
+   ],
+   "L": [
+    3064,
+    2299
+   ],
+   "pcert_min": 992
+  },
+  "treesum_direct(8) 3x3 rgrad 4 seed 3": {
+   "status": 0,
+   "cycles": 1410,
+   "live": [
+    268,
+    418
+   ],
+   "L": [
+    3064,
+    2299
+   ],
+   "pcert_min": 991
+  },
+  "sort(9) 2x2 seed 1": {
+   "status": 0,
+   "cycles": 2560,
+   "live": [
+    56,
+    91
+   ],
+   "L": [
+    1252,
+    1127
+   ],
+   "pcert_min": 1006
+  },
+  "sort(9) 2x2 seed 2": {
+   "status": 0,
+   "cycles": 2996,
+   "live": [
+    66,
+    99
+   ],
+   "L": [
+    1252,
+    1127
+   ],
+   "pcert_min": 1010
+  },
+  "sort(9) 2x2 seed 3": {
+   "status": 0,
+   "cycles": 2843,
+   "live": [
+    75,
+    101
+   ],
+   "L": [
+    1252,
+    1127
+   ],
+   "pcert_min": 1006
+  },
+  "sort(14) 3x3 seed 1": {
+   "status": 0,
+   "cycles": 3873,
+   "live": [
+    72,
+    131
+   ],
+   "L": [
+    2363,
+    2145
+   ],
+   "pcert_min": 1024
+  },
+  "sort(14) 3x3 seed 2": {
+   "status": 0,
+   "cycles": 4541,
+   "live": [
+    72,
+    127
+   ],
+   "L": [
+    2363,
+    2145
+   ],
+   "pcert_min": 1024
+  },
+  "sort(14) 3x3 seed 3": {
+   "status": 0,
+   "cycles": 4323,
+   "live": [
+    88,
+    144
+   ],
+   "L": [
+    2363,
+    2145
+   ],
+   "pcert_min": 1024
+  },
+  "sort(15) 3x3 rgrad 4 seed 1": {
+   "status": 0,
+   "cycles": 4356,
+   "live": [
+    80,
+    140
+   ],
+   "L": [
+    2679,
+    2435
+   ],
+   "pcert_min": 1024
+  },
+  "sort(15) 3x3 rgrad 4 seed 2": {
+   "status": 0,
+   "cycles": 4743,
+   "live": [
+    75,
+    137
+   ],
+   "L": [
+    2679,
+    2435
+   ],
+   "pcert_min": 1024
+  },
+  "sort(15) 3x3 rgrad 4 seed 3": {
+   "status": 0,
+   "cycles": 4478,
+   "live": [
+    81,
+    152
+   ],
+   "L": [
+    2679,
+    2435
+   ],
+   "pcert_min": 1024
+  },
+  "qsort_l(6) 2x2 seed 1": {
+   "status": 0,
+   "cycles": 2743,
+   "live": [
+    77,
+    132
+   ],
+   "L": [
+    1192,
+    1045
+   ],
+   "pcert_min": 998
+  },
+  "qsort_l(6) 2x2 seed 2": {
+   "status": 0,
+   "cycles": 2840,
+   "live": [
+    91,
+    134
+   ],
+   "L": [
+    1192,
+    1045
+   ],
+   "pcert_min": 997
+  },
+  "qsort_l(6) 2x2 seed 3": {
+   "status": 0,
+   "cycles": 2700,
+   "live": [
+    95,
+    144
+   ],
+   "L": [
+    1192,
+    1045
+   ],
+   "pcert_min": 994
+  },
+  "qsort_l(10) 3x3 seed 1": {
+   "status": 0,
+   "cycles": 4591,
+   "live": [
+    111,
+    191
+   ],
+   "L": [
+    2285,
+    2027
+   ],
+   "pcert_min": 1016
+  },
+  "qsort_l(10) 3x3 seed 2": {
+   "status": 0,
+   "cycles": 4822,
+   "live": [
+    103,
+    173
+   ],
+   "L": [
+    2285,
+    2027
+   ],
+   "pcert_min": 1018
+  },
+  "qsort_l(10) 3x3 seed 3": {
+   "status": 0,
+   "cycles": 4937,
+   "live": [
+    110,
+    178
+   ],
+   "L": [
+    2285,
+    2027
+   ],
+   "pcert_min": 1018
+  },
+  "qsort_l(10) 3x3 rgrad 4 seed 1": {
+   "status": 0,
+   "cycles": 4591,
+   "live": [
+    111,
+    191
+   ],
+   "L": [
+    2285,
+    2027
+   ],
+   "pcert_min": 1017
+  },
+  "qsort_l(10) 3x3 rgrad 4 seed 2": {
+   "status": 0,
+   "cycles": 4822,
+   "live": [
+    103,
+    173
+   ],
+   "L": [
+    2285,
+    2027
+   ],
+   "pcert_min": 1019
+  },
+  "qsort_l(10) 3x3 rgrad 4 seed 3": {
+   "status": 0,
+   "cycles": 4937,
+   "live": [
+    110,
+    178
+   ],
+   "L": [
+    2285,
+    2027
+   ],
+   "pcert_min": 1021
+  }
+ },
+ "rtl_big": {
+  "fib(20) seed 1": {
+   "S": 52602,
+   "status": 0,
+   "cycles": 79957,
+   "live": [
+    748,
+    1179
+   ],
+   "L": [
+    262690,
+    207963
+   ],
+   "cell_peak": 267
+  },
+  "fib(20) seed 2": {
+   "S": 52602,
+   "status": 0,
+   "cycles": 80011,
+   "live": [
+    721,
+    1242
+   ],
+   "L": [
+    262690,
+    207963
+   ],
+   "cell_peak": 240
+  },
+  "fib(20) seed 3": {
+   "S": 52602,
+   "status": 0,
+   "cycles": 88498,
+   "live": [
+    1193,
+    1744
+   ],
+   "L": [
+    262690,
+    207963
+   ],
+   "cell_peak": 353
+  },
+  "treesum_direct(14) seed 1": {
+   "S": 39384,
+   "status": 0,
+   "cycles": 60309,
+   "live": [
+    323,
+    720
+   ],
+   "L": [
+    196600,
+    147451
+   ],
+   "cell_peak": 129
+  },
+  "treesum_direct(14) seed 2": {
+   "S": 39384,
+   "status": 0,
+   "cycles": 60203,
+   "live": [
+    372,
+    928
+   ],
+   "L": [
+    196600,
+    147451
+   ],
+   "cell_peak": 174
+  },
+  "treesum_direct(14) seed 3": {
+   "S": 39384,
+   "status": 0,
+   "cycles": 66833,
+   "live": [
+    551,
+    1028
+   ],
+   "L": [
+    196600,
+    147451
+   ],
+   "cell_peak": 221
+  }
+ },
+ "admission": {
+  "budget_per_cell": [
+   2019,
+   2019
+  ],
+  "budget_placement": [
+   5954,
+   11909
+  ],
+  "cycles_per_cell": 25316,
+  "cycles_placement": 11621,
+  "rtl_cycles": 6986,
+  "max_concurrent": [
+   1,
+   7
+  ],
+  "rejected_per_cell": 2
+ }
+}

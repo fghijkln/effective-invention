@@ -20,5 +20,7 @@ python3 tests/test_s26.py --mutants          2>&1 | tee results/s26_mutants.log
 python3 tests/test_s27.py                    2>&1 | tee results/s27_tests.log   # step 27: qsort_l
 python3 tests/test_s28.py                    2>&1 | tee results/s28_tests.log   # step 28: 16-bit slots, certified sizes
 python3 tests/test_s28.py --mutants          2>&1 | tee results/s28_mutants.log
+python3 tests/test_s29.py                    2>&1 | tee results/s29_tests.log   # step 29: placement-aware certificate
+python3 tests/test_s29.py --mutants          2>&1 | tee results/s29_mutants.log
 python3 tests/mutants.py                      2>&1 | tee results/mutants.txt
 echo ALLDONE

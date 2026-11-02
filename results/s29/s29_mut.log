@@ -1,0 +1,9 @@
+  mutant 1 (watermark ignored (a cell counts as poor only when full)): caught  [FAIL certify vs brute-force witness: 149/600 disagree]
+  mutant 2 (nodes and vars checked separately): caught  [FAIL certify vs brute-force witness: 39/600 disagree]
+  mutant 3 (rgrad ignored (every cell sees the whole mesh)): caught  [FAIL certify vs brute-force witness: 37/600 disagree]
+  mutant 4 (lm_lo >= D_max not required): caught  [FAIL lm_lo < D_max: no certificate]
+  mutant 5 (poor-cell cost off by one): caught  [FAIL certify vs brute-force witness: 10/600 disagree]
+  mutant 6 (ball one hop too wide): caught  [FAIL certify vs brute-force witness: 19/600 disagree]
+  mutant 7 (ballast / other tenants ignored): caught  [FAIL certify vs brute-force witness: 132/600 disagree]
+  mutant 8 (admission budgets one cell too generous): caught  [FAIL budgets 2x2 r3 S300 mix (1, 1): (947, 710) admit a coverable load]
+s29 mutants: 8/8 caught

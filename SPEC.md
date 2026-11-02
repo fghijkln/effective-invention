@@ -870,6 +870,94 @@ slot 4,096, forged pointers, RTL 1×1 at exactly B and 2×2 at slots_mesh for th
 2×2 × 20,000-slot cells with the root pool above slot 4,096 vs the fabric-model scheduler); mutants 65 (allocated
 addresses truncated to 12 bits) and 66 (OOB check on bits [11:0] only).
 
+### 7.8 A placement-aware certificate: bigger meshes certify bigger inputs (step 29, `omega/placement.py`)
+
+§7.2–§7.7 certify a job on a mesh only if *every* cell can hold the whole job (`slots_mesh` = max(B) + D_max +
+reserve), because nothing was assumed about where the work goes; a 3×3 mesh then certifies no larger N than one
+cell, and fib(20) / treesum_direct(14) (B > 65,536) nowhere. Step 29 certifies from the *total* load and the
+placement policy of §5 instead.
+
+**What a per-cell peak bound cannot do.** The policy lets any single cell fill up to its slots: an expansion runs
+where it is whenever it fits, and under arbitration, jitter and stalls one cell can end up doing almost all the work.
+So no per-cell bound below the job's own all-schedule bound holds for every schedule (measured per-cell peaks are far
+lower, but that is a schedule, not a bound). What the policy *does* guarantee is that work is forwarded toward room;
+the certificate makes sure there always is room close enough.
+
+**Lemma (pigeonhole, exact).** Let the live load of the mesh be at most L_n nodes and L_v vars at every moment (the
+§7.2 / §7.3 bounds, summed over the running jobs: L_n = B_nodes or W_nodes, L_v = B_vars; ballast and other tenants
+are taken off the free counts instead). Cell d starts with f_n(d) / f_v(d) free slots. A cell with fewer than
+T = `lm_hi` free node slots holds at least c_n(d) = max(0, f_n(d) − T + 1) live nodes (vars alike). If for every cell c
+the cells of its ball Ball(c, r), r = `rgrad` (Manhattan distance ≤ r), cannot all be made poor, i.e. there is no split
+of Ball(c, r) into P_n, P_v with Σ_{P_n} c_n ≤ L_n and Σ_{P_v} c_v ≤ L_v, then **at every moment of every schedule
+every cell has, within `rgrad` hops, a cell with ≥ `lm_hi` free node and var slots**, whose `roomy` bit is therefore
+set (low-memory mode, §5: set at ≥ `lm_hi`, one register stage). Homogeneous cells (S free slots each, m = S − T + 1):
+
+    certified  ⇔  ⌊L_n / m⌋ + ⌊L_v / m⌋ ≤ n_r − 1,      n_r = min_c |Ball(c, rgrad)|
+
+(n_r: 4 on 2×2; 8 on 3×3 at the default `rgrad` = 3, 9 at `rgrad` = 4; 10 on 4×4 at 3, 16 at 6; 36 on 8×8 at 7, the
+3-bit cap). Nodes and vars count separately because a cell is roomy only when both are above the watermark; that
+costs about a factor 2 against a single resource. `placement.certify` decides the general (ballast) case exactly
+(closed form per ball for equal costs, else all 2^|ball| splits); `placement.witness` is an independent brute force
+that returns an explicit occupancy breaking the conclusion.
+
+**Progress (an argument, as §7.1, not a machine-checked proof).** With a roomy cell within `rgrad` hops of every
+cell, every non-roomy cell's `rdist` is its true distance d ≤ `rgrad` to room (`rdist` = min(d, `rgrad`), registered),
+and its neighbour on a shortest path to room reads d − 1, so every non-roomy cell has a downhill neighbour: a SPAWN that does not fit is
+forwarded downhill at once (rule a), escalated SWI / commutation retries go downhill (rule b), a NODE / PULL blocking
+the ejection head of a full cell is passed on (rule d), and a roomy cell (`rdist` 0: no downhill neighbour, so no
+reserve) takes any expansion, since it has ≥ `lm_lo` ≥ D_max free slots. Free counts change only through rule
+instances and the migrations that serve one redex, and Ω-L jobs fire finitely many rules; between two changes the
+gradient is fixed and a pending SPAWN reaches room within `rgrad` hops, so the §7.1 (2) walk now covers the whole
+mesh and the rotor-router part is not needed. **Conditions:** `lm_mode` = 2 (default), `rgrad` ≥ 1, `lm_lo` ≥ D_max,
+W·H > 1 (on one cell the step-28 rule max(B) ≤ S stays, and is better). Not covered, as in §7.2: the task stack
+(status 2), cycle limits, untyped jobs. A configuration the lemma rejects may still finish; no claim is made.
+
+**Certifiable N** (closed forms of §7.3 / §7.6, sort / qsort_l worst case over all inputs; the better of the step-28
+rule and the certificate; `results/s29/cert_table.py`):
+
+| program | S = 1,024: 1×1 / 2×2 / 3×3 | S = 4,096 | S = 65,536 | smallest cell for the benchmark size: 1×1 / 2×2 / 3×3 / 4×4 (`rgrad` 6) |
+|---|---|---|---|---|
+| sum, fact | 92 / 239 / 436 | 371 / 1,007 / 1,832 | 5,957 / 16,367 / 29,759 | sum(1000): 11,007 / 4,067 / 2,265 / 1,207 |
+| list | 17 / 35 / 70 | 72 / 148 / 298 | 1,169 / 2,424 / 4,849 | list(120): 6,743 / 3,317 / 1,690 / 877 |
+| higher | 22 / 43 / 88 | 92 / 186 / 374 | 1,488 / 3,044 / 6,089 | higher(100): 4,443 / 2,235 / 1,149 / 606 |
+| fib | 8 / 10 / 11 | 11 / 13 / 14 | 17 / 19 / **20** | fib(20): 262,690 / 104,045 / **52,602** / **29,251** |
+| treesum | 4 / 5 / 6 | 6 / 7 / 8 | 10 / 11 / 12 | treesum(9): 18,921 / 8,246 / 4,155 / 2,166 |
+| treesum_direct | 6 / 7 / 8 | 8 / 9 / 10 | 12 / 13 / **14** | treesum_direct(14): 196,600 / 73,789 / **39,384** / **21,128** |
+| sort (any input) | 6 / 9 / 14 | 14 / 22 / 32 | 64 / 96 / 137 | sort(20), any input: 7,214 / 3,379 / 1,721 / 892 |
+| qsort_l (any input) | 4 / 6 / 10 | 10 / 15 / 22 | 43 / 65 / 93 | qsort_l(40), any input: 54,657 / 25,081 / 12,572 / 6,318 |
+
+At the default `rgrad` = 3, 3×3 = 8 cells' worth; `rgrad` 4 adds the ninth (3×3 at 1,024: sum 479, list 85,
+treesum 7). So **fib(20) and treesum_direct(14) are certified on a 3×3 mesh of 65,536-slot cells** (smallest cells
+52,602 / 39,384) and on 4×4 at `rgrad` 6 with 29,251 / 21,128, though no single cell can be certified for them.
+
+**Validation (RTL, `results/s29/validate.py`, simulation audit `+pcert=r` in `omega_mesh`).** The audit counts, every
+cycle, cells with no cell of ≥ `lm_hi` free node and var slots within r hops, and records the mesh-wide live peak;
+any certified run with a wrong answer, a different interaction count, a stall, an audit count > 0 or live > L would be a
+bug. (a) 192 runs: 8 programs at the largest N each mesh certifies at 1,024 slots (2×2, 3×3 at `rgrad` 3 and 4, 4×4
+at 6) × 6 knob sets (seeds, jitter, stall, `pmsg`, `+ilr=2`, `+s14=0 +rto=32`): 192 / 192 sound. (b) 3×3 × 1,024
+with ballast (poor cells of 4–40 free slots, room only in some cells), 124 runs: all 70 certified ones sound; with room
+only in the corner the certificate holds at `rgrad` 4, not at 3, and the audit sees exactly that (≈ 1,400–2,000
+cell-cycles without room in reach at 3, 0 at 4); every uncertified run happened to finish. (c) 186 runs: the
+benchmark sizes on the smallest certified cells of 3×3, 4×4 at `rgrad` 6 and 2×2 (cells built at 65,536 / 32,768 /
+65,536 slots, ballast leaving exactly S free), 6 knob sets each, incl. fib(20) 3×3 × 52,602, treesum_direct(14) 3×3 ×
+39,384, fib(19) 2×2 × 64,326, treesum_direct(13) 2×2 × 36,925: 186 / 186 sound. In all 448 certified runs the real live
+load stays 2.6–678× below L (fib(20) 3×3: at most 1,175 live nodes against 262,690; largest per-cell peak 244 / 328),
+so the validation checks the claim but cannot get near its edge: L is an all-schedule bound
+(`results/s29/validation.md`).
+
+**Admission option** (`admission.Scheduler(placement=True)`, `adm_rtl.run_admitted(placement=True)`; default off,
+nothing else changes). The per-cell margin goes and the budgets come from the certificate: with qn + qv = n_r − 1 split
+in the ratio of the typed jobs' total (n, v) reservations, budget_n = qn·m + m − 1 and budget_v = qv·m + m − 1, so any
+reserved sums within them satisfy the lemma (`placement.budgets`, checked against the brute force). The RTL
+controller is unchanged (only its configuration words differ); the model's audit checks the lemma's conclusion every
+cycle. 3×3 × 2,048, 8 jobs: per-cell budgets (2,019, 2,019) reject 2 and run one at a time; placement budgets
+(5,954, 11,909) admit all 8, up to 7 at once, RTL = model (start order, interactions).
+
+**Checker mutants** (`OMEGA_S29_MUT`, `tests/test_s29.py --mutants`): 1 watermark ignored, 2 nodes and vars checked
+separately, 3 `rgrad` ignored, 4 `lm_lo` ≥ D_max not required, 5 poor-cell cost off by one, 6 ball one hop too wide, 7
+ballast ignored, 8 budgets one cell too generous: 8 / 8 caught (brute-force disagreement, boundary loads, refused modes,
+budget check).
+
 ## 8. Termination detection
 
 A cell is *idle* when its engine is in IDLE, its task stack is empty, its eject FIFO and outbox are

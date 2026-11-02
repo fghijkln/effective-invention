@@ -110,6 +110,8 @@ def main = tsum(gen(N))
 | quicksort in Ω-L (`tests/test_s27.py`, step 27) | **253 / 253** | `qsort_l` accepted / `qsort` rejected; qsort_l = qsort = `sorted` on 182 inputs (semantic), fabric 1×1 / 2×2 / 4×4, RTL 2×2; B ≥ semantic and fabric peaks, W between; exact closed forms (descending, ascending) with held-out N, decomposition exact on 263 inputs with its maximum equal to the descending form; RTL 1×1 with exactly B slots |
 | 16-bit slots, certified sizes (`tests/test_s28.py`, step 28) | **129 / 129** | encoding round trip over all 16 slot bits; forged slot bits [15:12] trap OOB (semantic, fabric, RTL); 7 runs with every allocation above slot 4,096 (up to 65,535) equal to the semantic reducer; 10 benchmark-size jobs on RTL 1×1 with exactly B free slots, 3 on 2×2 at slots_mesh; admission of 7 benchmark-size jobs on 2×2 × 20,000 slots = fabric-model scheduler; fib(20) / treesum_direct(14) flagged uncertifiable |
 | step-28 mutants (`tests/test_s28.py --mutants`) | **2 / 2 caught** | allocated slot addresses truncated to 12 bits, OOB check on slot bits [11:0] only |
+| placement certificate (`tests/test_s29.py`, step 29) | **326 / 326** | certify = brute-force witness on 2,500 random meshes / radii / ballast shapes / loads, boundary loads, refused modes, admission budgets; certifiable-N table vs step 28; RTL with the `+pcert` audit: 8 programs at the largest N certified on 1,024-slot cells (2×2, 3×3 at `rgrad` 3 / 4, 3 knob sets), ballast shapes (corner room: certified at `rgrad` 4; the audit sees the uncertified `rgrad` 3 case), fib(20) / treesum_direct(14) on 3×3 at 52,602 / 39,384 slots; placement-budget admission, RTL = model |
+| step-29 mutants (`tests/test_s29.py --mutants`) | **8 / 8 caught** | watermark ignored, nodes and vars separately, `rgrad` ignored, `lm_lo` ≥ D_max not required, cost off by one, ball too wide, ballast ignored, budgets too generous |
 | mutation testing (`tests/mutants.py`) | **55 / 55 caught** | 15 functional mutants of the rule logic / protocol / quiescence + 1 performance mutant (no work distribution, caught by the speed-up bound) + 6 security mutants (each owner-capability check disabled, owner stamping missing, trap not blocking). Two mutants (eraser reaches only aux1; REF~DUP expands instead of copying) produce the *right* answer and are caught only by the node count / interaction count. That is why all three observables are compared. + 5 v3 engine mutants (read-ahead write bypass, write-queue drain, var owner-tag queue, allocation pop count, ROM read-ahead) + 2 memory-pressure mutants (caught by `tests/test_mempress.py`) + 3 cluster-ROM mutants (grant beyond the port count, EXPAND not waiting for its template word, stale buffered word) + 7 v4 mutants (second node write port not bypassed into the read-ahead, second EXPAND entry's var tag to the wrong slot, EXPAND skipping an entry, VHU without the same-slot stall, VHU hand-back never taken, VHU disabled = performance mutant caught by a fib(12) cycle bound, VHU read-ahead without bypass of write port 1) + 3 retry-slot mutants (39 parked retry never taken, 40 quiescence ignores the slot, 41 no escalation). Mutant 27 (roomy offload disabled) now survives on its own, because escalation also rescues every pressure case (roomy offload became a fast path); it is run together with 41 and caught. Mutant 28 (a full cell still asks for work) is tolerated by the step-19 full-cell pass-on on the quick pressure set, so since step 19 it runs on the full set and is caught by the global treesum(9) 3×3 case. + 3 step-11/12 performance mutants, each caught by its own bound: 42 spawn threshold ignored (qsort(20) 4×4 > 0.6 messages per interaction), 43 fork hint ignored (fib(12) 4×4 > 1.3× slower), 44 local-first link orientation disabled (treesum(7) 4×4 > 1.3× more LINKs) + 2 step-13 performance mutants: 45 producer hint ignored (qsort(30) 4×4 > 1.15× slower: 11,383 vs 9,118 cycles), 46 governor never tightens (qsort(30) 4×4 > 1.15× more messages per interaction: 0.529 vs 0.398) + 2 step-14 mutants: 47 oldest-fork give disabled (performance only: fib(16) 4×4 seed 1 > 1.05× slower, 8,254 vs 7,530 cycles; a treesum(7) bound let it survive at 1.04×, because the step-11 path still gives a fork task popped from an empty stack), 48 a fork task finding the deque full is dropped (caught by the program suite: fib(8) 2×2 loses work) + 2 step-19 mutants, each caught by the livelock / deadlock seeds that motivated the change at the new default: 49 room-distance gradient ignored (global treesum(9) 3×3 seeds 3 / 10 / 11 stop without progress), 50 full-cell pass-on off (since step 21 caught at the default `+rsv=1` by the ballast keep 0 / 8 cases fib(12) 2×2 and treesum(6) 3×2, which stop with status 3; step 19's global treesum(7) 8×8 seeds 16 / 18 stop only at `+rsv=4`) + 1 step-20 mutant: 51 slot reserve applied without a downhill neighbour (fib(10) on 1×1 with exactly the 93 free node / var slots its RTL run needs ends in status 2) + 1 step-22 mutant: 52 low-memory watermarks never engage (caught by the near-overfull treesum(9) 3×3 corner-500 case, RTL seed 9 stops with status 3) + 2 step-23 mutants: 53 the root is linked at once whatever `+ilr` says, 54 `+ilr=2` without the model's child order (both caught by the expansion-order pressure cases) |
 
 Strong confluence is the test oracle. Any schedule (arbitration, delays, stalls, task/message priority,
@@ -155,6 +157,73 @@ slower than one cell (sum(1000) on 1×1 needs a 4,096-slot cell: 29,018 cycles v
 step 12 the cost was qsort: on meshes it was 16–27% slower than with step 10's eager spreading,
 because its filter chains (lo/hi/app) stayed where they started; step 13 (next section) fixes that. treesum(9)
 on 8×8 varies ±20% with the arbitration seed; over seeds 1–4 the mean is 2,374 vs 2,470 for step 10.
+
+### A placement-aware memory certificate: bigger meshes certify bigger inputs (step 29)
+
+Step 28 left two benchmark sizes uncertifiable, fib(20) (B = 262,690 / 207,963) and treesum_direct(14) (196,600 /
+147,451), and found that a bigger mesh did not help: the mesh rule gave every cell room for the whole job. Step 29
+replaces "every cell can hold the job" by "at every moment some cell close to every cell has room", which the mesh's
+placement policy turns into progress (SPEC §7.8, `omega/placement.py`).
+
+* **Why not a per-cell peak bound.** The policy expands work wherever it fits, so one cell may end up doing almost all
+  of it; no per-cell bound below the job's own bound holds for every schedule. What the policy guarantees is that
+  work that does not fit is forwarded down the room-distance gradient to a `roomy` cell (steps 19–22, rules a, b, d).
+* **The certificate (pigeonhole, exact).** A cell is roomy at ≥ `lm_hi` = 64 free node and var slots. Making a cell
+  with S free slots non-roomy takes m = S − 63 live nodes or m live vars. With the job's load bounded by
+  (L_n, L_v) = (B_nodes, B_vars) at every moment (§7.2), every cell sees a roomy cell within `rgrad` hops if
+  **⌊L_n / m⌋ + ⌊L_v / m⌋ ≤ n_r − 1**, n_r = the smallest `rgrad`-ball (4 on 2×2; 8 on 3×3 at the default `rgrad` 3,
+  9 at `rgrad` 4; 16 on 4×4 at `rgrad` 6). With ballast or other tenants the general case is an exact cover check;
+  an independent brute force (`placement.witness`) agrees on every instance tested.
+* **Progress argument.** Room within `rgrad` hops of every cell means every non-roomy cell has a downhill neighbour, so
+  every SPAWN / retry / blocked NODE is forwarded toward room and a roomy cell takes any expansion; the gradient
+  changes only when a rule fires, and Ω-L jobs fire finitely many. This removes the rotor-router plausibility step of
+  SPEC §7.1 (2). It is an argument like §7.1, not a machine-checked proof; the task stack is still not covered.
+
+Largest N certified (closed forms; sort / qsort_l worst case over all inputs; the better of the step-28 rule and the
+certificate), **1×1 (step 28) / 2×2 / 3×3** at the default `rgrad` = 3:
+
+| program | S = 1,024 | S = 4,096 | S = 65,536 | smallest cell for the benchmark size, 1×1 / 2×2 / 3×3 / 4×4 (`rgrad` 6) |
+|---|---|---|---|---|
+| sum, fact | 92 / 239 / 436 | 371 / 1,007 / 1,832 | 5,957 / 16,367 / 29,759 | sum(1000): 11,007 / 4,067 / 2,265 / 1,207 |
+| list | 17 / 35 / 70 | 72 / 148 / 298 | 1,169 / 2,424 / 4,849 | list(120): 6,743 / 3,317 / 1,690 / 877 |
+| higher | 22 / 43 / 88 | 92 / 186 / 374 | 1,488 / 3,044 / 6,089 | higher(100): 4,443 / 2,235 / 1,149 / 606 |
+| fib | 8 / 10 / 11 | 11 / 13 / 14 | 17 / 19 / **20** | fib(20): 262,690 / 104,045 / **52,602** / **29,251** |
+| treesum | 4 / 5 / 6 | 6 / 7 / 8 | 10 / 11 / 12 | treesum(9): 18,921 / 8,246 / 4,155 / 2,166 |
+| treesum_direct | 6 / 7 / 8 | 8 / 9 / 10 | 12 / 13 / **14** | treesum_direct(14): 196,600 / 73,789 / **39,384** / **21,128** |
+| sort (any input) | 6 / 9 / 14 | 14 / 22 / 32 | 64 / 96 / 137 | sort(20): 7,214 / 3,379 / 1,721 / 892 |
+| qsort_l (any input) | 4 / 6 / 10 | 10 / 15 / 22 | 43 / 65 / 93 | qsort_l(40): 54,657 / 25,081 / 12,572 / 6,318 |
+
+So **fib(20) and treesum_direct(14) are certified on 3×3 × 65,536-slot cells** (smallest 52,602 / 39,384), and on
+4×4 at `+rgrad=6` with 29,251 / 21,128; a 2×2 does not reach them at 65,536 (needs 104,045 / 73,789) but certifies
+fib(19) and treesum_direct(13), which no single cell does. Nodes and vars count separately (a cell is roomy only when
+both are), so a k-cell ball buys about k/2 cells' worth, not k.
+
+**Validation on RTL** (`results/s29/validate.py`, `results/s29/validation.md`; simulation-only audit `+pcert=r` in
+`rtl/omega_mesh.sv`: every cycle, cells with no cell of ≥ `lm_hi` free node and var slots within r hops, and the
+mesh-wide live peak). A certified run that ends wrong, stalls, counts a different number of interactions, has an
+audit count > 0 or a live load > L would be a bug:
+
+| set | runs | certified | sound | what |
+|---|---:|---:|---:|---|
+| small | 192 | 192 | **192** | 8 programs at the largest N certified on 1,024-slot cells on 2×2, 3×3 (`rgrad` 3, 4), 4×4 (`rgrad` 6) × 6 knob sets (seed, jitter, stall, `pmsg`, `+ilr=2`, `+s14=0 +rto=32`) |
+| ballast | 124 | 70 | **70** | 3×3 × 1,024, poor cells with 4–40 free slots; room only in the corner: certified at `rgrad` 4 (audit 0) but not 3 (audit ≈ 1,400–2,000 cell-cycles without room in reach); the 54 uncertified runs all happened to finish |
+| benchmark sizes | 186 | 186 | **186** | 11 sizes on the smallest certified cells of 3×3, 4×4 (`rgrad` 6), 2×2 × 6 knob sets; fib(20) 3×3 × 52,602: 79,957–84,797 cycles; treesum_direct(14) 3×3 × 39,384: 60,203–63,689 |
+
+The measured live load stays 2.6–678× below L (fib(20) 3×3: ≤ 1,175 live nodes against 262,690; largest per-cell
+peak 244 nodes / 328 vars), so these runs check the claim without getting near its edge.
+
+**Admission option** (`admission.Scheduler(placement=True)`, `adm_rtl.run_admitted(placement=True)`, default off): no
+per-cell margin; per-resource budgets split from the certificate (budget = q·m + m − 1, q_n + q_v = n_r − 1, split by
+the jobs' total reservations), checked sound by the brute force. The RTL controller is unchanged (configuration words
+only). 3×3 × 2,048 slots, 8 jobs: the step-25 per-cell budgets (2,019 / 2,019) reject 2 and run one at a time
+(25,316 cycles for the 6 admitted); the placement budgets (5,954 / 11,909) admit all 8, up to 7 at once (11,621 model
+cycles, 6,986 RTL cycles), with the RTL start order and interaction count equal to the model's and the model's
+per-cycle audit clean.
+
+**Defaults unchanged**: the audit runs only with `+pcert`, the admission option is off, nothing in the cell changed
+(identity 128 / 128). Tests `tests/test_s29.py` **326 / 326**; checker **mutants 8 / 8 caught** (watermark ignored,
+nodes and vars checked separately, `rgrad` ignored, `lm_lo` ≥ D_max not required, cost off by one, ball too wide,
+ballast ignored, budgets too generous).
 
 ### Cells of up to 65,536 slots: the benchmark sizes certified (step 28)
 
@@ -1644,9 +1713,10 @@ What this says:
 
 13. **Ω-L bound (step 24): sound but schedule-agnostic.** B covers every schedule, so it is 5–102× (nodes) and
     2.3–35× (vars) above the 1×1 RTL peaks at the tested sizes, growing with N for exponential programs (treesum(9):
-    18,921 nodes against 281), and the mesh rule gives every cell the whole B, so the benchmark sizes
-    (treesum(9), fib(20) B_nodes 262,690, sum(1000) 11,007) cannot be certified on 4,096-slot cells at all; only
-    small instances are. Step 25 gives B as a closed form in N (exact for 7 of 8 suite programs), but certified only
+    18,921 nodes against 281), and the step-24 mesh rule gives every cell the whole B (step 28 widened cells to
+    65,536 slots; step 29's placement certificate divides B over the cells of an `rgrad`-ball, about n_r / 2 cells'
+    worth because nodes and vars count separately, and relies on the §7.1-style progress argument, not a proof; it
+    still charges the whole-mesh all-schedule B, 2.6–678× the measured live load). Step 25 gives B as a closed form in N (exact for 7 of 8 suite programs), but certified only
     on the range it was counted on (beyond it: the C-finite argument), and sort's data-independent bound comes from a
     program-level argument, not from the tool. The causal var bound W_vars (step 25) holds for atomic links only, so
     the fabric / RTL keep B_vars. The task stack is not bounded (atoms occupy no slot). Ω-L
@@ -1655,7 +1725,8 @@ What this says:
     is made about the interaction-combinator oracle problem.
 14. **Admission control (steps 25, 26): conservative, and coarse completion in the RTL.** The per-cell rule (every
     cell can hold the sum of all reservations) ignores placement and B_vars is far above real var peaks, so small
-    cells run about one job at a time (120-job flood on the model: 2.4× the unadmitted cycles); reserving real peaks
+    cells run about one job at a time (step 29's placement budgets, an option, admit about n_r / 2 cells' worth
+    instead; the reservations are still all-schedule bounds, 2.6–678× the measured live load) (120-job flood on the model: 2.4× the unadmitted cycles); reserving real peaks
     would be fast but is unsound (step-25 mutant 13). Untyped jobs run unreserved and void the guarantee while they
     run. Jobs of one owner run one at a time. In the RTL (step 26, `+adm`, default off) completion is detected only
     at global quiescence, so an early finisher keeps its reservation until the mesh is idle; a data (non-atom)
@@ -1672,8 +1743,8 @@ What this says:
    guarantee (SPEC §7.1); step 24 gives one statically for Ω-L programs, but at a slot count sized for the worst
    schedule, and step 25 admits jobs by it (fabric model). Tighter: a bound for a *restricted* schedule (e.g. the
    sequential peak, if a low-memory mode provably stops all gives), a fabric-sound var bound (W_vars plus a bound on
-   pending LINK tasks / messages), placement-aware admission (per-cell budgets instead of the whole sum in every
-   cell), per-owner idle detection for the RTL admission controller (step 26 releases only at global quiescence) and a host
+   pending LINK tasks / messages), a bound that is tight for the depth-first fabric (step 29's placement certificate
+   uses the whole-mesh load B; a schedule-restricted load would shrink every cell it needs), per-owner idle detection for the RTL admission controller (step 26 releases only at global quiescence) and a host
    unload for data results, a sized-type derivation of B(N) that needs no counting runs; a guarantee still needs bounding the peak by the sequential one (e.g. no gives at all
    once memory is low, which step 22 found the no-room forwarding path undoes) or spilling to off-fabric memory. The treesum(6) 3×3 +3.7% needs a signal that tells "the room is far from
    full" from "the room will run out" (the same spreading helps one and livelocks the other); a relative
@@ -1736,3 +1807,4 @@ What this says:
 * step 25: symbolic B(N) for Ω-L (`omega/symbolic.py`, SPEC §7.3: count, exact Berlekamp–Massey, solve, certify on a range; exact for 7 / 8 suite programs, e.g. fib 24·F(N+1) − 14, treesum 37·2^N − 23; sort by a data decomposition ≤ 29/2·N² + 139/2·N + 24), causal var bound W_vars (`omega/causal.py`, atomic links only, B_vars / W_vars 1.1–2.4), memory-bound admission control on the fabric model (`omega/admission.py`, SPEC §7.4: Σ (W_nodes, B_vars) ≤ slots − margin per cell, FIFO, untyped unreserved; floods that stall without it finish with it); no RTL / `fabric.Fabric` change; step-25 tests 2,749/2,749, mutants 6/6; identity 128/128, units 42/42, programs 315/315, s14 90/90, fuzz 600/600 + big 200/200, security 420/420, mempress 60/60, mutants 55/55, Ω-L tests 597/597, Ω-L mutants 7/7
 * step 26: memory-bound admission control in the RTL (`rtl/omega_adm.sv`, `omega/adm_rtl.py`, SPEC §7.5: job table, 16-slot root pool in cell (0,0), FIFO, reservations, per-owner exclusion, start through a host port as a SPAWN of {REF @main, VAR root}, completion at mesh quiescence; `+adm`, default 0 = step 25 cycle for cycle); RTL and fabric-model scheduler agree on rejects, start order and interactions on 2×2 / 3×3 floods that stop without admission; step-26 tests 76/76, mutants 5/5; identity 128/128, units 42/42, programs 315/315, s14 90/90, fuzz 600/600 + big 200/200, security 420/420, mempress 60/60, mutants 55/55, Ω-L 597/597 + 7/7, step-25 2,749/2,749 + 6/6
 * step 27: quicksort in Ω-L (`programs/qsort_l.olm`, SPEC §7.6; `qsort.olm` unchanged): pair-returning partition, numeric fuel; worst case over all inputs B_nodes = 32·N² + 86·N + 17, B_vars = 59/2·N² + 141/2·N + 15 (attained by the descending input, proved by an exact data decomposition); RTL 1×1 with exactly B slots finishes; 0.78× qsort's interactions at N = 40 but +32–36% cycles on 2×2; step-27 tests 253/253
+* step 29: placement-aware memory certificate (`omega/placement.py`, SPEC §7.8): a roomy cell within `rgrad` hops of every cell while ⌊L_n / m⌋ + ⌊L_v / m⌋ ≤ n_r − 1 (m = S − `lm_hi` + 1, n_r = smallest `rgrad`-ball), exact cover check for ballast, independent brute force; fib(20) / treesum_direct(14) certified on 3×3 × 52,602 / 39,384-slot cells (4×4 `rgrad` 6: 29,251 / 21,128); RTL `+pcert` audit (simulation only), 448 certified RTL runs sound; placement-budget admission option (default off, RTL = model); test_s29 326/326, mutants 8/8; defaults cycle-identical

@@ -38,10 +38,13 @@ def budget_of(book, W, H, S):
     return margin, (S - margin, S - margin)
 
 
-def run_admitted(jobs, W, H, S, seed=1, mut=0, maxcycles=20_000_000, timeout=3000, noprog=0, keep=None):
+def run_admitted(jobs, W, H, S, seed=1, mut=0, maxcycles=20_000_000, timeout=3000, noprog=0, keep=None, placement=False):
+    """placement=True (step 29, SPEC 7.8): budgets from the placement certificate (admission.placement_budget,
+    margin 0) instead of S - margin; the controller is unchanged (only its configuration words differ)."""
     if len(jobs) > NJ: raise ValueError("job table holds 512 jobs")
     book = admission.merge_unique(jobs)
     margin, budget = budget_of(book, W, H, S)
+    if placement and W * H > 1: margin, budget = admission.placement_budget(jobs, W, H, S)
     P = S + RR
     img = AdmImage(book, W, H, P, 1024, tenants=[{"owner": 0, "main": jobs[0].main}])
     for c in img.nodes:                                   # empty image; the region [S, S + RR) is outside the free stacks

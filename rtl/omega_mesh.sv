@@ -185,4 +185,36 @@ module omega_mesh #(
       end
     all_idle &= adm_idle;
   end
+
+`ifndef SYNTHESIS
+  // step 29 (simulation only, SPEC 7.8): placement-certificate audit, on with +pcert=r (r = the ball radius, i.e.
+  // rgrad).  Every cycle after initialisation: for every cell c, best(c) = max over cells d within r hops of
+  // min(free_n(d), free_v(d)); a cycle in which some best(c) < lm_hi (no cell within r hops of c can be roomy)
+  // counts as a violation.  Also the smallest best(c) seen and the peak of the mesh-wide used slots.  Reported by
+  // the final block ("pcert_viol", "pcert_min", "pcert_used_n", "pcert_used_v"); without +pcert nothing runs.
+  int pc_r; logic pc_on; longint pc_viol, pc_min, pc_un, pc_uv;
+  initial begin
+    pc_on = $value$plusargs("pcert=%d", pc_r); pc_viol = 0; pc_min = 64'd1 << 40; pc_un = 0; pc_uv = 0;
+  end
+  always @(posedge clk) if (pc_on && !rst && all_ready) begin
+    longint bc, mf, un, uv;
+    un = 0; uv = 0;
+    for (int x = 0; x < W; x++)
+      for (int y = 0; y < H; y++) begin
+        un += longint'(SLOTS) - longint'(c_fn[x][y]); uv += longint'(SLOTS) - longint'(c_fv[x][y]);
+        bc = 0;
+        for (int u = 0; u < W; u++)
+          for (int v = 0; v < H; v++)
+            if ((u > x ? u - x : x - u) + (v > y ? v - y : y - v) <= pc_r) begin
+              mf = longint'(c_fn[u][v]) < longint'(c_fv[u][v]) ? longint'(c_fn[u][v]) : longint'(c_fv[u][v]);
+              if (mf > bc) bc = mf;
+            end
+        if (bc < pc_min) pc_min = bc;
+        if (bc < longint'(lm_hi)) pc_viol++;
+      end
+    if (un > pc_un) pc_un = un;
+    if (uv > pc_uv) pc_uv = uv;
+  end
+  final if (pc_on) $display("pcert_viol %0d\npcert_min %0d\npcert_used_n %0d\npcert_used_v %0d", pc_viol, pc_min, pc_un, pc_uv);
+`endif
 endmodule
