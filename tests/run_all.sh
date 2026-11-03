@@ -2,7 +2,7 @@
 # Full regression: unit (semantic+fabric+RTL), programs (+150 random program cases), RTL fuzz
 # (600 small + 200 big random nets), owner-capability security (+300 multi-tenant fuzz), memory pressure, Ω-L (step 24), symbolic bound + admission (step 25), mutants.  Logs in results/.
 cd "$(dirname "$0")/.." && export PYTHONPATH=.:tests
-set -o pipefail
+set -euo pipefail
 python3 tests/test_units.py --rtl            2>&1 | tee results/units_rtl.log
 python3 tests/test_programs.py --fuzz 150    2>&1 | tee results/programs.log
 python3 tests/test_s14.py                    2>&1 | tee results/s14_cross.log
