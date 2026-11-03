@@ -1404,6 +1404,23 @@ interactions (on 1×1 it is the engine's own cost per interaction):
 * Python fabric model: the VHU and the v4 costs are modelled (`Cell.vhu_chain`); it remains
   cycle-approximate.
 
+### Benchmarks, current RTL (step 30 defaults; `python3 bench/bench.py --8x8`, full table in `results/bench.md`)
+
+Regenerated 2026-11-04 on commit 047b1d8 (Verilator 5.054, default 2×2 cells per ROM, one port). Every row is
+`ok`: readback equals the expected value and the interaction count equals the reference interpreter's.
+`*` = sequential baseline on a 4,096-slot cell because the program does not fit 1,024 slots.
+The v3 and v1 tables below are kept for history; their cycle counts are not the current design's.
+
+| program | 1×1 cycles | 2×2 | 4×4 | 8×8 | speed-up 8×8 | 8×8 utilisation |
+|---|---:|---:|---:|---:|---:|---:|
+| fib(20) | 697,629 | 178,524 | 46,421 | 18,440 | 37.83× | 65% |
+| treesum_direct(14) | 521,785 | 137,511 | 35,103 | 12,382 | 42.14× | 75% |
+| treesum(9) | 49,199 | 13,215 | 4,072 | 2,029 | 24.25× | 47% |
+| qsort(40) | 42,873 | 15,440 | 10,779 | 10,608 | 4.04× | 7% |
+| list(120) | 19,024* | 10,453 | 7,816 | 8,646 | 2.20× | 4% |
+| sum(1000) | 29,018* | 29,011 | 28,942 | 28,943 | 1.00× | 2% |
+| fact(12) | 366 | 366 | 366 | 366 | 1.00× | 2% |
+
 ### Benchmarks, v3 engine (step 5; Verilator RTL, cycle accurate, 1024 node + 1024 var slots per cell)
 
 `python3 bench/bench.py --8x8 --progs fib:20,treesum_direct:14,treesum:9 --tag v3` → `results/bench_v3.{json,md}`.
